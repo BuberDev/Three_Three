@@ -1,0 +1,145 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database with pgvector
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: voice-notes-postgres
+    environment:
+      POSTGRES_DB: voice_notes_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+    networks:
+      - voice-notes-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for caching and queues
+  redis:
+    image: redis:7-alpine
+    container_name: voice-notes-redis
+    command: redis-server --appendonly yes --requirepass redis_password
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - voice-notes-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS API Application
+  api:
+    build:
+      context: .
+      target: production
+    container_name: voice-notes-api
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      
+      # Database
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_USERNAME: postgres
+      DATABASE_PASSWORD: postgres
+      DATABASE_NAME: voice_notes_db
+      DATABASE_SSL: false
+      
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: redis_password
+      REDIS_DB: 0
+      
+      # JWT (use your own secret in production)
+      JWT_SECRET: your-production-jwt-secret-here
+      JWT_EXPIRES_IN: 7d
+      
+      # OpenAI API (set in .env file)
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      
+      # Rate limiting
+      RATE_LIMIT_TTL: 60
+      RATE_LIMIT_MAX: 100
+      
+      # CORS
+      CORS_ORIGINS: http://localhost:3000,http://localhost:8081
+    volumes:
+      - api_uploads:/app/uploads
+    ports:
+      - "3001:3001"
+    networks:
+      - voice-notes-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Redis Insight for Redis monitoring (development only)
+  redis-insight:
+    image: redislabs/redisinsight:latest
+    container_name: voice-notes-redis-insight
+    ports:
+      - "8001:8001"
+    networks:
+      - voice-notes-network
+    profiles:
+      - development
+    restart: unless-stopped
+
+  # pgAdmin for PostgreSQL administration (development only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: voice-notes-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@voice-notes.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    networks:
+      - voice-notes-network
+    depends_on:
+      - postgres
+    profiles:
+      - development
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  api_uploads:
+    driver: local
+  pgadmin_data:
+    driver: local
+
+networks:
+  voice-notes-network:
+    driver: bridge
