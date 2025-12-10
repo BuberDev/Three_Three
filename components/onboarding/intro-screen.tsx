@@ -1,13 +1,13 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import {
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
-} from 'react-native';
+import { TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Colors, DesignSystem } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ModernView } from '../modern-view';
+import { ThemedText } from '../themed-text';
+import { IconSymbol } from '../ui/icon-symbol';
 
 interface IntroScreenProps {
     onContinue: () => void;
@@ -15,126 +15,201 @@ interface IntroScreenProps {
 
 export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme ?? 'light'];
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={{
+            flex: 1,
+            paddingTop: insets.top + DesignSystem.spacing.lg
+        }}>
             <LinearGradient
-                colors={['#4CAF50', '#45A049', '#388E3C']}
-                style={styles.gradient}
+                colors={DesignSystem.gradients.primary.colors}
+                locations={DesignSystem.gradients.primary.locations}
+                start={DesignSystem.gradients.primary.start}
+                end={DesignSystem.gradients.primary.end}
+                style={{ flex: 1 }}
             >
-                <View style={styles.content}>
-                    <View style={styles.iconContainer}>
-                        <Ionicons name="mic" size={80} color="white" />
+                <View style={{
+                    flex: 1,
+                    paddingHorizontal: DesignSystem.spacing.xl,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                }}>
+                    <View style={{
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        borderRadius: DesignSystem.borderRadius.full,
+                        padding: DesignSystem.spacing['3xl'],
+                        marginBottom: DesignSystem.spacing['4xl'],
+                        ...DesignSystem.elevation[2],
+                    }}>
+                        <IconSymbol
+                            name="mic"
+                            size={80}
+                            color="white"
+                        />
                     </View>
 
-                    <Text style={styles.title}>
-                        Zapisuj swój dzień w sposób naturalny – głosem.
-                    </Text>
+                    <ThemedText
+                        variant="displayMedium"
+                        lightColor="white"
+                        darkColor="white"
+                        style={{
+                            textAlign: 'center',
+                            marginBottom: DesignSystem.spacing.xl,
+                            fontWeight: '700',
+                        }}
+                    >
+                        Zapisuj swój dzień w sposób naturalny – głosem
+                    </ThemedText>
 
-                    <Text style={styles.subtitle}>
+                    <ThemedText
+                        variant="bodyLarge"
+                        lightColor="rgba(255,255,255,0.9)"
+                        darkColor="rgba(255,255,255,0.9)"
+                        style={{
+                            textAlign: 'center',
+                            marginBottom: DesignSystem.spacing['5xl'],
+                            lineHeight: 28,
+                        }}
+                    >
                         Jedna krótka notatka, a my zamienimy ją w zadania, priorytety i podsumowania.
-                    </Text>
+                    </ThemedText>
 
-                    <View style={styles.features}>
-                        <View style={styles.featureItem}>
-                            <Ionicons name="flash" size={24} color="white" />
-                            <Text style={styles.featureText}>Natychmiastowy zapis myśli</Text>
-                        </View>
+                    <View style={{
+                        width: '100%',
+                        gap: DesignSystem.spacing.xl,
+                        marginBottom: DesignSystem.spacing['5xl'],
+                    }}>
+                        <ModernView
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                padding: DesignSystem.spacing.lg,
+                                borderRadius: DesignSystem.borderRadius.xl,
+                                gap: DesignSystem.spacing.lg,
+                            }}
+                        >
+                            <View style={{
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                borderRadius: DesignSystem.borderRadius.lg,
+                                padding: DesignSystem.spacing.md,
+                            }}>
+                                <IconSymbol name="bolt.fill" size={24} color="white" />
+                            </View>
+                            <ThemedText
+                                variant="titleMedium"
+                                lightColor="white"
+                                darkColor="white"
+                                style={{ flex: 1, fontWeight: '600' }}
+                            >
+                                Natychmiastowy zapis myśli
+                            </ThemedText>
+                        </ModernView>
 
-                        <View style={styles.featureItem}>
-                            <Ionicons name="list" size={24} color="white" />
-                            <Text style={styles.featureText}>Automatyczne zadania</Text>
-                        </View>
+                        <ModernView
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                padding: DesignSystem.spacing.lg,
+                                borderRadius: DesignSystem.borderRadius.xl,
+                                gap: DesignSystem.spacing.lg,
+                            }}
+                        >
+                            <View style={{
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                borderRadius: DesignSystem.borderRadius.lg,
+                                padding: DesignSystem.spacing.md,
+                            }}>
+                                <IconSymbol name="list.bullet" size={24} color="white" />
+                            </View>
+                            <ThemedText
+                                variant="titleMedium"
+                                lightColor="white"
+                                darkColor="white"
+                                style={{ flex: 1, fontWeight: '600' }}
+                            >
+                                Automatyczne zadania
+                            </ThemedText>
+                        </ModernView>
 
-                        <View style={styles.featureItem}>
-                            <Ionicons name="analytics" size={24} color="white" />
-                            <Text style={styles.featureText}>Inteligentne podsumowania</Text>
-                        </View>
+                        <ModernView
+                            style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                                padding: DesignSystem.spacing.lg,
+                                borderRadius: DesignSystem.borderRadius.xl,
+                                gap: DesignSystem.spacing.lg,
+                            }}
+                        >
+                            <View style={{
+                                backgroundColor: 'rgba(255,255,255,0.2)',
+                                borderRadius: DesignSystem.borderRadius.lg,
+                                padding: DesignSystem.spacing.md,
+                            }}>
+                                <IconSymbol name="chart.line.uptrend.xyaxis" size={24} color="white" />
+                            </View>
+                            <ThemedText
+                                variant="titleMedium"
+                                lightColor="white"
+                                darkColor="white"
+                                style={{ flex: 1, fontWeight: '600' }}
+                            >
+                                Inteligentne analizy
+                            </ThemedText>
+                        </ModernView>
                     </View>
 
-                    <TouchableOpacity style={styles.button} onPress={onContinue}>
-                        <Text style={styles.buttonText}>Rozpocznij</Text>
-                    </TouchableOpacity>
+                    <View style={{
+                        width: '100%',
+                        paddingBottom: insets.bottom + DesignSystem.spacing.lg,
+                    }}>
+                        <View style={{
+                            backgroundColor: 'rgba(255,255,255,0.15)',
+                            borderRadius: DesignSystem.borderRadius.xl,
+                            padding: 2,
+                            marginBottom: DesignSystem.spacing.lg,
+                        }}>
+                            <TouchableOpacity
+                                onPress={onContinue}
+                                style={{
+                                    backgroundColor: 'white',
+                                    borderRadius: DesignSystem.borderRadius.lg,
+                                    paddingVertical: DesignSystem.spacing.lg,
+                                    paddingHorizontal: DesignSystem.spacing.xl,
+                                    alignItems: 'center',
+                                    ...DesignSystem.elevation[2],
+                                }}
+                            >
+                                <ThemedText
+                                    variant="titleMedium"
+                                    style={{
+                                        color: colors.primary,
+                                        fontWeight: '600',
+                                    }}
+                                >
+                                    Rozpocznij
+                                </ThemedText>
+                            </TouchableOpacity>
+                        </View>
+
+                        <ThemedText
+                            variant="bodySmall"
+                            lightColor="rgba(255,255,255,0.7)"
+                            darkColor="rgba(255,255,255,0.7)"
+                            style={{
+                                textAlign: 'center',
+                                lineHeight: 18,
+                            }}
+                        >
+                            Rozpoczęcie zajmuje mniej niż 2 minuty
+                        </ThemedText>
+                    </View>
                 </View>
             </LinearGradient>
         </View>
     );
 };
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-    },
-    gradient: {
-        flex: 1,
-    },
-    content: {
-        flex: 1,
-        paddingHorizontal: 32,
-        paddingTop: 60,
-        paddingBottom: 40,
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    iconContainer: {
-        width: 120,
-        height: 120,
-        borderRadius: 60,
-        backgroundColor: 'rgba(255, 255, 255, 0.2)',
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginTop: 40,
-    },
-    title: {
-        fontSize: 28,
-        fontWeight: 'bold',
-        color: 'white',
-        textAlign: 'center',
-        marginTop: 40,
-        lineHeight: 36,
-    },
-    subtitle: {
-        fontSize: 18,
-        color: 'rgba(255, 255, 255, 0.9)',
-        textAlign: 'center',
-        lineHeight: 26,
-        marginTop: 20,
-    },
-    features: {
-        width: '100%',
-        marginTop: 40,
-    },
-    featureItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 16,
-        paddingHorizontal: 20,
-    },
-    featureText: {
-        color: 'white',
-        fontSize: 16,
-        marginLeft: 16,
-        flex: 1,
-    },
-    button: {
-        backgroundColor: 'white',
-        paddingHorizontal: 48,
-        paddingVertical: 16,
-        borderRadius: 30,
-        marginTop: 40,
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 4,
-        },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
-    },
-    buttonText: {
-        color: '#4CAF50',
-        fontSize: 18,
-        fontWeight: 'bold',
-        textAlign: 'center',
-    },
-});

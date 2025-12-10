@@ -14,6 +14,10 @@ export class DatabaseService {
         return DatabaseService.instance;
     }
 
+    public isInitialized(): boolean {
+        return this.db !== null;
+    }
+
     public async initialize(): Promise<void> {
         try {
             this.db = await SQLite.openDatabaseAsync('threethree.db');

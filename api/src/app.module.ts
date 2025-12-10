@@ -21,13 +21,24 @@ import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 // Core Modules
+import { ActivitiesModule } from './activities/activities.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { EventsModule } from './events/events.module';
+import { JournalModule } from './journal/journal.module';
+import { SleepModule } from './sleep/sleep.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
 import { VoiceNotesModule } from './voice-notes/voice-notes.module';
 
 // Entities for TypeORM
+import { DailyActivity } from './activities/entities/daily-activity.entity';
+import { AIInsight } from './analytics/entities/ai-insight.entity';
+import { BehavioralPattern } from './analytics/entities/behavioral-pattern.entity';
+import { LifeCorrelation } from './analytics/entities/life-correlation.entity';
+import { PerformanceMetric } from './analytics/entities/performance-metric.entity';
 import { Event } from './events/entities/event.entity';
+import { JournalEntry } from './journal/entities/journal-entry.entity';
+import { SleepTracking } from './sleep/entities/sleep-tracking.entity';
 import { Task } from './tasks/entities/task.entity';
 import { UserSettings } from './users/entities/user-settings.entity';
 import { User } from './users/entities/user.entity';
@@ -52,7 +63,20 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                 username: configService.get('database.username'),
                 password: configService.get('database.password'),
                 database: configService.get('database.name'),
-                entities: [User, UserSettings, VoiceNote, Task, Event],
+                entities: [
+                    User,
+                    UserSettings,
+                    VoiceNote,
+                    Task,
+                    Event,
+                    DailyActivity,
+                    SleepTracking,
+                    JournalEntry,
+                    LifeCorrelation,
+                    AIInsight,
+                    PerformanceMetric,
+                    BehavioralPattern
+                ],
                 migrations: ['dist/migrations/*.js'],
                 synchronize: configService.get('app.nodeEnv') === 'development',
                 logging: configService.get('app.nodeEnv') === 'development' ? ['query', 'error'] : ['error'],
@@ -108,6 +132,10 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         VoiceNotesModule,
         TasksModule,
         EventsModule,
+        ActivitiesModule,
+        SleepModule,
+        JournalModule,
+        AnalyticsModule,
     ],
     providers: [
         // Global guards

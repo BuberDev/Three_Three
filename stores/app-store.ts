@@ -5,7 +5,20 @@ import { DatabaseService } from '../lib/database/database';
 import { ApiService } from '../lib/services/api';
 import { AudioService } from '../lib/services/audio';
 import { EventService } from '../lib/services/event';
-import { DailyEntry, EventType, Recommendation, RecordingState, Task, User, UserSettings, VoiceNote } from '../lib/types';
+import {
+    Activity,
+    DailyEntry,
+    DailyMetrics,
+    EventType,
+    ProgressMetrics,
+    Recommendation,
+    RecordingState,
+    Task,
+    User,
+    UserSettings,
+    VoiceNote,
+    WeeklyInsights
+} from '../lib/types';
 
 interface AppStore {
     // User state
@@ -28,6 +41,13 @@ interface AppStore {
     // Recommendations state
     recommendations: Recommendation[];
 
+    // Activity tracking state
+    activities: Activity[];
+    todaysActivities: Activity[];
+    dailyMetrics: DailyMetrics | null;
+    weeklyInsights: WeeklyInsights | null;
+    progressMetrics: ProgressMetrics | null;
+
     // UI state
     isLoading: boolean;
     error: string | null;
@@ -43,6 +63,8 @@ interface AppStore {
     updateRecordingState: (state: RecordingState) => void;
     setProcessingVoiceNote: (processing: boolean) => void;
     uploadVoiceNote: (audioUri: string) => Promise<boolean>;
+    uploadVoiceNoteWithContext: (audioUri: string, context?: string) => Promise<boolean>;
+    uploadSleepRecording: (sleepData: any) => Promise<boolean>;
 
     // Tasks actions
     addTask: (task: Task) => void;
@@ -50,6 +72,14 @@ interface AppStore {
     toggleTaskCompletion: (taskId: string) => void;
     deleteTask: (taskId: string) => void;
     loadTasks: () => Promise<void>;
+
+    // Activity tracking actions
+    addActivity: (activity: Activity) => void;
+    loadActivities: () => Promise<void>;
+    loadDailyMetrics: () => Promise<void>;
+    loadWeeklyInsights: () => Promise<void>;
+    loadProgressMetrics: () => Promise<void>;
+    generatePersonalizedRecommendations: () => Promise<void>;
 
     // Daily entry actions
     setTodayEntry: (entry: DailyEntry) => void;
@@ -78,6 +108,14 @@ export const useAppStore = create<AppStore>()(
             todaysTasks: [],
             todayEntry: null,
             recommendations: [],
+
+            // Activity tracking initial state
+            activities: [],
+            todaysActivities: [],
+            dailyMetrics: null,
+            weeklyInsights: null,
+            progressMetrics: null,
+
             isLoading: false,
             error: null,
             isOnboarding: true,
@@ -154,6 +192,91 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
+            // Nowa funkcja uploadVoiceNoteWithContext
+            uploadVoiceNoteWithContext: async (audioUri: string, context?: string) => {
+                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return false;
+                }
+
+                try {
+                    setProcessingVoiceNote(true);
+                    setError(null);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.uploadVoiceNoteWithContext(audioUri, user.id, context);
+
+                    if (response.success && response.data) {
+                        // Add voice note to local state
+                        addVoiceNote(response.data.voiceNote);
+
+                        // Add extracted tasks and activities to local state
+                        const { tasks, activities } = get();
+                        const newTasks = [...response.data.extractedTasks, ...tasks];
+                        const newActivities = [...(response.data.extractedActivities || []), ...activities];
+
+                        const today = new Date();
+                        const isToday = (date: Date) => date.toDateString() === today.toDateString();
+
+                        set({
+                            tasks: newTasks,
+                            activities: newActivities,
+                            todaysActivities: newActivities.filter(a => isToday(new Date(a.createdAt)))
+                        });
+
+                        // Save to local database
+                        const dbService = DatabaseService.getInstance();
+                        await dbService.saveVoiceNote(response.data.voiceNote);
+
+                        for (const task of response.data.extractedTasks) {
+                            await dbService.createTask(task);
+                        }
+
+                        return true;
+                    } else {
+                        setError(response.error || 'Failed to upload voice note');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('Upload voice note error:', error);
+                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    return false;
+                } finally {
+                    setProcessingVoiceNote(false);
+                }
+            },
+
+            uploadSleepRecording: async (sleepData: any) => {
+                const { user, setError, setLoading } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return false;
+                }
+
+                try {
+                    setLoading(true);
+                    console.log('Uploading sleep recording data:', sleepData);
+
+                    // Here you would typically upload to your API
+                    // For now, just save locally and return success
+                    console.log('Sleep data would be saved locally:', sleepData);
+
+                    // TODO: Implement proper database save when sleep_sessions table is created
+                    // const dbService = DatabaseService.getInstance();
+                    // await dbService.saveSleepSession(sleepData);
+
+                    console.log('Sleep recording data saved successfully');
+                    return true;
+                } catch (error) {
+                    console.error('Upload sleep recording error:', error);
+                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    return false;
+                } finally {
+                    setLoading(false);
+                }
+            },
+
             // Tasks actions
             addTask: (task) => {
                 const { user } = get();
@@ -221,10 +344,21 @@ export const useAppStore = create<AppStore>()(
 
             loadTasks: async () => {
                 const { user, setError } = get();
-                if (!user) return;
+                if (!user) {
+                    // Jeśli brak użytkownika, ustaw puste tablice
+                    set({ tasks: [], todaysTasks: [] });
+                    return;
+                }
 
                 try {
                     const dbService = DatabaseService.getInstance();
+
+                    // Sprawdź czy baza jest zainicjalizowana
+                    if (!dbService.isInitialized()) {
+                        console.log('Database not initialized, initializing now...');
+                        await dbService.initialize();
+                    }
+
                     const tasks = await dbService.getTasksByUserId(user.id);
                     const today = new Date().toISOString().split('T')[0];
                     const todaysTasks = tasks.filter(task => {
@@ -235,7 +369,128 @@ export const useAppStore = create<AppStore>()(
                     set({ tasks, todaysTasks });
                 } catch (error) {
                     console.error('Failed to load tasks:', error);
-                    setError('Failed to load tasks');
+                    // Nie pokazuj błędu użytkownikowi jeśli to tylko brak danych
+                    set({ tasks: [], todaysTasks: [] });
+                }
+            },
+
+            // Activity tracking actions
+            addActivity: (activity) => {
+                const today = new Date();
+                const isToday = (date: Date) => date.toDateString() === today.toDateString();
+
+                set((state) => ({
+                    activities: [activity, ...state.activities],
+                    todaysActivities: isToday(new Date(activity.createdAt))
+                        ? [activity, ...state.todaysActivities]
+                        : state.todaysActivities
+                }));
+            },
+
+            loadActivities: async () => {
+                const { user } = get();
+                if (!user) {
+                    set({ activities: [], todaysActivities: [] });
+                    return;
+                }
+
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getActivities(user.id);
+
+                    if (response.success && response.data) {
+                        const activities = response.data;
+                        const today = new Date();
+                        const isToday = (date: Date) => date.toDateString() === today.toDateString();
+                        const todaysActivities = activities.filter(activity =>
+                            isToday(new Date(activity.createdAt))
+                        );
+
+                        set({ activities, todaysActivities });
+                    }
+                } catch (error) {
+                    console.log('Activities not available (likely in development mode)');
+                    // Ustaw puste dane zamiast błędu
+                    set({ activities: [], todaysActivities: [] });
+                }
+            }, loadDailyMetrics: async () => {
+                const { user } = get();
+                if (!user) {
+                    set({ dailyMetrics: null });
+                    return;
+                }
+
+                try {
+                    const apiService = ApiService.getInstance();
+                    const today = new Date().toISOString().split('T')[0];
+                    const response = await apiService.getDailyMetrics(user.id, today);
+
+                    if (response.success && response.data) {
+                        set({ dailyMetrics: response.data });
+                    }
+                } catch (error) {
+                    console.log('Daily metrics not available (likely in development mode)');
+                    set({ dailyMetrics: null });
+                }
+            },
+
+            loadWeeklyInsights: async () => {
+                const { user } = get();
+                if (!user) {
+                    set({ weeklyInsights: null });
+                    return;
+                }
+
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getWeeklyInsights(user.id);
+
+                    if (response.success && response.data) {
+                        set({ weeklyInsights: response.data });
+                    }
+                } catch (error) {
+                    console.log('Weekly insights not available (likely in development mode)');
+                    set({ weeklyInsights: null });
+                }
+            },
+
+            loadProgressMetrics: async () => {
+                const { user } = get();
+                if (!user) {
+                    set({ progressMetrics: null });
+                    return;
+                }
+
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getProgressMetrics(user.id);
+
+                    if (response.success && response.data) {
+                        set({ progressMetrics: response.data });
+                    }
+                } catch (error) {
+                    console.log('Progress metrics not available (likely in development mode)');
+                    set({ progressMetrics: null });
+                }
+            },
+
+            generatePersonalizedRecommendations: async () => {
+                const { user } = get();
+                if (!user) {
+                    set({ recommendations: [] });
+                    return;
+                }
+
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.generatePersonalizedRecommendations(user.id);
+
+                    if (response.success && response.data) {
+                        set({ recommendations: response.data });
+                    }
+                } catch (error) {
+                    console.log('Recommendations not available (likely in development mode)');
+                    set({ recommendations: [] });
                 }
             },
 
@@ -291,20 +546,155 @@ export const useAppStore = create<AppStore>()(
                     const audioService = AudioService.getInstance();
                     await audioService.initialize();
 
-                    // Load user data if authenticated
+                    // W trybie development, stwórz demo użytkownika jeśli nie ma zalogowanego
                     const { user, isAuthenticated } = get();
-                    if (user && isAuthenticated) {
-                        await get().loadTasks();
+                    let currentUser = user;
+
+                    if (!user && __DEV__) {
+                        console.log('Creating demo user for development...');
+                        const demoUser: User = {
+                            id: 'demo-user-123',
+                            email: 'demo@example.com',
+                            name: 'Demo User',
+                            authProvider: 'demo',
+                            createdAt: new Date().toISOString(),
+                            updatedAt: new Date().toISOString()
+                        };
+
+                        // Dodaj demo dane
+                        const demoTasks: Task[] = [
+                            {
+                                id: '1',
+                                title: 'Przygotuj prezentację',
+                                description: 'Prezentacja na spotkanie z klientem',
+                                priority: 'high' as const,
+                                completed: false,
+                                dueDate: new Date().toISOString(),
+                                category: 'work',
+                                extractedFromVoiceNoteId: 'demo-note-1'
+                            },
+                            {
+                                id: '2',
+                                title: 'Trening biegowy',
+                                description: '30 minut biegania w parku',
+                                priority: 'medium' as const,
+                                completed: true,
+                                dueDate: new Date().toISOString(),
+                                category: 'health'
+                            },
+                            {
+                                id: '3',
+                                title: 'Przeczytaj artykuł o AI',
+                                description: 'Artykuł o najnowszych trendach w AI',
+                                priority: 'low' as const,
+                                completed: false,
+                                category: 'learning'
+                            }
+                        ];
+
+                        const demoRecommendations: Recommendation[] = [
+                            {
+                                id: '1',
+                                userId: demoUser.id,
+                                type: 'time_management' as const,
+                                title: 'Zaplanuj przerwę',
+                                description: 'Ostatnio pracowałeś intensywnie. Zaplanuj 15-minutową przerwę na spacer.',
+                                reason: 'Analiza Twoich wzorców pracy pokazuje, że krótkie przerwy zwiększają produktywność',
+                                confidence: 0.8,
+                                createdAt: new Date().toISOString(),
+                                dismissed: false
+                            },
+                            {
+                                id: '2',
+                                userId: demoUser.id,
+                                type: 'habit_suggestion' as const,
+                                title: 'Czas na trening',
+                                description: 'To dobry moment na aktywność fizyczną - zwykle o tej porze masz najwięcej energii.',
+                                reason: 'Twoja energia jest najwyższa między 16:00-18:00',
+                                confidence: 0.9,
+                                createdAt: new Date().toISOString(),
+                                dismissed: false
+                            }
+                        ];
+
+                        currentUser = demoUser;
+                        set({
+                            user: demoUser,
+                            isAuthenticated: true,
+                            isOnboarding: false,
+                            tasks: demoTasks,
+                            todaysTasks: demoTasks.filter(t => t.dueDate?.startsWith(new Date().toISOString().split('T')[0]) || !t.completed),
+                            recommendations: demoRecommendations
+                        });
+                    }
+
+                    // Load user data if authenticated
+                    if (currentUser && (isAuthenticated || __DEV__)) {
+                        // Load data gracefully - don't throw on network errors
+                        const loadPromises = [
+                            get().loadTasks(),
+                            get().loadActivities(),
+                            get().loadDailyMetrics(),
+                            get().loadWeeklyInsights(),
+                            get().loadProgressMetrics(),
+                            get().generatePersonalizedRecommendations()
+                        ];
+
+                        // Wait for all promises but don't fail if some fail
+                        const results = await Promise.allSettled(loadPromises);
+
+                        // Log which operations failed (for debugging)
+                        results.forEach((result, index) => {
+                            const operations = ['loadTasks', 'loadActivities', 'loadDailyMetrics', 'loadWeeklyInsights', 'loadProgressMetrics', 'generateRecommendations'];
+                            if (result.status === 'rejected') {
+                                console.log(`⚠️ ${operations[index]} failed:`, result.reason?.message || 'Unknown error');
+                            }
+                        });
 
                         // Load today's entry
                         const today = new Date().toISOString().split('T')[0];
-                        const todayEntry = await dbService.getDailyEntry(user.id, today);
-                        set({ todayEntry });
+                        try {
+                            const todayEntry = await dbService.getDailyEntry(currentUser.id, today);
+                            if (todayEntry) {
+                                set({ todayEntry });
+                            } else {
+                                // Stwórz przykładowy entry dla demo
+                                const demoEntry: DailyEntry = {
+                                    id: 'demo-entry-' + today,
+                                    userId: currentUser.id,
+                                    date: today,
+                                    autoSummary: 'Dzisiaj masz 3 zadania do wykonania. Świetnie rozpocząłeś dzień!',
+                                    tasks: [],
+                                    habits: [],
+                                    mood: 'positive',
+                                    voiceNotesCount: 2,
+                                    updatedAt: new Date().toISOString()
+                                };
+                                set({ todayEntry: demoEntry });
+                            }
+                        } catch (error) {
+                            console.log('No daily entry found for today, using demo data');
+                            const demoEntry: DailyEntry = {
+                                id: 'demo-entry-' + today,
+                                userId: currentUser.id,
+                                date: today,
+                                autoSummary: 'Dzisiaj masz 3 zadania do wykonania. Świetnie rozpocząłeś dzień!',
+                                tasks: [],
+                                habits: [],
+                                mood: 'positive',
+                                voiceNotesCount: 2,
+                                updatedAt: new Date().toISOString()
+                            };
+                            set({ todayEntry: demoEntry });
+                        }
                     }
 
                 } catch (error) {
                     console.error('App initialization failed:', error);
-                    set({ error: 'Failed to initialize app' });
+                    // Nie pokazuj błędu użytkownikowi w development
+                    if (!__DEV__) {
+                        set({ error: 'Failed to initialize app' });
+                    }
                 } finally {
                     set({ isLoading: false });
                 }

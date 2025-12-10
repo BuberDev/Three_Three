@@ -84,11 +84,14 @@ export class VoiceProcessingError extends AppError {
 
 export class ErrorHandler {
     private static instance: ErrorHandler;
-    private readonly errorListeners: ((error: AppError) => void)[] = [];
+    private errorListeners: Array<(error: AppError) => void> = [];
+    private recentErrors: Map<string, number> = new Map();
+    private readonly ERROR_DEBOUNCE_TIME = 5000; // 5 seconds
+    private readonly MAX_SAME_ERRORS = 3;
 
     private constructor() { }
 
-    public static getInstance(): ErrorHandler {
+    static getInstance(): ErrorHandler {
         if (!ErrorHandler.instance) {
             ErrorHandler.instance = new ErrorHandler();
         }
@@ -111,7 +114,7 @@ export class ErrorHandler {
         // Notify listeners
         for (const listener of this.errorListeners) {
             try {
-                listener(error);
+                listener(appError);
             } catch (listenerError) {
                 console.error('Error in error listener:', listenerError);
             }

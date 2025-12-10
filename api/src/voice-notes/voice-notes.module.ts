@@ -24,6 +24,6 @@ import { VoiceProcessingService } from './voice-processing.service';
         VoiceProcessingService,
         VoiceProcessingProcessor,
     ],
-    exports: [VoiceNotesService],
+    exports: [VoiceNotesService, VoiceProcessingService],
 })
 export class VoiceNotesModule { }

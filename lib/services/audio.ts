@@ -1,16 +1,28 @@
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import {
+    AudioModule,
+    AudioPlayer,
+    AudioRecorder,
+    createAudioPlayer,
+    RecordingPresets,
+    setAudioModeAsync
+} from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import { AudioRecording, RecordingState } from '../types';
 
 export class AudioService {
     private static instance: AudioService;
-    private recording: Audio.Recording | null = null;
-    private playbackObject: Audio.Sound | null = null;
+    private recorder: AudioRecorder | null = null;
+    private player: AudioPlayer | null = null;
     private recordingState: RecordingState = {
         isRecording: false,
         duration: 0,
+        uri: null,
+        isPaused: false
     };
+    private isInitialized: boolean = false;
+    private durationInterval: ReturnType<typeof setInterval> | null = null;
     private listeners: ((state: RecordingState) => void)[] = [];
+    private startTime: number = 0;
 
     private constructor() { }
 
@@ -23,11 +35,20 @@ export class AudioService {
 
     public async initialize(): Promise<void> {
         try {
-            await Audio.setAudioModeAsync({
-                allowsRecordingIOS: true,
-                playsInSilentModeIOS: true,
-                staysActiveInBackground: false,
+            // Request audio permissions using AudioModule
+            const { status } = await AudioModule.requestRecordingPermissionsAsync();
+            if (status !== 'granted') {
+                throw new Error('Audio permissions not granted');
+            }
+
+            // Set audio mode for recording
+            await setAudioModeAsync({
+                playsInSilentMode: true,
+                allowsRecording: true,
             });
+
+            this.isInitialized = true;
+            console.log('Audio service initialized successfully');
         } catch (error) {
             console.error('Audio service initialization failed:', error);
             throw error;
@@ -36,7 +57,7 @@ export class AudioService {
 
     public async requestPermissions(): Promise<boolean> {
         try {
-            const { status } = await Audio.requestPermissionsAsync();
+            const { status } = await AudioModule.requestRecordingPermissionsAsync();
             return status === 'granted';
         } catch (error) {
             console.error('Permission request failed:', error);
@@ -44,66 +65,39 @@ export class AudioService {
         }
     }
 
+    public getRecordingState(): RecordingState {
+        return { ...this.recordingState };
+    }
+
     public async startRecording(): Promise<void> {
         try {
-            // Stop any existing playback
-            if (this.playbackObject) {
-                await this.playbackObject.unloadAsync();
-                this.playbackObject = null;
+            if (!this.isInitialized) {
+                await this.initialize();
             }
 
-            // Check permissions
-            const hasPermission = await this.requestPermissions();
-            if (!hasPermission) {
-                throw new Error('Audio recording permission not granted');
+            if (this.recordingState.isRecording) {
+                throw new Error('Recording is already in progress');
             }
 
-            // Configure recording options
-            const recordingOptions: Audio.RecordingOptions = {
-                android: {
-                    extension: '.m4a',
-                    outputFormat: Audio.RecordingOptionsPresets.HIGH_QUALITY.android.outputFormat,
-                    audioEncoder: Audio.RecordingOptionsPresets.HIGH_QUALITY.android.audioEncoder,
-                    sampleRate: 44100,
-                    numberOfChannels: 2,
-                    bitRate: 128000,
-                },
-                ios: {
-                    extension: '.m4a',
-                    audioQuality: Audio.RecordingOptionsPresets.HIGH_QUALITY.ios.audioQuality,
-                    sampleRate: 44100,
-                    numberOfChannels: 2,
-                    bitRate: 128000,
-                    linearPCMBitDepth: 16,
-                    linearPCMIsBigEndian: false,
-                    linearPCMIsFloat: false,
-                },
-                web: {
-                    mimeType: 'audio/webm',
-                    bitsPerSecond: 128000,
-                },
-            };
+            // Create new recorder with high quality settings
+            this.recorder = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
 
-            // Create and start recording
-            this.recording = new Audio.Recording();
-            await this.recording.prepareToRecordAsync(recordingOptions);
+            // Prepare to record
+            await this.recorder.prepareToRecordAsync();
 
-            // Set up status update listener
-            this.recording.setOnRecordingStatusUpdate((status) => {
-                if (status.isRecording) {
-                    this.updateRecordingState({
-                        isRecording: true,
-                        duration: status.durationMillis || 0,
-                    });
-                }
-            });
+            // Start recording
+            this.recorder.record();
 
-            await this.recording.startAsync();
-
-            this.updateRecordingState({
+            this.startTime = Date.now();
+            this.recordingState = {
                 isRecording: true,
                 duration: 0,
-            });
+                uri: null,
+                isPaused: false
+            };
+
+            this.startDurationTracking();
+            this.notifyListeners();
 
             console.log('Recording started');
         } catch (error) {
@@ -112,71 +106,92 @@ export class AudioService {
         }
     }
 
-    public async stopRecording(): Promise<AudioRecording | null> {
+    public async stopRecording(): Promise<string | null> {
         try {
-            if (!this.recording) {
-                console.warn('No recording in progress');
-                return null;
+            if (!this.recorder || !this.recordingState.isRecording) {
+                throw new Error('No recording in progress');
             }
 
-            await this.recording.stopAndUnloadAsync();
-            const uri = this.recording.getURI();
+            // Stop the recorder
+            await this.recorder.stop();
 
-            if (!uri) {
-                throw new Error('Recording URI not available');
-            }
+            // Get the URI of the recorded file
+            const uri = this.recorder.uri;
 
-            // Get file info
-            const fileInfo = await FileSystem.getInfoAsync(uri);
-
-            const audioRecording: AudioRecording = {
-                uri,
+            this.recordingState = {
+                isRecording: false,
                 duration: this.recordingState.duration,
-                size: fileInfo.exists && !fileInfo.isDirectory && 'size' in fileInfo ? fileInfo.size : 0,
+                uri: uri,
+                isPaused: false
             };
 
-            // Reset state
-            this.recording = null;
-            this.updateRecordingState({
-                isRecording: false,
-                duration: 0,
-                uri,
-            });
+            this.stopDurationTracking();
+            this.notifyListeners();
 
-            console.log('Recording stopped:', audioRecording);
-            return audioRecording;
+            console.log('Recording stopped, file saved at:', uri);
+            return uri;
         } catch (error) {
             console.error('Failed to stop recording:', error);
-            this.recording = null;
-            this.updateRecordingState({
-                isRecording: false,
-                duration: 0,
-            });
+            throw error;
+        }
+    }
+
+    public async pauseRecording(): Promise<void> {
+        try {
+            if (!this.recorder || !this.recordingState.isRecording) {
+                throw new Error('No recording in progress');
+            }
+
+            this.recorder.pause();
+
+            this.recordingState = {
+                ...this.recordingState,
+                isPaused: true
+            };
+
+            this.stopDurationTracking();
+            this.notifyListeners();
+
+            console.log('Recording paused');
+        } catch (error) {
+            console.error('Failed to pause recording:', error);
+            throw error;
+        }
+    }
+
+    public async resumeRecording(): Promise<void> {
+        try {
+            if (!this.recorder || !this.recordingState.isRecording || !this.recordingState.isPaused) {
+                throw new Error('No paused recording to resume');
+            }
+
+            this.recorder.record();
+
+            this.recordingState = {
+                ...this.recordingState,
+                isPaused: false
+            };
+
+            this.startDurationTracking();
+            this.notifyListeners();
+
+            console.log('Recording resumed');
+        } catch (error) {
+            console.error('Failed to resume recording:', error);
             throw error;
         }
     }
 
     public async playRecording(uri: string): Promise<void> {
         try {
-            // Stop any existing playback
-            if (this.playbackObject) {
-                await this.playbackObject.unloadAsync();
+            if (this.player) {
+                this.player.remove();
             }
 
-            // Load and play the recording
-            const { sound } = await Audio.Sound.createAsync({ uri });
-            this.playbackObject = sound;
+            this.player = createAudioPlayer(uri);
+            this.player.play();
 
-            await sound.playAsync();
-
-            // Set up completion listener
-            sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-                if (status.isLoaded && status.didJustFinish) {
-                    this.stopPlayback();
-                }
-            });
-
-            console.log('Playback started');
+            console.log('Playing recording from:', uri);
         } catch (error) {
             console.error('Failed to play recording:', error);
             throw error;
@@ -185,19 +200,123 @@ export class AudioService {
 
     public async stopPlayback(): Promise<void> {
         try {
-            if (this.playbackObject) {
-                await this.playbackObject.unloadAsync();
-                this.playbackObject = null;
+            if (this.player) {
+                this.player.pause();
                 console.log('Playback stopped');
             }
         } catch (error) {
             console.error('Failed to stop playback:', error);
+            throw error;
+        }
+    }
+
+    public addListener(callback: (state: RecordingState) => void): void {
+        this.listeners.push(callback);
+    }
+
+    public removeListener(callback: (state: RecordingState) => void): void {
+        this.listeners = this.listeners.filter(listener => listener !== callback);
+    }
+
+    private startDurationTracking(): void {
+        this.stopDurationTracking();
+        this.durationInterval = setInterval(() => {
+            if (this.recordingState.isRecording && !this.recordingState.isPaused) {
+                this.recordingState = {
+                    ...this.recordingState,
+                    duration: (Date.now() - this.startTime) / 1000
+                };
+                this.notifyListeners();
+            }
+        }, 100);
+    }
+
+    private stopDurationTracking(): void {
+        if (this.durationInterval) {
+            clearInterval(this.durationInterval);
+            this.durationInterval = null;
+        }
+    }
+
+    private notifyListeners(): void {
+        this.listeners.forEach(listener => {
+            try {
+                listener({ ...this.recordingState });
+            } catch (error) {
+                console.error('Error in audio service listener:', error);
+            }
+        });
+    }
+
+    public async saveRecording(recording: AudioRecording): Promise<void> {
+        try {
+            if (!recording.uri) {
+                throw new Error('No recording URI provided');
+            }
+
+            // Create recordings directory if it doesn't exist
+            const recordingsDir = `${FileSystem.documentDirectory}recordings/`;
+            const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
+
+            if (!dirInfo.exists) {
+                await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
+            }
+
+            // Generate filename with timestamp
+            const timestamp = new Date().getTime();
+            const filename = `recording_${timestamp}.m4a`;
+            const destinationUri = `${recordingsDir}${filename}`;
+
+            // Copy the recording to the permanent location
+            await FileSystem.copyAsync({
+                from: recording.uri,
+                to: destinationUri
+            });
+
+            console.log('Recording saved to:', destinationUri);
+        } catch (error) {
+            console.error('Failed to save recording:', error);
+            throw error;
+        }
+    }
+
+    public async getRecordings(): Promise<AudioRecording[]> {
+        try {
+            const recordingsDir = `${FileSystem.documentDirectory}recordings/`;
+            const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
+
+            if (!dirInfo.exists) {
+                return [];
+            }
+
+            const recordings = await FileSystem.readDirectoryAsync(recordingsDir);
+            const recordingFiles: AudioRecording[] = [];
+
+            for (const filename of recordings) {
+                const uri = `${recordingsDir}${filename}`;
+                const fileInfo = await FileSystem.getInfoAsync(uri);
+
+                if (fileInfo.exists && !fileInfo.isDirectory) {
+                    recordingFiles.push({
+                        uri,
+                        name: filename.replace(/\.[^/.]+$/, ''), // Remove extension
+                        duration: 0, // Duration would need to be calculated
+                        createdAt: new Date(fileInfo.modificationTime || Date.now())
+                    });
+                }
+            }
+
+            // Sort by creation date, newest first
+            return recordingFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        } catch (error) {
+            console.error('Failed to get recordings:', error);
+            return [];
         }
     }
 
     public async deleteRecording(uri: string): Promise<void> {
         try {
-            await FileSystem.deleteAsync(uri, { idempotent: true });
+            await FileSystem.deleteAsync(uri);
             console.log('Recording deleted:', uri);
         } catch (error) {
             console.error('Failed to delete recording:', error);
@@ -205,44 +324,124 @@ export class AudioService {
         }
     }
 
-    public getRecordingState(): RecordingState {
-        return { ...this.recordingState };
-    }
+    public cleanup(): void {
+        this.stopDurationTracking();
 
-    public addListener(listener: (state: RecordingState) => void): void {
-        this.listeners.push(listener);
-    }
-
-    public removeListener(listener: (state: RecordingState) => void): void {
-        const index = this.listeners.indexOf(listener);
-        if (index > -1) {
-            this.listeners.splice(index, 1);
+        if (this.player) {
+            this.player.remove();
+            this.player = null;
         }
+
+        this.listeners = [];
+        this.recordingState = {
+            isRecording: false,
+            duration: 0,
+            uri: null,
+            isPaused: false
+        };
+
+        console.log('Audio service cleaned up');
     }
 
-    private updateRecordingState(newState: Partial<RecordingState>): void {
-        this.recordingState = { ...this.recordingState, ...newState };
-        for (const listener of this.listeners) {
-            listener(this.recordingState);
-        }
-    }
-
-    public async cleanup(): Promise<void> {
+    // Sleep recording methods
+    public async startNocturnalRecording(config?: {
+        startTime?: Date;
+        endTime?: Date;
+        sensitivity?: 'low' | 'medium' | 'high';
+    }): Promise<string | null> {
         try {
-            if (this.recording) {
-                await this.recording.stopAndUnloadAsync();
-                this.recording = null;
+            console.log('Starting nocturnal sleep recording with config:', config);
+
+            // Use existing startRecording method with enhanced settings for sleep
+            await this.startRecording();
+
+            // Store config for later use
+            if (config) {
+                this.sleepRecordingConfig = config;
             }
 
-            if (this.playbackObject) {
-                await this.playbackObject.unloadAsync();
-                this.playbackObject = null;
-            }
-
-            this.listeners = [];
-            this.recordingState = { isRecording: false, duration: 0 };
+            // Return placeholder URI since startRecording doesn't return URI
+            return `sleep_recording_${Date.now()}.m4a`;
         } catch (error) {
-            console.error('Audio service cleanup failed:', error);
+            console.error('Failed to start nocturnal recording:', error);
+            throw error;
         }
     }
+
+    public async stopNocturnalRecording(): Promise<{
+        uri: string;
+        duration: number;
+        analysis?: any;
+    } | null> {
+        try {
+            console.log('Stopping nocturnal sleep recording');
+
+            const uri = await this.stopRecording();
+            if (!uri) return null;
+
+            const duration = this.recordingState.duration;
+
+            // Basic sleep analysis placeholder
+            const analysis = {
+                snoringEvents: [],
+                sleepTalkingEvents: [],
+                totalSleepDuration: duration,
+                sleepQuality: Math.floor(Math.random() * 10) + 1, // Placeholder
+                recordedAt: new Date().toISOString()
+            };
+
+            return {
+                uri,
+                duration,
+                analysis
+            };
+        } catch (error) {
+            console.error('Failed to stop nocturnal recording:', error);
+            throw error;
+        }
+    }
+
+    public async getCurrentSleepAnalysis(): Promise<{
+        snoringEvents: Array<{
+            timestamp: Date;
+            duration: number;
+            intensity: 'light' | 'moderate' | 'heavy';
+        }>;
+        sleepTalkingEvents: Array<{
+            timestamp: Date;
+            transcript: string;
+            confidence: number;
+        }>;
+        totalSleepDuration: number;
+        sleepQuality: number;
+    } | null> {
+        try {
+            console.log('Getting current sleep analysis');
+
+            // Return current session analysis or null if not recording
+            if (!this.recordingState.isRecording) {
+                return null;
+            }
+
+            // Placeholder analysis - in real implementation this would analyze the audio
+            return {
+                snoringEvents: [],
+                sleepTalkingEvents: [],
+                totalSleepDuration: this.recordingState.duration,
+                sleepQuality: 7 // Placeholder
+            };
+        } catch (error) {
+            console.error('Failed to get sleep analysis:', error);
+            return null;
+        }
+    }
+
+    // Private properties for sleep recording
+    private sleepRecordingConfig?: {
+        startTime?: Date;
+        endTime?: Date;
+        sensitivity?: 'low' | 'medium' | 'high';
+    };
 }
+
+export default AudioService;

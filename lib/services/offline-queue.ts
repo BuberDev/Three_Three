@@ -245,4 +245,102 @@ export class OfflineQueueService {
         }
         return { ...serverData, ...localData };
     }
+
+    // Sleep recording specific methods
+    public async enqueueSleepRecording(
+        audioUri: string,
+        sleepAnalysis: any,
+        userId: string,
+        bedtime: Date,
+        wakeTime: Date
+    ): Promise<string> {
+        return this.enqueue(
+            'sleep-tracking',
+            'POST',
+            {
+                audioUri,
+                bedtime: bedtime.toISOString(),
+                wakeTime: wakeTime.toISOString(),
+                totalSleep: Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60)), // minutes
+                sleepEfficiency: sleepAnalysis.sleepEfficiency || 80,
+                sleepQuality: sleepAnalysis.sleepQuality || 7,
+                snoringIntensity: sleepAnalysis.snoringEvents?.length > 0 ? 'MODERATE' : 'NONE',
+                sleepTalkingDetected: sleepAnalysis.sleepTalkingEvents?.length > 0,
+                sleepTalkingFrequency: sleepAnalysis.sleepTalkingEvents?.length || 0,
+                restfulnessScore: sleepAnalysis.restfulnessScore || 7,
+                audioFileUrl: audioUri,
+                insights: [
+                    `Sleep session from ${bedtime.toLocaleString()} to ${wakeTime.toLocaleString()}`,
+                    `Detected ${sleepAnalysis.snoringEvents?.length || 0} snoring events`,
+                    `Sleep talking episodes: ${sleepAnalysis.sleepTalkingEvents?.length || 0}`
+                ]
+            },
+            9, // High priority for sleep data
+            userId
+        );
+    }
+
+    public async enqueueVoiceNoteWithContext(
+        audioUri: string,
+        userId: string,
+        context?: string,
+        isJournalEntry: boolean = false
+    ): Promise<string> {
+        const endpoint = isJournalEntry ? 'journal' : 'voice-notes';
+
+        return this.enqueue(
+            endpoint,
+            'POST',
+            {
+                audioUri,
+                context,
+                metadata: {
+                    recordedAt: new Date().toISOString(),
+                    isJournalEntry,
+                    deviceInfo: 'mobile_app'
+                }
+            },
+            isJournalEntry ? 7 : 5, // Journal entries get slightly higher priority
+            userId
+        );
+    }
+
+    public async enqueueDailyActivity(
+        activityData: any,
+        userId: string
+    ): Promise<string> {
+        return this.enqueue(
+            'activities',
+            'POST',
+            activityData,
+            6, // Medium-high priority for activity tracking
+            userId
+        );
+    }
+
+    // Batch upload for multiple sleep events
+    public async enqueueBatchSleepEvents(
+        sleepEvents: Array<{
+            audioUri: string;
+            analysis: any;
+            bedtime: Date;
+            wakeTime: Date;
+        }>,
+        userId: string
+    ): Promise<string[]> {
+        const queueIds = [];
+
+        for (const event of sleepEvents) {
+            const queueId = await this.enqueueSleepRecording(
+                event.audioUri,
+                event.analysis,
+                userId,
+                event.bedtime,
+                event.wakeTime
+            );
+            queueIds.push(queueId);
+        }
+
+        return queueIds;
+    }
 }

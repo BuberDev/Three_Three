@@ -62,6 +62,16 @@ export class UsersService {
         });
     }
 
+    async findByEmailAndProvider(email: string, authProvider: string): Promise<User | null> {
+        return this.userRepository.findOne({
+            where: {
+                email,
+                authProvider: authProvider as any
+            },
+            relations: ['settings'],
+        });
+    }
+
     async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
         const user = await this.findById(id);
 

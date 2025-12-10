@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
+import GoogleAuthService from '../../lib/services/google-auth';
 
 interface AuthScreenProps {
     onContinue: (authData: { email: string; authProvider: string }) => void;
@@ -40,18 +41,34 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
     const handleGoogleAuth = async () => {
         setIsLoading(true);
         try {
-            // In real implementation, use expo-auth-session with Google
-            // For demo, simulate Google sign-in
-            setTimeout(() => {
-                onContinue({
-                    email: 'user@gmail.com',
-                    authProvider: 'google'
-                });
-                setIsLoading(false);
-            }, 1000);
-        } catch {
+            const googleAuthService = GoogleAuthService.getInstance();
+
+            // Validate configuration
+            if (!googleAuthService.validateConfiguration()) {
+                throw new Error('Google OAuth not properly configured. Please check app.json and Google Cloud Console setup.');
+            }
+
+            const result = await googleAuthService.signIn();
+
+            // Successfully authenticated with Google
+            onContinue({
+                email: result.user.email,
+                authProvider: 'google',
+                googleAuth: {
+                    accessToken: result.accessToken,
+                    refreshToken: result.refreshToken,
+                    idToken: result.idToken,
+                    user: result.user
+                }
+            });
+        } catch (error) {
+            console.error('Google authentication failed:', error);
+            Alert.alert(
+                'Błąd uwierzytelniania',
+                error instanceof Error ? error.message : 'Nie udało się zalogować przez Google. Sprawdź połączenie internetowe i spróbuj ponownie.'
+            );
+        } finally {
             setIsLoading(false);
-            Alert.alert('Błąd', 'Nie udało się zalogować przez Google');
         }
     };
 

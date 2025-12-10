@@ -142,4 +142,11 @@ export class AuthService {
 
         return user;
     }
+
+    /**
+     * Generate tokens for OAuth user (used by Google/Apple auth)
+     */
+    async generateTokensForUser(user: User): Promise<AuthResponse> {
+        return this.generateTokens(user);
+    }
 }

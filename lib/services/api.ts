@@ -1,10 +1,22 @@
-import { ApiResponse, DailyEntry, Task, User, UserSettings, VoiceNote, VoiceNoteResponse } from '../types';
+import {
+    ApiResponse,
+    DailyEntry,
+    Task,
+    User,
+    UserSettings,
+    VoiceNote,
+    VoiceNoteResponse
+} from '../types';
 import { AppError, AuthError, ErrorHandler, NetworkError, ServerError, ValidationError } from '../utils/errors';
 
 export class ApiService {
     private static instance: ApiService;
     private readonly baseURL: string = __DEV__ ? 'http://localhost:3000/api' : 'https://your-api.com/api';
     private authToken: string | null = null;
+    private backendAvailable: boolean | null = null;
+    private lastBackendCheck: number = 0;
+    private readonly BACKEND_CHECK_INTERVAL = 30000; // 30 seconds
+    private hasLoggedBackendUnavailable = false;
 
     private constructor() { }
 
@@ -17,6 +29,45 @@ export class ApiService {
 
     public setAuthToken(token: string): void {
         this.authToken = token;
+    }
+
+    private async checkBackendAvailability(): Promise<boolean> {
+        const now = Date.now();
+        if (this.backendAvailable !== null && now - this.lastBackendCheck < this.BACKEND_CHECK_INTERVAL) {
+            return this.backendAvailable;
+        }
+
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+            const response = await fetch(`${this.baseURL}/health`, {
+                method: 'GET',
+                signal: controller.signal,
+            });
+
+            clearTimeout(timeoutId);
+            const wasAvailable = this.backendAvailable;
+            this.backendAvailable = response.ok;
+
+            // Log when backend becomes available again
+            if (this.backendAvailable && wasAvailable === false) {
+                console.log('✅ Backend API is now available');
+                this.hasLoggedBackendUnavailable = false;
+            }
+        } catch {
+            const wasAvailable = this.backendAvailable;
+            this.backendAvailable = false;
+
+            // Only log once when backend becomes unavailable
+            if (__DEV__ && !this.hasLoggedBackendUnavailable && wasAvailable !== false) {
+                console.warn('⚠️ Backend API is not available (this is normal during development if server is not running)');
+                this.hasLoggedBackendUnavailable = true;
+            }
+        }
+
+        this.lastBackendCheck = now;
+        return this.backendAvailable;
     }
 
     private async makeRequest<T>(
@@ -83,7 +134,11 @@ export class ApiService {
                 const message = error instanceof Error ? error.message : 'Network error';
                 appError = new NetworkError(message);
             }
-            errorHandler.handleError(appError);
+
+            // Only log network errors if backend should be available
+            if (!__DEV__ || await this.checkBackendAvailability()) {
+                errorHandler.handleError(appError);
+            }
 
             return {
                 success: false,
@@ -107,7 +162,6 @@ export class ApiService {
         });
     }
 
-    // Voice Notes methods
     public async uploadVoiceNote(audioUri: string, userId: string): Promise<ApiResponse<VoiceNoteResponse>> {
         try {
             const formData = new FormData();
@@ -181,7 +235,7 @@ export class ApiService {
         });
     }
 
-    // Tasks methods (if backend supports direct task management)
+    // Tasks methods
     public async getTasks(completed?: boolean): Promise<ApiResponse<Task[]>> {
         const params = new URLSearchParams();
         if (completed !== undefined) params.append('completed', completed.toString());
@@ -202,6 +256,64 @@ export class ApiService {
         });
     }
 
+    // Activity tracking methods
+    public async uploadVoiceNoteWithContext(audioUri: string, userId: string, context?: string): Promise<ApiResponse<VoiceNoteResponse & { extractedActivities?: any[] }>> {
+        const formData = new FormData();
+        formData.append('audio', {
+            uri: audioUri,
+            type: 'audio/m4a',
+            name: 'voice_note.m4a',
+        } as any);
+        formData.append('userId', userId);
+        if (context) {
+            formData.append('context', context);
+        }
+
+        return this.makeRequest('/voice-notes/upload-with-context', {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Content-Type': 'multipart/form-data',
+            },
+        });
+    }
+
+    public async getActivities(userId: string): Promise<ApiResponse<any[]>> {
+        return this.makeRequest(`/activities?userId=${userId}`);
+    }
+
+    public async createActivity(activity: any): Promise<ApiResponse<any>> {
+        return this.makeRequest('/activities', {
+            method: 'POST',
+            body: JSON.stringify(activity),
+        });
+    }
+
+    public async getDailyMetrics(userId: string, date: string): Promise<ApiResponse<any>> {
+        return this.makeRequest(`/metrics/daily?userId=${userId}&date=${date}`);
+    }
+
+    public async getWeeklyInsights(userId: string): Promise<ApiResponse<any>> {
+        return this.makeRequest(`/insights/weekly?userId=${userId}`);
+    }
+
+    public async getProgressMetrics(userId: string): Promise<ApiResponse<any>> {
+        return this.makeRequest(`/metrics/progress?userId=${userId}`);
+    }
+
+    public async generatePersonalizedRecommendations(userId: string): Promise<ApiResponse<any[]>> {
+        return this.makeRequest(`/recommendations/generate?userId=${userId}`, {
+            method: 'POST',
+        });
+    }
+
+    public async generateDailySummary(userId: string, date: string): Promise<ApiResponse<DailyEntry>> {
+        return this.makeRequest('/daily-entries/generate', {
+            method: 'POST',
+            body: JSON.stringify({ userId, date }),
+        });
+    }
+
     // Health check
     public async healthCheck(): Promise<boolean> {
         try {
@@ -212,7 +324,7 @@ export class ApiService {
         }
     }
 
-    // Offline queue management (for when device is offline)
+    // Offline queue management
     private offlineQueue: Array<{
         endpoint: string;
         options: RequestInit;
@@ -254,3 +366,6 @@ export class ApiService {
         return this.offlineQueue.length;
     }
 }
+
+// Export singleton instance
+export const apiService = ApiService.getInstance();

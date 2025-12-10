@@ -6,6 +6,13 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "threethree",
+    "extra": {
+      "googleClientId": {
+        "android": "YOUR_GOOGLE_CLIENT_ID_ANDROID",
+        "ios": "523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3.apps.googleusercontent.com",
+        "web": "523125599576-22q0ankb0upvkagqlp7qquknp7gcdnbu.apps.googleusercontent.com"
+      }
+    },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
@@ -21,7 +28,8 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.buber.threethree"
+      "package": "com.buber.threethree",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "output": "static",
@@ -41,7 +49,8 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

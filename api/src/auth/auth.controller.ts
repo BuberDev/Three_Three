@@ -2,10 +2,12 @@ import {
     Body,
     Controller,
     Delete,
+    Get,
     HttpCode,
     HttpStatus,
     Post,
     Request,
+    Res,
     UseGuards,
 } from '@nestjs/common';
 import {
@@ -15,6 +17,7 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
+import { Response } from 'express';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { User } from '../users/entities/user.entity';
 import { AuthResponse, AuthService } from './auth.service';
@@ -22,6 +25,7 @@ import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 
@@ -118,5 +122,43 @@ export class AuthController {
     })
     async getProfile(@CurrentUser() user: User): Promise<User> {
         return user;
+    }
+
+    // Google OAuth endpoints
+    @Public()
+    @Get('google')
+    @UseGuards(GoogleAuthGuard)
+    @ApiOperation({ summary: 'Initiate Google OAuth flow' })
+    @ApiResponse({
+        status: 302,
+        description: 'Redirects to Google OAuth consent page',
+    })
+    async googleAuth(@Request() req: any): Promise<void> {
+        // This will trigger the Google OAuth flow
+    }
+
+    @Public()
+    @Get('google/callback')
+    @UseGuards(GoogleAuthGuard)
+    @ApiOperation({ summary: 'Google OAuth callback' })
+    @ApiResponse({
+        status: 302,
+        description: 'Handles Google OAuth callback and redirects with tokens',
+    })
+    async googleAuthRedirect(
+        @Request() req: any,
+        @Res() res: Response,
+    ): Promise<void> {
+        try {
+            const user = req.user as User;
+            const tokens = await this.authService.generateTokensForUser(user);
+
+            // Redirect to frontend with tokens
+            const redirectUrl = `${process.env.FRONTEND_URL || 'exp://localhost:8081'}/auth/callback?token=${tokens.accessToken}&refresh=${tokens.refreshToken}`;
+            res.redirect(redirectUrl);
+        } catch (error) {
+            console.error('Google OAuth callback error:', error);
+            res.redirect(`${process.env.FRONTEND_URL || 'exp://localhost:8081'}/auth/error`);
+        }
     }
 }
