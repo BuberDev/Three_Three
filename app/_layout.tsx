@@ -5,7 +5,7 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 
 import { ErrorBoundary } from '@/components/error-boundary';
-import { OnboardingFlow } from '@/components/onboarding/onboarding-flow';
+import { SwipeableOnboarding } from '@/components/onboarding/swipeable-onboarding';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/stores/app-store';
@@ -19,7 +19,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
-  const { initialize, isOnboarding, setOnboardingComplete } = useAppStore();
+  const { initialize, isOnboarding, isAuthenticated, user, setOnboardingComplete } = useAppStore();
 
   useEffect(() => {
     // Initialize the app store and services
@@ -55,8 +55,10 @@ export default function RootLayout() {
     },
   };
 
-  if (isOnboarding) {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+  // CRITICAL: Niezalogowany user ZAWSZE musi przejść przez onboarding/auth!
+  // Tylko zalogowany user może ominąć onboarding
+  if (isOnboarding || !isAuthenticated || !user) {
+    return <SwipeableOnboarding onComplete={handleOnboardingComplete} />;
   }
 
   return (

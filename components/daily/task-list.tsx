@@ -2,11 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
     Alert,
-    FlatList,
     StyleSheet,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { Task } from '../../lib/types';
@@ -156,13 +155,13 @@ export const TaskList: React.FC<TaskListProps> = ({
     }
 
     return (
-        <FlatList
-            data={filteredTasks}
-            keyExtractor={(item) => item.id}
-            renderItem={renderTask}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.listContainer}
-        />
+        <View style={styles.listContainer}>
+            {filteredTasks.map((task) => (
+                <View key={task.id}>
+                    {renderTask({ item: task })}
+                </View>
+            ))}
+        </View>
     );
 };
 

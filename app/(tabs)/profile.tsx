@@ -10,7 +10,7 @@ import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const { user, userSettings, setUserSettings } = useAppStore();
+    const { user, userSettings, setUserSettings, logout } = useAppStore();
 
     // Lokalne stany dla ustawień
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(
@@ -22,6 +22,27 @@ export default function ProfileScreen() {
     const [aiAnalysisEnabled, setAiAnalysisEnabled] = React.useState(
         userSettings?.aiAnalysisEnabled ?? true
     );
+
+    const handleLogout = () => {
+        Alert.alert(
+            'Wyloguj się',
+            'Czy na pewno chcesz się wylogować?',
+            [
+                {
+                    text: 'Anuluj',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Wyloguj',
+                    style: 'destructive',
+                    onPress: async () => {
+                        await logout();
+                        // Logout sets isOnboarding to true, which will automatically show OnboardingFlow
+                    },
+                },
+            ]
+        );
+    };
 
     const handleSettingChange = (setting: string, value: boolean) => {
         if (!userSettings) return;
@@ -58,20 +79,27 @@ export default function ProfileScreen() {
         {
             title: 'Pomoc i wsparcie',
             description: 'Znajdź odpowiedzi na pytania',
-            icon: 'paperplane.fill' as const,
+            icon: 'questionmark.circle' as const,
             onPress: () => Alert.alert('Pomoc', 'Skontaktuj się z naszym zespołem wsparcia'),
         },
         {
             title: 'Polityka prywatności',
             description: 'Jak chronimy Twoje dane',
-            icon: 'house.fill' as const,
+            icon: 'shield' as const,
             onPress: () => Alert.alert('Prywatność', 'Polityka prywatności zostanie wyświetlona'),
         },
         {
             title: 'Regulamin',
             description: 'Warunki korzystania z aplikacji',
-            icon: 'list.bullet' as const,
+            icon: 'doc.text' as const,
             onPress: () => Alert.alert('Regulamin', 'Regulamin zostanie wyświetlony'),
+        },
+        {
+            title: 'Wyloguj się',
+            description: 'Zakończ sesję w aplikacji',
+            icon: 'rectangle.portrait.and.arrow.right' as const,
+            onPress: handleLogout,
+            isDestructive: true,
         },
     ];
 
@@ -238,15 +266,26 @@ export default function ProfileScreen() {
                         {aboutMenuItems.map((item, index) => (
                             <TouchableOpacity key={`about-${index}`} style={styles.menuItem} onPress={item.onPress}>
                                 <View style={styles.menuItemLeft}>
-                                    <IconSymbol name={item.icon} size={20} color={Colors.light.tint} />
+                                    <IconSymbol
+                                        name={item.icon}
+                                        size={20}
+                                        color={item.isDestructive ? '#ff3b30' : Colors.light.tint}
+                                    />
                                     <View style={styles.menuItemText}>
-                                        <ThemedText style={styles.menuItemTitle}>{item.title}</ThemedText>
+                                        <ThemedText style={[
+                                            styles.menuItemTitle,
+                                            item.isDestructive && { color: '#ff3b30' }
+                                        ]}>
+                                            {item.title}
+                                        </ThemedText>
                                         <ThemedText style={styles.menuItemDescription}>
                                             {item.description}
                                         </ThemedText>
                                     </View>
                                 </View>
-                                <IconSymbol name="chevron.right" size={16} color="#ccc" />
+                                {!item.isDestructive && (
+                                    <IconSymbol name="chevron.right" size={16} color="#ccc" />
+                                )}
                             </TouchableOpacity>
                         ))}
                     </View>

@@ -25,6 +25,8 @@ interface AppStore {
     user: User | null;
     userSettings: UserSettings | null;
     isAuthenticated: boolean;
+    accessToken: string | null;
+    refreshToken: string | null;
 
     // Voice notes state
     voiceNotes: VoiceNote[];
@@ -57,6 +59,8 @@ interface AppStore {
     setUser: (user: User | null) => void;
     setUserSettings: (settings: UserSettings) => void;
     setAuthenticated: (auth: boolean) => void;
+    setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
+    clearTokens: () => Promise<void>;
 
     // Voice notes actions
     addVoiceNote: (voiceNote: VoiceNote) => void;
@@ -65,6 +69,11 @@ interface AppStore {
     uploadVoiceNote: (audioUri: string) => Promise<boolean>;
     uploadVoiceNoteWithContext: (audioUri: string, context?: string) => Promise<boolean>;
     uploadSleepRecording: (sleepData: any) => Promise<boolean>;
+
+    // 🏢 ENTERPRISE Voice Recording Functions
+    uploadDailyReportVoice: (audioUri: string, reportType: 'morning' | 'evening' | 'summary') => Promise<boolean>;
+    uploadSleepReportVoice: (audioUri: string, sleepType: 'dream' | 'insomnia' | 'morning-reflection' | 'sleep-quality') => Promise<boolean>;
+    uploadLifeExperienceVoice: (audioUri: string, category: 'reflection' | 'gratitude' | 'emotion' | 'achievement' | 'challenge') => Promise<boolean>;
 
     // Tasks actions
     addTask: (task: Task) => void;
@@ -101,6 +110,8 @@ export const useAppStore = create<AppStore>()(
             user: null,
             userSettings: null,
             isAuthenticated: false,
+            accessToken: null,
+            refreshToken: null,
             voiceNotes: [],
             currentRecording: { isRecording: false, duration: 0 },
             isProcessingVoiceNote: false,
@@ -124,6 +135,51 @@ export const useAppStore = create<AppStore>()(
             setUser: (user) => set({ user }),
             setUserSettings: (userSettings) => set({ userSettings }),
             setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
+
+            setTokens: async (accessToken, refreshToken) => {
+                try {
+                    // Enterprise validation - prevent AsyncStorage errors
+                    if (!accessToken || !refreshToken) {
+                        console.error('❌ setTokens called with invalid tokens:', {
+                            hasAccessToken: !!accessToken,
+                            hasRefreshToken: !!refreshToken,
+                            accessTokenType: typeof accessToken,
+                            refreshTokenType: typeof refreshToken
+                        });
+                        throw new Error('Invalid tokens: both accessToken and refreshToken are required');
+                    }
+
+                    // Ensure tokens are strings
+                    const validAccessToken = String(accessToken).trim();
+                    const validRefreshToken = String(refreshToken).trim();
+
+                    if (!validAccessToken || !validRefreshToken) {
+                        throw new Error('Invalid tokens: empty or whitespace-only tokens');
+                    }
+
+                    await AsyncStorage.setItem('@access_token', validAccessToken);
+                    await AsyncStorage.setItem('@refresh_token', validRefreshToken);
+                    set({ accessToken: validAccessToken, refreshToken: validRefreshToken });
+
+                    console.log('✅ Tokens stored successfully', {
+                        accessTokenLength: validAccessToken.length,
+                        refreshTokenLength: validRefreshToken.length
+                    });
+                } catch (error) {
+                    console.error('❌ Error saving tokens:', error);
+                    throw error; // Re-throw for calling code to handle
+                }
+            },
+
+            clearTokens: async () => {
+                try {
+                    await AsyncStorage.removeItem('@access_token');
+                    await AsyncStorage.removeItem('@refresh_token');
+                    set({ accessToken: null, refreshToken: null });
+                } catch (error) {
+                    console.error('Error clearing tokens:', error);
+                }
+            },
 
             // Voice notes actions
             addVoiceNote: (voiceNote) => {
@@ -159,7 +215,7 @@ export const useAppStore = create<AppStore>()(
                     setError(null);
 
                     const apiService = ApiService.getInstance();
-                    const response = await apiService.uploadVoiceNote(audioUri, user.id);
+                    const response = await apiService.uploadVoiceNote(audioUri);
 
                     if (response.success && response.data) {
                         // Add voice note to local state
@@ -205,7 +261,7 @@ export const useAppStore = create<AppStore>()(
                     setError(null);
 
                     const apiService = ApiService.getInstance();
-                    const response = await apiService.uploadVoiceNoteWithContext(audioUri, user.id, context);
+                    const response = await apiService.uploadVoiceNoteWithContext(audioUri, context);
 
                     if (response.success && response.data) {
                         // Add voice note to local state
@@ -274,6 +330,103 @@ export const useAppStore = create<AppStore>()(
                     return false;
                 } finally {
                     setLoading(false);
+                }
+            },
+
+            // 🏢 ENTERPRISE Voice Recording Functions
+            uploadDailyReportVoice: async (audioUri: string, reportType: 'morning' | 'evening' | 'summary') => {
+                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return false;
+                }
+
+                try {
+                    setProcessingVoiceNote(true);
+                    setError(null);
+                    console.log(`🌅 Uploading ${reportType} daily report voice note...`);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.uploadDailyReportVoice(audioUri, reportType);
+
+                    if (response.success && response.data) {
+                        addVoiceNote(response.data.voiceNote);
+                        console.log(`✅ Daily ${reportType} report uploaded successfully!`);
+                        return true;
+                    } else {
+                        setError(response.error || 'Failed to upload daily report');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('🚨 Daily report upload failed:', error);
+                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    return false;
+                } finally {
+                    setProcessingVoiceNote(false);
+                }
+            },
+
+            uploadSleepReportVoice: async (audioUri: string, sleepType: 'dream' | 'insomnia' | 'morning-reflection' | 'sleep-quality') => {
+                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return false;
+                }
+
+                try {
+                    setProcessingVoiceNote(true);
+                    setError(null);
+                    console.log(`🌙 Uploading ${sleepType} sleep report voice note...`);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.uploadSleepReportVoice(audioUri, sleepType);
+
+                    if (response.success && response.data) {
+                        addVoiceNote(response.data.voiceNote);
+                        console.log(`✅ Sleep ${sleepType} report uploaded successfully!`);
+                        return true;
+                    } else {
+                        setError(response.error || 'Failed to upload sleep report');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('🚨 Sleep report upload failed:', error);
+                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    return false;
+                } finally {
+                    setProcessingVoiceNote(false);
+                }
+            },
+
+            uploadLifeExperienceVoice: async (audioUri: string, category: 'reflection' | 'gratitude' | 'emotion' | 'achievement' | 'challenge') => {
+                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return false;
+                }
+
+                try {
+                    setProcessingVoiceNote(true);
+                    setError(null);
+                    console.log(`💭 Uploading ${category} life experience voice note...`);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.uploadLifeExperienceVoice(audioUri, category);
+
+                    if (response.success && response.data) {
+                        addVoiceNote(response.data.voiceNote);
+                        console.log(`✅ Life ${category} experience uploaded successfully!`);
+                        return true;
+                    } else {
+                        setError(response.error || 'Failed to upload life experience');
+                        return false;
+                    }
+                } catch (error) {
+                    console.error('🚨 Life experience upload failed:', error);
+                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    return false;
+                } finally {
+                    setProcessingVoiceNote(false);
                 }
             },
 
@@ -413,25 +566,18 @@ export const useAppStore = create<AppStore>()(
                     // Ustaw puste dane zamiast błędu
                     set({ activities: [], todaysActivities: [] });
                 }
-            }, loadDailyMetrics: async () => {
+            },
+
+            loadDailyMetrics: async () => {
                 const { user } = get();
                 if (!user) {
                     set({ dailyMetrics: null });
                     return;
                 }
 
-                try {
-                    const apiService = ApiService.getInstance();
-                    const today = new Date().toISOString().split('T')[0];
-                    const response = await apiService.getDailyMetrics(user.id, today);
-
-                    if (response.success && response.data) {
-                        set({ dailyMetrics: response.data });
-                    }
-                } catch (error) {
-                    console.log('Daily metrics not available (likely in development mode)');
-                    set({ dailyMetrics: null });
-                }
+                // TODO: Enable when backend endpoint is implemented
+                console.log('Daily metrics not available (backend endpoint not implemented yet)');
+                set({ dailyMetrics: null });
             },
 
             loadWeeklyInsights: async () => {
@@ -441,17 +587,9 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                try {
-                    const apiService = ApiService.getInstance();
-                    const response = await apiService.getWeeklyInsights(user.id);
-
-                    if (response.success && response.data) {
-                        set({ weeklyInsights: response.data });
-                    }
-                } catch (error) {
-                    console.log('Weekly insights not available (likely in development mode)');
-                    set({ weeklyInsights: null });
-                }
+                // TODO: Enable when backend endpoint is implemented
+                console.log('Weekly insights not available (backend endpoint not implemented yet)');
+                set({ weeklyInsights: null });
             },
 
             loadProgressMetrics: async () => {
@@ -461,17 +599,9 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                try {
-                    const apiService = ApiService.getInstance();
-                    const response = await apiService.getProgressMetrics(user.id);
-
-                    if (response.success && response.data) {
-                        set({ progressMetrics: response.data });
-                    }
-                } catch (error) {
-                    console.log('Progress metrics not available (likely in development mode)');
-                    set({ progressMetrics: null });
-                }
+                // TODO: Enable when backend endpoint is implemented
+                console.log('Progress metrics not available (backend endpoint not implemented yet)');
+                set({ progressMetrics: null });
             },
 
             generatePersonalizedRecommendations: async () => {
@@ -481,17 +611,9 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                try {
-                    const apiService = ApiService.getInstance();
-                    const response = await apiService.generatePersonalizedRecommendations(user.id);
-
-                    if (response.success && response.data) {
-                        set({ recommendations: response.data });
-                    }
-                } catch (error) {
-                    console.log('Recommendations not available (likely in development mode)');
-                    set({ recommendations: [] });
-                }
+                // TODO: Enable when backend endpoint is implemented
+                console.log('Recommendations not available (backend endpoint not implemented yet)');
+                set({ recommendations: [] });
             },
 
             // Daily entry actions
@@ -536,8 +658,75 @@ export const useAppStore = create<AppStore>()(
 
             // General actions
             initialize: async () => {
+                console.log('🚀 App Store Initialize started, __DEV__:', __DEV__);
                 try {
                     set({ isLoading: true });
+
+                    // Load JWT tokens from storage and verify authentication
+                    let loadedTokens = { accessToken: null, refreshToken: null };
+                    let authenticatedUser = null;
+
+                    try {
+                        const accessToken = await AsyncStorage.getItem('@access_token');
+                        const refreshToken = await AsyncStorage.getItem('@refresh_token');
+
+                        if (accessToken && refreshToken) {
+                            loadedTokens = { accessToken, refreshToken };
+
+                            // Set up API service with the token
+                            const apiService = ApiService.getInstance();
+                            apiService.setAuthToken(accessToken);
+
+                            // Try to fetch user profile to verify token is still valid
+                            try {
+                                const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
+                                    method: 'POST',
+                                    headers: {
+                                        'Authorization': `Bearer ${accessToken}`,
+                                        'Content-Type': 'application/json',
+                                    },
+                                });
+
+                                if (response.ok) {
+                                    authenticatedUser = await response.json();
+                                    console.log('✅ User authenticated from stored token:', authenticatedUser.id);
+                                } else {
+                                    console.log('❌ Stored token is invalid, clearing...');
+                                    await AsyncStorage.removeItem('@access_token');
+                                    await AsyncStorage.removeItem('@refresh_token');
+                                    loadedTokens = { accessToken: null, refreshToken: null };
+                                }
+                            } catch (error) {
+                                console.log('❌ Failed to verify token, clearing...', error);
+                                await AsyncStorage.removeItem('@access_token');
+                                await AsyncStorage.removeItem('@refresh_token');
+                                loadedTokens = { accessToken: null, refreshToken: null };
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading tokens:', error);
+                    }
+
+                    // Set initial state based on authentication status
+                    set({
+                        user: authenticatedUser,
+                        userSettings: null,
+                        isAuthenticated: !!authenticatedUser,
+                        isOnboarding: !authenticatedUser, // Only show onboarding if not authenticated
+                        accessToken: loadedTokens.accessToken,
+                        refreshToken: loadedTokens.refreshToken,
+                        voiceNotes: [],
+                        tasks: [],
+                        todaysTasks: [],
+                        todayEntry: null,
+                        recommendations: [],
+                        activities: [],
+                        todaysActivities: [],
+                        dailyMetrics: null,
+                        weeklyInsights: null,
+                        progressMetrics: null,
+                        error: null
+                    });
 
                     // Initialize services
                     const dbService = DatabaseService.getInstance();
@@ -546,90 +735,25 @@ export const useAppStore = create<AppStore>()(
                     const audioService = AudioService.getInstance();
                     await audioService.initialize();
 
-                    // W trybie development, stwórz demo użytkownika jeśli nie ma zalogowanego
-                    const { user, isAuthenticated } = get();
-                    let currentUser = user;
+                    const state = get();
+                    let currentUser = state.user;
 
-                    if (!user && __DEV__) {
-                        console.log('Creating demo user for development...');
-                        const demoUser: User = {
-                            id: 'demo-user-123',
-                            email: 'demo@example.com',
-                            name: 'Demo User',
-                            authProvider: 'demo',
-                            createdAt: new Date().toISOString(),
-                            updatedAt: new Date().toISOString()
-                        };
-
-                        // Dodaj demo dane
-                        const demoTasks: Task[] = [
-                            {
-                                id: '1',
-                                title: 'Przygotuj prezentację',
-                                description: 'Prezentacja na spotkanie z klientem',
-                                priority: 'high' as const,
-                                completed: false,
-                                dueDate: new Date().toISOString(),
-                                category: 'work',
-                                extractedFromVoiceNoteId: 'demo-note-1'
-                            },
-                            {
-                                id: '2',
-                                title: 'Trening biegowy',
-                                description: '30 minut biegania w parku',
-                                priority: 'medium' as const,
-                                completed: true,
-                                dueDate: new Date().toISOString(),
-                                category: 'health'
-                            },
-                            {
-                                id: '3',
-                                title: 'Przeczytaj artykuł o AI',
-                                description: 'Artykuł o najnowszych trendach w AI',
-                                priority: 'low' as const,
-                                completed: false,
-                                category: 'learning'
-                            }
-                        ];
-
-                        const demoRecommendations: Recommendation[] = [
-                            {
-                                id: '1',
-                                userId: demoUser.id,
-                                type: 'time_management' as const,
-                                title: 'Zaplanuj przerwę',
-                                description: 'Ostatnio pracowałeś intensywnie. Zaplanuj 15-minutową przerwę na spacer.',
-                                reason: 'Analiza Twoich wzorców pracy pokazuje, że krótkie przerwy zwiększają produktywność',
-                                confidence: 0.8,
-                                createdAt: new Date().toISOString(),
-                                dismissed: false
-                            },
-                            {
-                                id: '2',
-                                userId: demoUser.id,
-                                type: 'habit_suggestion' as const,
-                                title: 'Czas na trening',
-                                description: 'To dobry moment na aktywność fizyczną - zwykle o tej porze masz najwięcej energii.',
-                                reason: 'Twoja energia jest najwyższa między 16:00-18:00',
-                                confidence: 0.9,
-                                createdAt: new Date().toISOString(),
-                                dismissed: false
-                            }
-                        ];
-
-                        currentUser = demoUser;
+                    // EMERGENCY CHECK: If we find demo-user-123, CLEAR IT!
+                    if (currentUser?.id === 'demo-user-123') {
+                        console.log('🚨 DEMO USER DETECTED! Clearing...');
+                        await get().clearTokens();
                         set({
-                            user: demoUser,
-                            isAuthenticated: true,
-                            isOnboarding: false,
-                            tasks: demoTasks,
-                            todaysTasks: demoTasks.filter(t => t.dueDate?.startsWith(new Date().toISOString().split('T')[0]) || !t.completed),
-                            recommendations: demoRecommendations
+                            user: null,
+                            isAuthenticated: false,
+                            isOnboarding: true,
                         });
+                        currentUser = null;
                     }
 
                     // Load user data if authenticated
-                    if (currentUser && (isAuthenticated || __DEV__)) {
+                    if (currentUser && state.isAuthenticated && currentUser.id !== 'demo-user-123') {
+                        console.log('📚 Loading user data for:', currentUser.email);
+
                         // Load data gracefully - don't throw on network errors
                         const loadPromises = [
                             get().loadTasks(),
@@ -657,35 +781,11 @@ export const useAppStore = create<AppStore>()(
                             const todayEntry = await dbService.getDailyEntry(currentUser.id, today);
                             if (todayEntry) {
                                 set({ todayEntry });
-                            } else {
-                                // Stwórz przykładowy entry dla demo
-                                const demoEntry: DailyEntry = {
-                                    id: 'demo-entry-' + today,
-                                    userId: currentUser.id,
-                                    date: today,
-                                    autoSummary: 'Dzisiaj masz 3 zadania do wykonania. Świetnie rozpocząłeś dzień!',
-                                    tasks: [],
-                                    habits: [],
-                                    mood: 'positive',
-                                    voiceNotesCount: 2,
-                                    updatedAt: new Date().toISOString()
-                                };
-                                set({ todayEntry: demoEntry });
                             }
+                            // No demo entry creation - user must create real data
                         } catch (error) {
-                            console.log('No daily entry found for today, using demo data');
-                            const demoEntry: DailyEntry = {
-                                id: 'demo-entry-' + today,
-                                userId: currentUser.id,
-                                date: today,
-                                autoSummary: 'Dzisiaj masz 3 zadania do wykonania. Świetnie rozpocząłeś dzień!',
-                                tasks: [],
-                                habits: [],
-                                mood: 'positive',
-                                voiceNotesCount: 2,
-                                updatedAt: new Date().toISOString()
-                            };
-                            set({ todayEntry: demoEntry });
+                            console.log('No daily entry found for today - user will need to create one');
+                            // No demo data - clean slate for real user
                         }
                     }
 
@@ -715,11 +815,16 @@ export const useAppStore = create<AppStore>()(
                     const apiService = ApiService.getInstance();
                     apiService.setAuthToken('');
 
+                    // Clear stored JWT tokens
+                    await get().clearTokens();
+
                     // Reset app state
                     set({
                         user: null,
                         userSettings: null,
                         isAuthenticated: false,
+                        accessToken: null,
+                        refreshToken: null,
                         voiceNotes: [],
                         tasks: [],
                         todaysTasks: [],
@@ -750,6 +855,7 @@ export const useAppStore = create<AppStore>()(
         }
     )
 );
+
 
 // Helper function
 function isToday(date: Date): boolean {

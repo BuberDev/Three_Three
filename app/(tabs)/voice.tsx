@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { ScrollView, View } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModernCard } from '@/components/modern-card';
@@ -9,6 +9,7 @@ import { ModernView } from '@/components/modern-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { VoiceRecorder } from '@/components/voice/voice-recorder';
+import { VoiceRecordingMenu } from '@/components/voice/voice-recording-menu';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/stores/app-store';
@@ -17,6 +18,7 @@ export default function VoiceScreen() {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const insets = useSafeAreaInsets();
+    const [showRecordingMenu, setShowRecordingMenu] = useState(false);
 
     const {
         voiceNotes,
@@ -93,12 +95,43 @@ export default function VoiceScreen() {
                     </ThemedText>
                 </LinearGradient>
 
+                {/* 🏢 ENTERPRISE Voice Recording Options */}
+                <ModernCard
+                    title="Kategorie nagrań"
+                    elevation={3}
+                    style={{ marginBottom: DesignSystem.spacing.lg }}
+                >
+                    <ThemedText
+                        variant="bodyMedium"
+                        color="secondary"
+                        style={{ marginBottom: DesignSystem.spacing.lg, lineHeight: 20 }}
+                    >
+                        Wybierz typ nagrania dla lepszej organizacji swoich myśli
+                    </ThemedText>
+
+                    <TouchableOpacity
+                        style={[styles.enterpriseButton, { backgroundColor: colors.primary }]}
+                        onPress={() => setShowRecordingMenu(true)}
+                        activeOpacity={0.8}
+                    >
+                        <IconSymbol name="list.bullet" size={20} color={colors.background} />
+                        <ThemedText
+                            variant="bodyLarge"
+                            style={{ color: colors.background, fontWeight: '600', marginLeft: DesignSystem.spacing.sm }}
+                        >
+                            Wybierz kategorie nagrania
+                        </ThemedText>
+                        <IconSymbol name="chevron.right" size={16} color={colors.background} />
+                    </TouchableOpacity>
+                </ModernCard>
+
                 {/* Voice Recorder */}
                 <ModernCard
+                    title="Szybkie nagranie"
                     elevation={3}
                     style={{ marginBottom: DesignSystem.spacing.xl }}
                 >
-                    <VoiceRecorder onRecordingComplete={onRecordingComplete} />
+                    <VoiceRecorder onComplete={onRecordingComplete} />
                 </ModernCard>
 
                 {/* Quick Tips */}
@@ -226,6 +259,28 @@ export default function VoiceScreen() {
                     </ModernCard>
                 )}
             </ScrollView>
+
+            {/* 🏢 ENTERPRISE Voice Recording Menu */}
+            <VoiceRecordingMenu
+                visible={showRecordingMenu}
+                onClose={() => setShowRecordingMenu(false)}
+            />
         </ModernView>
     );
 }
+
+const styles = StyleSheet.create({
+    enterpriseButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: DesignSystem.spacing.md,
+        paddingHorizontal: DesignSystem.spacing.lg,
+        borderRadius: DesignSystem.borderRadius.lg,
+        shadowColor: Colors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+        elevation: 2,
+    },
+});

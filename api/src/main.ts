@@ -40,6 +40,9 @@ async function bootstrap() {
         prefix: 'v',
     });
 
+    // Global prefix
+    app.setGlobalPrefix('api');
+
     // Global pipes
     app.useGlobalPipes(
         new ValidationPipe({

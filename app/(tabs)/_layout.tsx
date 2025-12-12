@@ -67,6 +67,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="sleep"
+        options={{
+          title: 'Sen',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              size={focused ? 26 : 24}
+              name="moon.fill"
+              color={color}
+              style={{ opacity: focused ? 1 : 0.7 }}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="routines"
         options={{
           title: 'Rutyny',

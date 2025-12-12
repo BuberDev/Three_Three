@@ -65,7 +65,7 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
     };
 
     return (
-        <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.container}>
             <View style={styles.header}>
                 <TouchableOpacity style={styles.backButton} onPress={onBack}>
                     <Ionicons name="arrow-back" size={24} color={Colors.light.text} />

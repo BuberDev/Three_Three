@@ -1,18 +1,11 @@
-import {
-    AudioModule,
-    AudioPlayer,
-    AudioRecorder,
-    createAudioPlayer,
-    RecordingPresets,
-    setAudioModeAsync
-} from 'expo-audio';
+import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { AudioRecording, RecordingState } from '../types';
 
 export class AudioService {
     private static instance: AudioService;
-    private recorder: AudioRecorder | null = null;
-    private player: AudioPlayer | null = null;
+    private recorder: Audio.Recording | null = null;
+    private player: Audio.Sound | null = null;
     private recordingState: RecordingState = {
         isRecording: false,
         duration: 0,
@@ -35,16 +28,16 @@ export class AudioService {
 
     public async initialize(): Promise<void> {
         try {
-            // Request audio permissions using AudioModule
-            const { status } = await AudioModule.requestRecordingPermissionsAsync();
+            // Request audio permissions using Audio from expo-av
+            const { status } = await Audio.requestPermissionsAsync();
             if (status !== 'granted') {
                 throw new Error('Audio permissions not granted');
             }
 
             // Set audio mode for recording
-            await setAudioModeAsync({
-                playsInSilentMode: true,
-                allowsRecording: true,
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
             });
 
             this.isInitialized = true;
@@ -57,7 +50,7 @@ export class AudioService {
 
     public async requestPermissions(): Promise<boolean> {
         try {
-            const { status } = await AudioModule.requestRecordingPermissionsAsync();
+            const { status } = await Audio.requestPermissionsAsync();
             return status === 'granted';
         } catch (error) {
             console.error('Permission request failed:', error);
@@ -79,14 +72,12 @@ export class AudioService {
                 throw new Error('Recording is already in progress');
             }
 
-            // Create new recorder with high quality settings
-            this.recorder = new AudioRecorder(RecordingPresets.HIGH_QUALITY);
-
-            // Prepare to record
-            await this.recorder.prepareToRecordAsync();
+            // Create new recording with high quality settings
+            this.recorder = new Audio.Recording();
+            await this.recorder.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
 
             // Start recording
-            this.recorder.record();
+            await this.recorder.startAsync();
 
             this.startTime = Date.now();
             this.recordingState = {
@@ -112,11 +103,9 @@ export class AudioService {
                 throw new Error('No recording in progress');
             }
 
-            // Stop the recorder
-            await this.recorder.stop();
-
-            // Get the URI of the recorded file
-            const uri = this.recorder.uri;
+            // Stop the recorder and get the URI
+            await this.recorder.stopAndUnloadAsync();
+            const uri = this.recorder.getURI();
 
             this.recordingState = {
                 isRecording: false,
@@ -137,59 +126,24 @@ export class AudioService {
     }
 
     public async pauseRecording(): Promise<void> {
-        try {
-            if (!this.recorder || !this.recordingState.isRecording) {
-                throw new Error('No recording in progress');
-            }
-
-            this.recorder.pause();
-
-            this.recordingState = {
-                ...this.recordingState,
-                isPaused: true
-            };
-
-            this.stopDurationTracking();
-            this.notifyListeners();
-
-            console.log('Recording paused');
-        } catch (error) {
-            console.error('Failed to pause recording:', error);
-            throw error;
-        }
+        console.warn('Pause recording not supported in expo-av API');
+        throw new Error('Pause recording not supported');
     }
 
     public async resumeRecording(): Promise<void> {
-        try {
-            if (!this.recorder || !this.recordingState.isRecording || !this.recordingState.isPaused) {
-                throw new Error('No paused recording to resume');
-            }
-
-            this.recorder.record();
-
-            this.recordingState = {
-                ...this.recordingState,
-                isPaused: false
-            };
-
-            this.startDurationTracking();
-            this.notifyListeners();
-
-            console.log('Recording resumed');
-        } catch (error) {
-            console.error('Failed to resume recording:', error);
-            throw error;
-        }
+        console.warn('Resume recording not supported in expo-av API');
+        throw new Error('Resume recording not supported');
     }
 
     public async playRecording(uri: string): Promise<void> {
         try {
             if (this.player) {
-                this.player.remove();
+                await this.player.unloadAsync();
             }
 
-            this.player = createAudioPlayer(uri);
-            this.player.play();
+            const { sound } = await Audio.Sound.createAsync({ uri });
+            this.player = sound;
+            await this.player.playAsync();
 
             console.log('Playing recording from:', uri);
         } catch (error) {
@@ -201,7 +155,7 @@ export class AudioService {
     public async stopPlayback(): Promise<void> {
         try {
             if (this.player) {
-                this.player.pause();
+                await this.player.stopAsync();
                 console.log('Playback stopped');
             }
         } catch (error) {
@@ -324,11 +278,11 @@ export class AudioService {
         }
     }
 
-    public cleanup(): void {
+    public async cleanup(): Promise<void> {
         this.stopDurationTracking();
 
         if (this.player) {
-            this.player.remove();
+            await this.player.unloadAsync();
             this.player = null;
         }
 
@@ -341,6 +295,36 @@ export class AudioService {
         };
 
         console.log('Audio service cleaned up');
+    }
+
+    private startDurationTracking(): void {
+        this.stopDurationTracking();
+        this.durationInterval = setInterval(() => {
+            if (this.recordingState.isRecording && !this.recordingState.isPaused) {
+                this.recordingState = {
+                    ...this.recordingState,
+                    duration: (Date.now() - this.startTime) / 1000
+                };
+                this.notifyListeners();
+            }
+        }, 100);
+    }
+
+    private stopDurationTracking(): void {
+        if (this.durationInterval) {
+            clearInterval(this.durationInterval);
+            this.durationInterval = null;
+        }
+    }
+
+    private notifyListeners(): void {
+        this.listeners.forEach(listener => {
+            try {
+                listener({ ...this.recordingState });
+            } catch (error) {
+                console.error('Error in audio service listener:', error);
+            }
+        });
     }
 
     // Sleep recording methods

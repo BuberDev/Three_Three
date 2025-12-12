@@ -13,12 +13,14 @@ import { useVoiceRecording } from '../../hooks/use-voice-recording';
 
 interface VoiceRecorderProps {
     onComplete?: () => void;
+    onCompleteWithAudio?: (audioUri: string) => Promise<boolean>; // New Enterprise callback
     size?: 'small' | 'medium' | 'large';
     disabled?: boolean;
 }
 
 export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     onComplete,
+    onCompleteWithAudio,
     size = 'large',
     disabled = false,
 }) => {
@@ -27,6 +29,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         duration,
         canRecord,
         recordAndUpload,
+        recordOnly,
         isProcessingVoiceNote,
     } = useVoiceRecording();
 
@@ -58,9 +61,22 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     const handlePress = async () => {
         if (disabled || !canRecord) return;
 
-        const success = await recordAndUpload();
-        if (success && !isRecording && onComplete) {
-            onComplete();
+        // Use custom upload callback if provided
+        if (onCompleteWithAudio) {
+            const result = await recordOnly();
+            if (result && result !== 'recording-started' && !isRecording) {
+                // Recording completed, call custom upload
+                const success = await onCompleteWithAudio(result);
+                if (success && onComplete) {
+                    onComplete();
+                }
+            }
+        } else {
+            // Use default upload behavior
+            const success = await recordAndUpload();
+            if (success && !isRecording && onComplete) {
+                onComplete();
+            }
         }
     };
 

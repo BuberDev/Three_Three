@@ -22,7 +22,6 @@ export enum JournalEntryType {
 @Index(['userId', 'date'])
 @Index(['entryType'])
 @Index(['sentimentScore'])
-@Index(['embedding'], { spatial: true })
 export class JournalEntry extends BaseEntity {
     @Column({ name: 'user_id' })
     userId: string;

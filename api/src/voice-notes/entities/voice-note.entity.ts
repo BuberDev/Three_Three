@@ -62,13 +62,14 @@ export class VoiceNote extends BaseEntity {
     @Column({ type: 'jsonb', default: {} })
     metadata: Record<string, any>;
 
-    // Vector embedding for semantic search (pgvector)
-    @Column({
-        type: 'vector',
-        nullable: true,
-        comment: 'Vector embedding for semantic search',
-    })
-    embedding?: number[];
+    // Vector embedding for semantic search (pgvector) - TEMPORARILY DISABLED
+    // TODO: Install pgvector extension to enable this feature
+    // @Column({
+    //     type: 'vector',
+    //     nullable: true,
+    //     comment: 'Vector embedding for semantic search',
+    // })
+    // embedding?: number[];
 
     @Column({ type: 'jsonb', default: [] })
     tags: string[];

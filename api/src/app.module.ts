@@ -22,6 +22,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 
 // Core Modules
 import { ActivitiesModule } from './activities/activities.module';
+import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EventsModule } from './events/events.module';
 import { JournalModule } from './journal/journal.module';
@@ -126,7 +127,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         // Scheduling for cron jobs
         ScheduleModule.forRoot(),
 
-        // Core modules
+        // Application modules
         AuthModule,
         UsersModule,
         VoiceNotesModule,
@@ -136,6 +137,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         SleepModule,
         JournalModule,
         AnalyticsModule,
+        AiModule,
     ],
     providers: [
         // Global guards

@@ -1,27 +1,35 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AISettingsModal } from '@/components/ai/ai-settings-modal';
+import { AnalyticsView } from '@/components/ai/analytics-view';
+import { ChatSessionManager } from '@/components/ai/chat-session-manager';
+import { EnterpriseChatInterface } from '@/components/ai/enterprise-chat-interface';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useAIChat } from '@/hooks/use-ai-chat-real';
 import { useAppStore } from '@/stores/app-store';
 
 export default function AIScreen() {
     const insets = useSafeAreaInsets();
+    const [currentView, setCurrentView] = useState<'chat' | 'analytics'>('chat');
+    const [showSettings, setShowSettings] = useState(false);
     const {
-        recommendations,
         tasks,
         todaysTasks,
         voiceNotes
     } = useAppStore();
 
+    const aiChat = useAIChat();
+
     // Analiza danych dla statystyk
     const completedTasks = todaysTasks.filter(t => t.completed);
     const completionRate = todaysTasks.length > 0 ? Math.round((completedTasks.length / todaysTasks.length) * 100) : 0;
 
-    // Symulacja danych analitycznych (w prawdziwej aplikacji z AI)
+    // Symulacja danych analitycznych
     const mockInsights = [
         {
             type: 'productivity',
@@ -48,183 +56,123 @@ export default function AIScreen() {
 
     const weeklyProgress = [
         { day: 'Pon', completed: 3, planned: 5 },
-        { day: 'Wto', completed: 4, planned: 4 },
-        { day: 'Śro', completed: 2, planned: 6 },
+        { day: 'Wt', completed: 4, planned: 4 },
+        { day: 'Śr', completed: 2, planned: 6 },
         { day: 'Czw', completed: 5, planned: 5 },
-        { day: 'Pią', completed: 6, planned: 7 },
-        { day: 'Sob', completed: 2, planned: 3 },
-        { day: 'Nie', completed: completedTasks.length, planned: todaysTasks.length },
+        { day: 'Pt', completed: 3, planned: 4 },
+        { day: 'Sob', completed: 1, planned: 2 },
+        { day: 'Nd', completed: 0, planned: 1 },
     ];
 
     return (
         <View style={styles.container}>
-            <StatusBar style="auto" />
+            <StatusBar style="light" backgroundColor={Colors.light.tint} />
 
-            <ScrollView
-                style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-                    <View style={styles.headerContent}>
+            {/* Navigation Header */}
+            <View style={[
+                currentView === 'chat' && aiChat.currentSession ? styles.compactHeader : styles.navigationHeader,
+                { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 10 : 20) }
+            ]}>
+                {!(currentView === 'chat' && aiChat.currentSession) && (
+                    <View style={styles.navContent}>
                         <IconSymbol name="brain" size={32} color={Colors.light.tint} />
-                        <ThemedText variant="headlineMedium" style={styles.title}>
-                            Analiza AI
+                        <ThemedText variant="headlineMedium" style={styles.navTitle}>
+                            AI Assistant
                         </ThemedText>
                     </View>
-                    <ThemedText style={styles.subtitle}>
-                        Wgląd w Twoje wzorce i rekomendacje
-                    </ThemedText>
-                </View>
+                )}
 
-                {/* Quick Stats */}
-                <View style={styles.statsSection}>
-                    <View style={styles.statsRow}>
-                        <View style={styles.statCard}>
-                            <IconSymbol name="list.bullet" size={20} color={Colors.light.tint} />
-                            <ThemedText style={styles.statNumber}>{completionRate}%</ThemedText>
-                            <ThemedText style={styles.statLabel}>Dzisiaj ukończone</ThemedText>
-                        </View>
+                <View style={styles.headerMain}>
+                    <View style={currentView === 'chat' && aiChat.currentSession ? styles.compactTabs : styles.navTabs}>
+                        <TouchableOpacity
+                            style={[styles.navTab, currentView === 'chat' && styles.activeNavTab]}
+                            onPress={() => setCurrentView('chat')}
+                        >
+                            <IconSymbol
+                                name="message.circle.fill"
+                                size={currentView === 'chat' && aiChat.currentSession ? 16 : 20}
+                                color={currentView === 'chat' ? '#fff' : Colors.light.tint}
+                            />
+                            <ThemedText style={[
+                                styles.navTabText,
+                                currentView === 'chat' && styles.activeNavTabText,
+                                currentView === 'chat' && aiChat.currentSession && { fontSize: 12 }
+                            ]}>
+                                Chat
+                            </ThemedText>
+                        </TouchableOpacity>
 
-                        <View style={styles.statCard}>
-                            <IconSymbol name="chart.bar.fill" size={20} color={Colors.light.tint} />
-                            <ThemedText style={styles.statNumber}>{tasks.length}</ThemedText>
-                            <ThemedText style={styles.statLabel}>Wszystkie zadania</ThemedText>
-                        </View>
-
-                        <View style={styles.statCard}>
-                            <IconSymbol name="mic.fill" size={20} color={Colors.light.tint} />
-                            <ThemedText style={styles.statNumber}>{voiceNotes.length}</ThemedText>
-                            <ThemedText style={styles.statLabel}>Notatki głosowe</ThemedText>
-                        </View>
+                        <TouchableOpacity
+                            style={[styles.navTab, currentView === 'analytics' && styles.activeNavTab]}
+                            onPress={() => setCurrentView('analytics')}
+                        >
+                            <IconSymbol
+                                name="chart.bar.fill"
+                                size={currentView === 'analytics' && aiChat.currentSession ? 16 : 20}
+                                color={currentView === 'analytics' ? '#fff' : Colors.light.tint}
+                            />
+                            <ThemedText style={[
+                                styles.navTabText,
+                                currentView === 'analytics' && styles.activeNavTabText,
+                                currentView === 'analytics' && aiChat.currentSession && { fontSize: 12 }
+                            ]}>
+                                Analiza
+                            </ThemedText>
+                        </TouchableOpacity>
                     </View>
+
+                    <TouchableOpacity
+                        style={[styles.settingsButton, { borderColor: Colors.light.tint + '30' }]}
+                        onPress={() => setShowSettings(true)}
+                    >
+                        <IconSymbol name="gear" size={18} color={Colors.light.tint} />
+                    </TouchableOpacity>
                 </View>
+            </View>
 
-                {/* Weekly Progress Chart */}
-                <View style={styles.chartSection}>
-                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Postęp w tym tygodniu
-                    </ThemedText>
-                    <View style={styles.chartContainer}>
-                        {weeklyProgress.map((day, index) => {
-                            const maxHeight = 80;
-                            const completedHeight = day.planned > 0 ? (day.completed / day.planned) * maxHeight : 0;
-
-                            return (
-                                <View key={day.day} style={styles.chartBar}>
-                                    <View style={[styles.chartBarContainer, { height: maxHeight }]}>
-                                        <View
-                                            style={[
-                                                styles.chartBarFill,
-                                                { height: completedHeight, backgroundColor: Colors.light.tint }
-                                            ]}
-                                        />
-                                        <View
-                                            style={[
-                                                styles.chartBarBackground,
-                                                { height: maxHeight - completedHeight }
-                                            ]}
-                                        />
-                                    </View>
-                                    <ThemedText style={styles.chartLabel}>{day.day}</ThemedText>
-                                    <ThemedText style={styles.chartValue}>
-                                        {day.completed}/{day.planned}
-                                    </ThemedText>
-                                </View>
-                            );
-                        })}
-                    </View>
-                </View>
-
-                {/* AI Insights */}
-                <View style={styles.insightsSection}>
-                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Wgląd AI
-                    </ThemedText>
-                    <View style={styles.insightsContainer}>
-                        {mockInsights.map((insight, index) => (
-                            <View key={`insight-${index}`} style={styles.insightCard}>
-                                <View style={styles.insightHeader}>
-                                    <IconSymbol name={insight.icon as any} size={20} color={Colors.light.tint} />
-                                    <ThemedText style={styles.insightTitle}>{insight.title}</ThemedText>
-                                    <View style={styles.confidenceBadge}>
-                                        <ThemedText style={styles.confidenceText}>
-                                            {insight.confidence}%
-                                        </ThemedText>
-                                    </View>
-                                </View>
-                                <ThemedText style={styles.insightDescription}>
-                                    {insight.description}
-                                </ThemedText>
-                            </View>
-                        ))}
-                    </View>
-                </View>
-
-                {/* Recommendations */}
-                <View style={styles.recommendationsSection}>
-                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Rekomendacje
-                    </ThemedText>
-                    {recommendations.length > 0 ? (
-                        <View style={styles.recommendationsContainer}>
-                            {recommendations.map((recommendation, index) => (
-                                <TouchableOpacity key={`recommendation-${index}`} style={styles.recommendationCard}>
-                                    <View style={styles.recommendationHeader}>
-                                        <IconSymbol name="paperplane.fill" size={18} color={Colors.light.tint} />
-                                        <ThemedText style={styles.recommendationTitle}>
-                                            {recommendation.title}
-                                        </ThemedText>
-                                    </View>
-                                    <ThemedText style={styles.recommendationDescription}>
-                                        {recommendation.description}
-                                    </ThemedText>
-                                    {recommendation.reason && (
-                                        <ThemedText style={styles.recommendationReason}>
-                                            💡 {recommendation.reason}
-                                        </ThemedText>
-                                    )}
-                                </TouchableOpacity>
-                            ))}
-                        </View>
+            {/* Content */}
+            {currentView === 'chat' ? (
+                <View style={styles.chatContainer}>
+                    {aiChat.currentSession ? (
+                        <EnterpriseChatInterface
+                            session={aiChat.currentSession}
+                            messages={aiChat.messages}
+                            isLoading={aiChat.isLoading}
+                            error={aiChat.error}
+                            onSendMessage={aiChat.sendMessage}
+                            onBackToSessions={() => aiChat.selectSession(null)}
+                            onNewSession={aiChat.newSession}
+                        />
                     ) : (
-                        <View style={styles.emptyRecommendations}>
-                            <IconSymbol name="brain" size={48} color="#ccc" />
-                            <ThemedText style={styles.emptyTitle}>
-                                Brak rekomendacji
-                            </ThemedText>
-                            <ThemedText style={styles.emptyDescription}>
-                                AI potrzebuje więcej danych, aby wygenerować spersonalizowane rekomendacje
-                            </ThemedText>
-                        </View>
+                        <ChatSessionManager
+                            sessions={aiChat.sessions}
+                            onCreateSession={aiChat.createSession}
+                            onSelectSession={aiChat.selectSession}
+                            onDeleteSession={aiChat.deleteSession}
+                        />
                     )}
                 </View>
+            ) : (
+                <AnalyticsView
+                    completionRate={completionRate}
+                    tasks={tasks}
+                    voiceNotes={voiceNotes}
+                    weeklyProgress={weeklyProgress}
+                    mockInsights={mockInsights}
+                    insets={insets}
+                />
+            )}
 
-                {/* Predictions */}
-                <View style={styles.predictionsSection}>
-                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Przewidywania
-                    </ThemedText>
-                    <View style={styles.predictionCard}>
-                        <View style={styles.predictionHeader}>
-                            <IconSymbol name="brain" size={24} color={Colors.light.tint} />
-                            <ThemedText style={styles.predictionTitle}>
-                                Przewidywana produktywność
-                            </ThemedText>
-                        </View>
-                        <ThemedText style={styles.predictionDescription}>
-                            Na podstawie Twoich wzorców, jutro prawdopodobnie ukończysz {Math.round(completionRate * 0.9)}% zadań
-                        </ThemedText>
-                        <View style={styles.predictionTips}>
-                            <ThemedText style={styles.tipsTitle}>💡 Wskazówki na jutro:</ThemedText>
-                            <ThemedText style={styles.tipItem}>• Zaplanuj najważniejsze zadania na rano</ThemedText>
-                            <ThemedText style={styles.tipItem}>• Rozważ krótkie przerwy co 45 minut</ThemedText>
-                            <ThemedText style={styles.tipItem}>• Unikaj planowania więcej niż 7 zadań</ThemedText>
-                        </View>
-                    </View>
-                </View>
-            </ScrollView>
+            {/* AI Settings Modal */}
+            <AISettingsModal
+                visible={showSettings}
+                onClose={() => setShowSettings(false)}
+                selectedModel={aiChat.selectedModel}
+                onModelSelect={aiChat.setSelectedModel}
+                availableModels={aiChat.availableModels}
+                systemInstruction={aiChat.systemInstruction}
+                onSystemInstructionChange={aiChat.setSystemInstruction}
+            />
         </View>
     );
 }
@@ -232,261 +180,92 @@ export default function AIScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
+        backgroundColor: '#f8f9fa',
     },
-    scrollView: {
-        flex: 1,
-    },
-    scrollContent: {
-        paddingBottom: 100,
-    },
-    header: {
-        paddingHorizontal: 20,
-        paddingTop: 60, // Will be overridden with dynamic style
-        paddingBottom: 24,
+    navigationHeader: {
         backgroundColor: 'white',
+        paddingHorizontal: 20,
+        paddingBottom: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
     },
-    headerContent: {
+    navContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        marginBottom: 20,
+    },
+    navTitle: {
+        color: Colors.light.tint,
+        fontWeight: '700',
+    },
+    headerMain: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flex: 1,
+    },
+    settingsButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        marginLeft: 12,
+    },
+    navTabs: {
+        flexDirection: 'row',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 12,
+        padding: 4,
+    },
+    chatContainer: {
+        flex: 1,
+    },
+    compactHeader: {
+        backgroundColor: 'white',
+        paddingHorizontal: 20,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    compactTabs: {
+        flexDirection: 'row',
+        backgroundColor: '#f8f9fa',
+        borderRadius: 8,
+        padding: 2,
+        height: 36,
+    },
+    navTab: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
-        marginBottom: 8,
+        paddingVertical: 6,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        gap: 6,
     },
-    title: {
-        color: '#333',
+    activeNavTab: {
+        backgroundColor: Colors.light.tint,
     },
-    subtitle: {
-        textAlign: 'center',
-        opacity: 0.7,
+    navTabText: {
         fontSize: 14,
-    },
-    statsSection: {
-        paddingHorizontal: 20,
-        paddingVertical: 20,
-    },
-    statsRow: {
-        flexDirection: 'row',
-        gap: 12,
-    },
-    statCard: {
-        flex: 1,
-        backgroundColor: 'white',
-        padding: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        gap: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    statNumber: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontWeight: '600',
         color: Colors.light.tint,
     },
-    statLabel: {
-        fontSize: 12,
-        opacity: 0.7,
-        textAlign: 'center',
-    },
-    chartSection: {
-        paddingHorizontal: 20,
-        marginBottom: 24,
-    },
-    sectionTitle: {
-        marginBottom: 16,
-        color: '#333',
-    },
-    chartContainer: {
-        flexDirection: 'row',
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 12,
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    chartBar: {
-        alignItems: 'center',
-        gap: 4,
-    },
-    chartBarContainer: {
-        width: 24,
-        flexDirection: 'column-reverse',
-        borderRadius: 4,
-        overflow: 'hidden',
-        backgroundColor: '#f0f0f0',
-    },
-    chartBarFill: {
-        width: '100%',
-        borderRadius: 4,
-    },
-    chartBarBackground: {
-        width: '100%',
-        backgroundColor: '#f0f0f0',
-    },
-    chartLabel: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    chartValue: {
-        fontSize: 10,
-        opacity: 0.6,
-    },
-    insightsSection: {
-        paddingHorizontal: 20,
-        marginBottom: 24,
-    },
-    insightsContainer: {
-        gap: 12,
-    },
-    insightCard: {
-        backgroundColor: 'white',
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    insightHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 8,
-    },
-    insightTitle: {
-        flex: 1,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    confidenceBadge: {
-        backgroundColor: Colors.light.tint,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    confidenceText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    insightDescription: {
-        fontSize: 14,
-        opacity: 0.8,
-        lineHeight: 20,
-    },
-    recommendationsSection: {
-        paddingHorizontal: 20,
-        marginBottom: 24,
-    },
-    recommendationsContainer: {
-        gap: 12,
-    },
-    recommendationCard: {
-        backgroundColor: 'white',
-        padding: 16,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    recommendationHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-        marginBottom: 8,
-    },
-    recommendationTitle: {
-        flex: 1,
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    recommendationDescription: {
-        fontSize: 14,
-        opacity: 0.8,
-        lineHeight: 20,
-        marginBottom: 8,
-    },
-    recommendationReason: {
-        fontSize: 13,
-        opacity: 0.7,
-        fontStyle: 'italic',
-    },
-    emptyRecommendations: {
-        alignItems: 'center',
-        padding: 40,
-        backgroundColor: 'white',
-        borderRadius: 12,
-        gap: 12,
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        opacity: 0.8,
-    },
-    emptyDescription: {
-        fontSize: 14,
-        opacity: 0.6,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    predictionsSection: {
-        paddingHorizontal: 20,
-        marginBottom: 32,
-    },
-    predictionCard: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    predictionHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
-    },
-    predictionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    predictionDescription: {
-        fontSize: 14,
-        opacity: 0.8,
-        lineHeight: 20,
-        marginBottom: 16,
-    },
-    predictionTips: {
-        gap: 4,
-    },
-    tipsTitle: {
-        fontSize: 14,
-        fontWeight: '500',
-        marginBottom: 8,
-    },
-    tipItem: {
-        fontSize: 13,
-        opacity: 0.7,
-        lineHeight: 18,
+    activeNavTabText: {
+        color: '#fff',
     },
 });

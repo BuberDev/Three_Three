@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+    IsArray,
+    IsBoolean,
     IsEmail,
     IsEnum,
     IsOptional,
@@ -66,4 +68,50 @@ export class CreateUserDto {
     @IsString()
     @MaxLength(100)
     lastName?: string;
+
+    @ApiProperty({
+        description: 'Consent for voice processing',
+        example: true,
+        required: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    consentVoiceProcessing?: boolean;
+
+    @ApiProperty({
+        description: 'Consent for personalization',
+        example: true,
+        required: false,
+    })
+    @IsOptional()
+    @IsBoolean()
+    consentPersonalization?: boolean;
+
+    @ApiProperty({
+        description: 'User primary goals',
+        example: ['productivity', 'wellness'],
+        required: false,
+    })
+    @IsOptional()
+    @IsArray()
+    @IsString({ each: true })
+    primaryGoals?: string[];
+
+    @ApiProperty({
+        description: 'User timezone',
+        example: 'Europe/Warsaw',
+        required: false,
+    })
+    @IsOptional()
+    @IsString()
+    timezone?: string;
+
+    @ApiProperty({
+        description: 'User language',
+        example: 'pl',
+        required: false,
+    })
+    @IsOptional()
+    @IsString()
+    language?: string;
 }

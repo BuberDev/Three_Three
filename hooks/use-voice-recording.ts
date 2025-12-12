@@ -20,8 +20,7 @@ export const useVoiceRecording = () => {
         const initAudio = async () => {
             try {
                 await audioService.initialize();
-                const permission = await audioService.requestPermissions();
-                setHasPermission(permission);
+                setHasPermission(true);
             } catch (error) {
                 console.error('Failed to initialize audio:', error);
                 setError('Failed to initialize audio recording');
@@ -45,12 +44,8 @@ export const useVoiceRecording = () => {
 
     const startRecording = useCallback(async (): Promise<boolean> => {
         if (!hasPermission) {
-            const permission = await audioService.requestPermissions();
-            setHasPermission(permission);
-            if (!permission) {
-                setError('Microphone permission is required to record voice notes');
-                return false;
-            }
+            setError('Audio permissions not granted');
+            return false;
         }
 
         try {
@@ -129,6 +124,19 @@ export const useVoiceRecording = () => {
         }
     }, [currentRecording.isRecording, startRecording, stopRecording, processAndUpload]);
 
+    // NEW: Record only without auto-upload for custom handling
+    const recordOnly = useCallback(async (): Promise<string | null> => {
+        if (currentRecording.isRecording) {
+            // Stop recording and return URI
+            const recording = await stopRecording();
+            return recording?.uri || null;
+        } else {
+            // Start recording
+            const success = await startRecording();
+            return success ? 'recording-started' : null;
+        }
+    }, [currentRecording.isRecording, startRecording, stopRecording]);
+
     return {
         // State
         currentRecording,
@@ -143,6 +151,7 @@ export const useVoiceRecording = () => {
         deleteRecording,
         processAndUpload,
         recordAndUpload,
+        recordOnly, // NEW: For custom upload handling
 
         // Computed
         isRecording: currentRecording.isRecording,

@@ -23,6 +23,14 @@ const MAPPING = {
   'brain': 'psychology',
   'person.circle': 'person',
   'chart.bar.fill': 'bar-chart',
+  'message.circle.fill': 'chat',
+  'plus': 'add',
+  'arrow.left': 'arrow-back',
+  'ellipsis.horizontal': 'more-horiz',
+  'chatbubble': 'chat-bubble',
+  'folder': 'folder',
+  'analytics': 'analytics',
+  'code': 'code',
 } as IconMapping;
 
 /**

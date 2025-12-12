@@ -5,6 +5,7 @@ import {
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
@@ -13,12 +14,16 @@ import { Colors } from '../../constants/theme';
 import GoogleAuthService from '../../lib/services/google-auth';
 
 interface AuthScreenProps {
-    onContinue: (authData: { email: string; authProvider: string }) => void;
+    onContinue: (authData: { email: string; password?: string; authProvider: string }) => void;
     onBack: () => void;
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) => {
     const [isLoading, setIsLoading] = useState(false);
+    const [showEmailForm, setShowEmailForm] = useState(false);
+    const [isLoginMode, setIsLoginMode] = useState(false); // true = login, false = register
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
 
     const handleAppleAuth = async () => {
         setIsLoading(true);
@@ -73,11 +78,74 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
     };
 
     const handleEmailAuth = () => {
-        // For demo, use a simple email
-        onContinue({
-            email: 'user@example.com',
-            authProvider: 'email'
-        });
+        setShowEmailForm(true);
+    };
+
+    const handleEmailSubmit = async () => {
+        if (!email.trim()) {
+            Alert.alert('Błąd', 'Proszę wprowadź adres email');
+            return;
+        }
+
+        if (!email.includes('@')) {
+            Alert.alert('Błąd', 'Proszę wprowadź prawidłowy adres email');
+            return;
+        }
+
+        if (!password.trim()) {
+            Alert.alert('Błąd', 'Proszę wprowadź hasło');
+            return;
+        }
+
+        if (!isLoginMode && password.length < 6) {
+            Alert.alert('Błąd', 'Hasło musi mieć co najmniej 6 znaków');
+            return;
+        }
+
+        setIsLoading(true);
+
+        try {
+            if (isLoginMode) {
+                // Handle login
+                const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: email.trim(),
+                        password: password.trim(),
+                    }),
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({ message: 'Login failed' }));
+                    throw new Error(errorData.message || 'Nieprawidłowy email lub hasło');
+                }
+
+                const authData = await response.json();
+                console.log('✅ Login successful:', authData);
+
+                // Pass login data to parent component
+                onContinue({
+                    email: email.trim(),
+                    password: password.trim(),
+                    authProvider: 'email',
+                    authData: authData // Include tokens and user data
+                });
+            } else {
+                // Handle registration (existing code)
+                onContinue({
+                    email: email.trim(),
+                    password: password.trim(),
+                    authProvider: 'email'
+                });
+            }
+        } catch (error) {
+            Alert.alert('Błąd', error.message || 'Wystąpił błąd podczas uwierzytelniania');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -93,9 +161,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>Utwórz konto</Text>
+                <Text style={styles.title}>{isLoginMode ? 'Zaloguj się' : 'Utwórz konto'}</Text>
                 <Text style={styles.subtitle}>
-                    Twoje dane są bezpieczne. Synchronizujemy je tylko po to, by usprawnić Twoją codzienność.
+                    {isLoginMode
+                        ? 'Zaloguj się do swojego konta, aby kontynuować.'
+                        : 'Twoje dane są bezpieczne. Synchronizujemy je tylko po to, by usprawnić Twoją codzienność.'
+                    }
                 </Text>
 
                 <View style={styles.authButtons}>
@@ -131,6 +202,67 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                         <Ionicons name="mail" size={24} color={Colors.light.text} />
                         <Text style={styles.emailButtonText}>Kontynuuj z Email</Text>
                     </TouchableOpacity>
+
+                    {showEmailForm && (
+                        <View style={styles.emailForm}>
+                            <TextInput
+                                style={styles.emailInput}
+                                placeholder="Wprowadź swój email"
+                                placeholderTextColor={Colors.light.icon}
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                                autoFocus
+                            />
+                            <TextInput
+                                style={styles.emailInput}
+                                placeholder="Wprowadź hasło"
+                                placeholderTextColor={Colors.light.icon}
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoCapitalize="none"
+                                autoComplete="password"
+                            />
+                            <View style={styles.emailFormButtons}>
+                                <TouchableOpacity
+                                    style={[styles.formButton, styles.cancelButton]}
+                                    onPress={() => {
+                                        setShowEmailForm(false);
+                                        setEmail('');
+                                        setPassword('');
+                                    }}
+                                >
+                                    <Text style={styles.cancelButtonText}>Anuluj</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.formButton, styles.submitButton]}
+                                    onPress={handleEmailSubmit}
+                                    disabled={!email.trim() || !password.trim() || isLoading}
+                                >
+                                    <Text style={[styles.submitButtonText, (!email.trim() || !password.trim()) && styles.disabledText]}>
+                                        {isLoading ? 'Przetwarzanie...' : isLoginMode ? 'Zaloguj się' : 'Kontynuuj'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Login/Register Toggle */}
+                            <TouchableOpacity
+                                style={styles.toggleButton}
+                                onPress={() => setIsLoginMode(!isLoginMode)}
+                                disabled={isLoading}
+                            >
+                                <Text style={styles.toggleText}>
+                                    {isLoginMode
+                                        ? 'Nie masz konta? Utwórz nowe'
+                                        : 'Masz już konto? Zaloguj się'
+                                    }
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
@@ -262,7 +394,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 24,
         paddingTop: 40,
-        paddingBottom: 20,
+        paddingBottom: 100, // Więcej miejsca na przełącznik logowania
     },
     footerContainer: {
         backgroundColor: Colors.light.background,
@@ -271,5 +403,66 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.05)',
+    },
+    emailForm: {
+        marginTop: 16,
+        padding: 16,
+        backgroundColor: Colors.light.surface,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+    },
+    emailInput: {
+        backgroundColor: Colors.light.background,
+        borderRadius: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+        fontSize: 16,
+        color: Colors.light.text,
+        borderWidth: 1,
+        borderColor: 'rgba(0,0,0,0.1)',
+        marginBottom: 12,
+    },
+    emailFormButtons: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    formButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: 'rgba(0,0,0,0.05)',
+    },
+    cancelButtonText: {
+        color: Colors.light.text,
+        fontWeight: '600',
+    },
+    submitButton: {
+        backgroundColor: Colors.light.primary,
+    },
+    submitButtonText: {
+        color: 'white',
+        fontWeight: '600',
+    },
+    disabledText: {
+        opacity: 0.5,
+    },
+    toggleButton: {
+        marginTop: 24,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: 'rgba(76, 175, 80, 0.2)',
+    },
+    toggleText: {
+        color: Colors.light.primary,
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

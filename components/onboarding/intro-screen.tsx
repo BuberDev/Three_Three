@@ -19,20 +19,25 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
     const colors = Colors[colorScheme ?? 'light'];
 
     return (
-        <View style={{
-            flex: 1,
-            paddingTop: insets.top + DesignSystem.spacing.lg
-        }}>
-            <LinearGradient
-                colors={DesignSystem.gradients.primary.colors}
-                locations={DesignSystem.gradients.primary.locations}
-                start={DesignSystem.gradients.primary.start}
-                end={DesignSystem.gradients.primary.end}
-                style={{ flex: 1 }}
-            >
+        <LinearGradient
+            colors={DesignSystem.gradients.primary.colors}
+            locations={DesignSystem.gradients.primary.locations}
+            start={DesignSystem.gradients.primary.start}
+            end={DesignSystem.gradients.primary.end}
+            style={{
+                flex: 1,
+                paddingTop: insets.top,
+                paddingBottom: insets.bottom
+            }}
+        >
+            <View style={{
+                flex: 1,
+                paddingHorizontal: DesignSystem.spacing.xl,
+                justifyContent: 'space-between',
+            }}>
+                {/* Main Content */}
                 <View style={{
                     flex: 1,
-                    paddingHorizontal: DesignSystem.spacing.xl,
                     justifyContent: 'center',
                     alignItems: 'center',
                 }}>
@@ -44,14 +49,14 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                         ...DesignSystem.elevation[2],
                     }}>
                         <IconSymbol
-                            name="mic"
+                            name="chart.line.uptrend.xyaxis"
                             size={80}
                             color="white"
                         />
                     </View>
 
                     <ThemedText
-                        variant="displayMedium"
+                        variant="displaySmall"
                         lightColor="white"
                         darkColor="white"
                         style={{
@@ -60,7 +65,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                             fontWeight: '700',
                         }}
                     >
-                        Zapisuj swój dzień w sposób naturalny – głosem
+                        Zwieksz swoj performance zyciowy
                     </ThemedText>
 
                     <ThemedText
@@ -69,24 +74,23 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                         darkColor="rgba(255,255,255,0.9)"
                         style={{
                             textAlign: 'center',
-                            marginBottom: DesignSystem.spacing['5xl'],
-                            lineHeight: 28,
+                            marginBottom: DesignSystem.spacing['3xl'],
+                            lineHeight: 26,
                         }}
                     >
-                        Jedna krótka notatka, a my zamienimy ją w zadania, priorytety i podsumowania.
+                        Analizuj zycie ze wsparciem AI i podejmuj lepsze decyzje kazdego dnia.
                     </ThemedText>
 
                     <View style={{
                         width: '100%',
-                        gap: DesignSystem.spacing.xl,
-                        marginBottom: DesignSystem.spacing['5xl'],
+                        gap: DesignSystem.spacing.lg,
                     }}>
                         <ModernView
                             style={{
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 backgroundColor: 'rgba(255,255,255,0.1)',
-                                padding: DesignSystem.spacing.lg,
+                                padding: DesignSystem.spacing.md,
                                 borderRadius: DesignSystem.borderRadius.xl,
                                 gap: DesignSystem.spacing.lg,
                             }}
@@ -104,7 +108,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 darkColor="white"
                                 style={{ flex: 1, fontWeight: '600' }}
                             >
-                                Natychmiastowy zapis myśli
+                                Analiza swojego zycia
                             </ThemedText>
                         </ModernView>
 
@@ -113,7 +117,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 backgroundColor: 'rgba(255,255,255,0.1)',
-                                padding: DesignSystem.spacing.lg,
+                                padding: DesignSystem.spacing.md,
                                 borderRadius: DesignSystem.borderRadius.xl,
                                 gap: DesignSystem.spacing.lg,
                             }}
@@ -123,7 +127,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 borderRadius: DesignSystem.borderRadius.lg,
                                 padding: DesignSystem.spacing.md,
                             }}>
-                                <IconSymbol name="list.bullet" size={24} color="white" />
+                                <IconSymbol name="list.bullet.clipboard" size={24} color="white" />
                             </View>
                             <ThemedText
                                 variant="titleMedium"
@@ -131,7 +135,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 darkColor="white"
                                 style={{ flex: 1, fontWeight: '600' }}
                             >
-                                Automatyczne zadania
+                                Rekomendacje dzialan
                             </ThemedText>
                         </ModernView>
 
@@ -140,7 +144,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 backgroundColor: 'rgba(255,255,255,0.1)',
-                                padding: DesignSystem.spacing.lg,
+                                padding: DesignSystem.spacing.md,
                                 borderRadius: DesignSystem.borderRadius.xl,
                                 gap: DesignSystem.spacing.lg,
                             }}
@@ -158,58 +162,60 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 darkColor="white"
                                 style={{ flex: 1, fontWeight: '600' }}
                             >
-                                Inteligentne analizy
+                                Najlepsze decyzje
                             </ThemedText>
                         </ModernView>
                     </View>
+                </View>
 
+                {/* Bottom Button Section */}
+                <View style={{
+                    paddingBottom: DesignSystem.spacing.lg,
+                    alignItems: 'center',
+                }}>
                     <View style={{
+                        backgroundColor: 'rgba(255,255,255,0.15)',
+                        borderRadius: DesignSystem.borderRadius.xl,
+                        padding: 2,
+                        marginBottom: DesignSystem.spacing.lg,
                         width: '100%',
-                        paddingBottom: insets.bottom + DesignSystem.spacing.lg,
                     }}>
-                        <View style={{
-                            backgroundColor: 'rgba(255,255,255,0.15)',
-                            borderRadius: DesignSystem.borderRadius.xl,
-                            padding: 2,
-                            marginBottom: DesignSystem.spacing.lg,
-                        }}>
-                            <TouchableOpacity
-                                onPress={onContinue}
-                                style={{
-                                    backgroundColor: 'white',
-                                    borderRadius: DesignSystem.borderRadius.lg,
-                                    paddingVertical: DesignSystem.spacing.lg,
-                                    paddingHorizontal: DesignSystem.spacing.xl,
-                                    alignItems: 'center',
-                                    ...DesignSystem.elevation[2],
-                                }}
-                            >
-                                <ThemedText
-                                    variant="titleMedium"
-                                    style={{
-                                        color: colors.primary,
-                                        fontWeight: '600',
-                                    }}
-                                >
-                                    Rozpocznij
-                                </ThemedText>
-                            </TouchableOpacity>
-                        </View>
-
-                        <ThemedText
-                            variant="bodySmall"
-                            lightColor="rgba(255,255,255,0.7)"
-                            darkColor="rgba(255,255,255,0.7)"
+                        <TouchableOpacity
+                            onPress={onContinue}
                             style={{
-                                textAlign: 'center',
-                                lineHeight: 18,
+                                backgroundColor: 'white',
+                                borderRadius: DesignSystem.borderRadius.lg,
+                                paddingVertical: DesignSystem.spacing.lg,
+                                paddingHorizontal: DesignSystem.spacing.xl,
+                                alignItems: 'center',
+                                ...DesignSystem.elevation[2],
                             }}
                         >
-                            Rozpoczęcie zajmuje mniej niż 2 minuty
-                        </ThemedText>
+                            <ThemedText
+                                variant="titleMedium"
+                                style={{
+                                    color: colors.primary,
+                                    fontWeight: '600',
+                                }}
+                            >
+                                Rozpocznij
+                            </ThemedText>
+                        </TouchableOpacity>
                     </View>
+
+                    <ThemedText
+                        variant="bodySmall"
+                        lightColor="rgba(255,255,255,0.7)"
+                        darkColor="rgba(255,255,255,0.7)"
+                        style={{
+                            textAlign: 'center',
+                            lineHeight: 18,
+                        }}
+                    >
+                        Rozpoczęcie zajmuje mniej niż 2 minuty
+                    </ThemedText>
                 </View>
-            </LinearGradient>
-        </View>
+            </View>
+        </LinearGradient>
     );
 };

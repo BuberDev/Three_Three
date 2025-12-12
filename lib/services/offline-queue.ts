@@ -170,7 +170,7 @@ export class OfflineQueueService {
     private async executeRequest(apiService: ApiService, request: QueuedRequest): Promise<any> {
         // Map queued requests to actual API calls
         switch (request.endpoint) {
-            case '/voice/notes':
+            case '/voice-notes':
                 return apiService.uploadVoiceNote(request.data.audioUri, request.data.userId);
             default:
                 // For extensibility - could implement more endpoint mappings

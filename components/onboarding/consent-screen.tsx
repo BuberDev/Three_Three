@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { ScrollView, Switch, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ThemedText } from '../themed-text';
-import { ModernView } from '../modern-view';
-import { ModernCard } from '../modern-card';
-import { ModernButton } from '../modern-button';
-import { IconSymbol } from '../ui/icon-symbol';
-import { DesignSystem, Colors } from '@/constants/theme';
+import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ModernButton } from '../modern-button';
+import { ModernCard } from '../modern-card';
+import { ModernView } from '../modern-view';
+import { ThemedText } from '../themed-text';
+import { IconSymbol } from '../ui/icon-symbol';
 
 interface ConsentScreenProps {
     onContinue: (consents: { voiceProcessing: boolean; personalization: boolean }) => void;
@@ -40,7 +40,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     paddingHorizontal: DesignSystem.spacing.lg,
                     paddingVertical: DesignSystem.spacing.md,
                 }}>
-                    <TouchableOpacity 
+                    <TouchableOpacity
                         onPress={onBack}
                         style={{
                             backgroundColor: colors.surfaceSecondary,
@@ -60,14 +60,16 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     style={{ flex: 1 }}
                     contentContainerStyle={{
                         paddingHorizontal: DesignSystem.spacing.lg,
-                        paddingBottom: DesignSystem.spacing['4xl'],
+                        paddingBottom: DesignSystem.spacing['6xl'], // More space for bottom button
                     }}
                     showsVerticalScrollIndicator={false}
+                    bounces={false}
                 >
                     {/* Header Section */}
                     <View style={{
                         alignItems: 'center',
-                        paddingVertical: DesignSystem.spacing['3xl'],
+                        paddingTop: DesignSystem.spacing.lg, // Less top padding
+                        paddingBottom: DesignSystem.spacing.xl,
                     }}>
                         <View style={{
                             backgroundColor: colors.surfaceSecondary,
@@ -75,14 +77,14 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                             padding: DesignSystem.spacing.xl,
                             marginBottom: DesignSystem.spacing.xl,
                         }}>
-                            <IconSymbol 
-                                name="shield.fill" 
-                                size={48} 
-                                color={colors.primary} 
+                            <IconSymbol
+                                name="shield.fill"
+                                size={48}
+                                color={colors.primary}
                             />
                         </View>
-                        <ThemedText 
-                            variant="displaySmall" 
+                        <ThemedText
+                            variant="displaySmall"
                             style={{
                                 textAlign: 'center',
                                 marginBottom: DesignSystem.spacing.md,
@@ -91,8 +93,8 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                         >
                             Twoje dane. Twoje decyzje.
                         </ThemedText>
-                        <ThemedText 
-                            variant="bodyLarge" 
+                        <ThemedText
+                            variant="bodyLarge"
                             color="secondary"
                             style={{ textAlign: 'center', lineHeight: 26 }}
                         >
@@ -106,54 +108,29 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                         <ModernCard elevation={2}>
                             <View style={{
                                 flexDirection: 'row',
-                                alignItems: 'flex-start',
-                                gap: DesignSystem.spacing.lg,
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: DesignSystem.spacing.md,
                             }}>
                                 <View style={{ flex: 1 }}>
-                                    <View style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        marginBottom: DesignSystem.spacing.sm,
-                                        gap: DesignSystem.spacing.md,
-                                    }}>
-                                        <ThemedText variant="titleMedium" style={{ fontWeight: '600' }}>
-                                            Analiza notatek głosowych
-                                        </ThemedText>
-                                        <View style={{
-                                            backgroundColor: colors.primary + '15',
-                                            paddingHorizontal: DesignSystem.spacing.sm,
-                                            paddingVertical: DesignSystem.spacing.xs,
-                                            borderRadius: DesignSystem.borderRadius.sm,
-                                        }}>
-                                            <ThemedText 
-                                                variant="bodySmall" 
-                                                style={{ 
-                                                    color: colors.primary,
-                                                    fontWeight: '600'
-                                                }}
-                                            >
-                                                Wymagane
-                                            </ThemedText>
-                                        </View>
-                                    </View>
-                                    <ThemedText 
-                                        variant="bodyMedium" 
-                                        color="secondary"
-                                        style={{ lineHeight: 22, marginBottom: DesignSystem.spacing.md }}
-                                    >
-                                        Zgadzam się na analizę moich notatek głosowych w celu automatycznego tworzenia zadań i podsumowań.
+                                    <ThemedText variant="titleMedium" style={{ fontWeight: '600', marginBottom: DesignSystem.spacing.xs }}>
+                                        Analiza notatek głosowych
                                     </ThemedText>
                                     <View style={{
-                                        backgroundColor: colors.backgroundTertiary,
-                                        padding: DesignSystem.spacing.md,
-                                        borderRadius: DesignSystem.borderRadius.md,
-                                        borderLeftWidth: 3,
-                                        borderLeftColor: colors.primary,
+                                        backgroundColor: colors.primary + '15',
+                                        paddingHorizontal: DesignSystem.spacing.sm,
+                                        paddingVertical: DesignSystem.spacing.xs,
+                                        borderRadius: DesignSystem.borderRadius.sm,
+                                        alignSelf: 'flex-start',
                                     }}>
-                                        <ThemedText variant="bodySmall" color="secondary">
-                                            ✓ Nagrania są przetwarzane lokalnie na urządzeniu{'\n'}
-                                            ✓ Dane nie są udostępniane podmiotom trzecim{'\n'}
-                                            ✓ Możesz usunąć swoje dane w każdej chwili
+                                        <ThemedText
+                                            variant="bodySmall"
+                                            style={{
+                                                color: colors.primary,
+                                                fontWeight: '600'
+                                            }}
+                                        >
+                                            Wymagane
                                         </ThemedText>
                                     </View>
                                 </View>
@@ -165,58 +142,53 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                                     style={{ transform: [{ scale: 1.1 }] }}
                                 />
                             </View>
+                            <ThemedText
+                                variant="bodyMedium"
+                                color="secondary"
+                                style={{ lineHeight: 22, marginBottom: DesignSystem.spacing.md }}
+                            >
+                                Zgadzam się na analizę moich notatek głosowych w celu automatycznego tworzenia zadań i podsumowań.
+                            </ThemedText>
+                            <View style={{
+                                backgroundColor: colors.backgroundTertiary,
+                                padding: DesignSystem.spacing.md,
+                                borderRadius: DesignSystem.borderRadius.md,
+                                borderLeftWidth: 3,
+                                borderLeftColor: colors.primary,
+                            }}>
+                                <ThemedText variant="bodySmall" color="secondary">
+                                    ✓ Nagrania są przetwarzane lokalnie na urządzeniu{'\n'}
+                                    ✓ Dane nie są udostępniane podmiotom trzecim{'\n'}
+                                    ✓ Możesz usunąć swoje dane w każdej chwili
+                                </ThemedText>
+                            </View>
                         </ModernCard>
 
                         {/* Personalization */}
                         <ModernCard elevation={2}>
                             <View style={{
                                 flexDirection: 'row',
-                                alignItems: 'flex-start',
-                                gap: DesignSystem.spacing.lg,
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                marginBottom: DesignSystem.spacing.md,
                             }}>
                                 <View style={{ flex: 1 }}>
-                                    <View style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        marginBottom: DesignSystem.spacing.sm,
-                                        gap: DesignSystem.spacing.md,
-                                    }}>
-                                        <ThemedText variant="titleMedium" style={{ fontWeight: '600' }}>
-                                            Personalizacja doświadczenia
-                                        </ThemedText>
-                                        <View style={{
-                                            backgroundColor: colors.iconSecondary + '15',
-                                            paddingHorizontal: DesignSystem.spacing.sm,
-                                            paddingVertical: DesignSystem.spacing.xs,
-                                            borderRadius: DesignSystem.borderRadius.sm,
-                                        }}>
-                                            <ThemedText 
-                                                variant="bodySmall" 
-                                                color="secondary"
-                                                style={{ fontWeight: '600' }}
-                                            >
-                                                Opcjonalne
-                                            </ThemedText>
-                                        </View>
-                                    </View>
-                                    <ThemedText 
-                                        variant="bodyMedium" 
-                                        color="secondary"
-                                        style={{ lineHeight: 22, marginBottom: DesignSystem.spacing.md }}
-                                    >
-                                        Pozwól na analizę wzorców aktywności w celu lepszego dopasowania rekomendacji i funkcji aplikacji.
+                                    <ThemedText variant="titleMedium" style={{ fontWeight: '600', marginBottom: DesignSystem.spacing.xs }}>
+                                        Personalizacja doświadczenia
                                     </ThemedText>
                                     <View style={{
-                                        backgroundColor: colors.backgroundTertiary,
-                                        padding: DesignSystem.spacing.md,
-                                        borderRadius: DesignSystem.borderRadius.md,
-                                        borderLeftWidth: 3,
-                                        borderLeftColor: colors.iconSecondary,
+                                        backgroundColor: colors.iconSecondary + '15',
+                                        paddingHorizontal: DesignSystem.spacing.sm,
+                                        paddingVertical: DesignSystem.spacing.xs,
+                                        borderRadius: DesignSystem.borderRadius.sm,
+                                        alignSelf: 'flex-start',
                                     }}>
-                                        <ThemedText variant="bodySmall" color="secondary">
-                                            • Lepsze rekomendacje AI{'\n'}
-                                            • Spersonalizowane powiadomienia{'\n'}
-                                            • Analiza wzorców produktywności
+                                        <ThemedText
+                                            variant="bodySmall"
+                                            color="secondary"
+                                            style={{ fontWeight: '600' }}
+                                        >
+                                            Opcjonalne
                                         </ThemedText>
                                     </View>
                                 </View>
@@ -227,6 +199,26 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                                     thumbColor={personalizationConsent ? colors.primary : colors.icon}
                                     style={{ transform: [{ scale: 1.1 }] }}
                                 />
+                            </View>
+                            <ThemedText
+                                variant="bodyMedium"
+                                color="secondary"
+                                style={{ lineHeight: 22, marginBottom: DesignSystem.spacing.md }}
+                            >
+                                Pozwól na analizę wzorców aktywności w celu lepszego dopasowania rekomendacji i funkcji aplikacji.
+                            </ThemedText>
+                            <View style={{
+                                backgroundColor: colors.backgroundTertiary,
+                                padding: DesignSystem.spacing.md,
+                                borderRadius: DesignSystem.borderRadius.md,
+                                borderLeftWidth: 3,
+                                borderLeftColor: colors.iconSecondary,
+                            }}>
+                                <ThemedText variant="bodySmall" color="secondary">
+                                    • Lepsze rekomendacje AI{'\n'}
+                                    • Spersonalizowane powiadomienia{'\n'}
+                                    • Analiza wzorców produktywności
+                                </ThemedText>
                             </View>
                         </ModernCard>
                     </View>
@@ -246,8 +238,8 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                             marginBottom: DesignSystem.spacing.md,
                         }}>
                             <IconSymbol name="info.circle" size={20} color={colors.primary} />
-                            <ThemedText 
-                                variant="titleSmall" 
+                            <ThemedText
+                                variant="titleSmall"
                                 style={{ marginLeft: DesignSystem.spacing.sm, fontWeight: '600' }}
                             >
                                 Ważne informacje
@@ -278,12 +270,12 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                         }}
                     />
                     {!canContinue && (
-                        <ThemedText 
-                            variant="bodySmall" 
+                        <ThemedText
+                            variant="bodySmall"
                             color="secondary"
-                            style={{ 
+                            style={{
                                 textAlign: 'center',
-                                marginTop: DesignSystem.spacing.md 
+                                marginTop: DesignSystem.spacing.md
                             }}
                         >
                             Akceptacja analizy notatek jest wymagana do działania aplikacji

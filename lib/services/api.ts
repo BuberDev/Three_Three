@@ -41,14 +41,15 @@ export class ApiService {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-            const response = await fetch(`${this.baseURL}/health`, {
+            // Use simple GET to base API path since /health doesn't exist
+            const response = await fetch(`${this.baseURL.replace('/api', '')}`, {
                 method: 'GET',
                 signal: controller.signal,
             });
 
             clearTimeout(timeoutId);
             const wasAvailable = this.backendAvailable;
-            this.backendAvailable = response.ok;
+            this.backendAvailable = response.status !== 0; // Any response means server is up
 
             // Log when backend becomes available again
             if (this.backendAvailable && wasAvailable === false) {
@@ -162,19 +163,31 @@ export class ApiService {
         });
     }
 
-    public async uploadVoiceNote(audioUri: string, userId: string): Promise<ApiResponse<VoiceNoteResponse>> {
+    public async uploadVoiceNote(audioUri: string, title?: string, tags?: string[]): Promise<ApiResponse<VoiceNoteResponse>> {
         try {
+            if (!await this.checkBackendAvailability()) {
+                throw new NetworkError('Backend server is not available');
+            }
+
             const formData = new FormData();
 
-            // Create file object from URI
-            const audioBlob = await fetch(audioUri).then(r => r.blob());
-            formData.append('audio', audioBlob as any, 'recording.m4a');
-            formData.append('userId', userId);
+            // React Native file upload structure
+            formData.append('audio', {
+                uri: audioUri,
+                type: 'audio/m4a',
+                name: 'voice_recording.m4a',
+            } as any);
 
-            const response = await fetch(`${this.baseURL}/voice/notes`, {
+            if (title) formData.append('title', title);
+            if (tags && tags.length > 0) {
+                formData.append('tags', JSON.stringify(tags));
+            }
+
+            const response = await fetch(`${this.baseURL}/voice-notes`, {
                 method: 'POST',
                 headers: {
                     Authorization: this.authToken ? `Bearer ${this.authToken}` : '',
+                    // Don't set Content-Type - let fetch set it with boundary
                 },
                 body: formData,
             });
@@ -205,11 +218,11 @@ export class ApiService {
         const params = new URLSearchParams();
         if (limit) params.append('limit', limit.toString());
 
-        return this.makeRequest(`/voice/notes?${params.toString()}`);
+        return this.makeRequest(`/voice-notes?${params.toString()}`);
     }
 
     public async deleteVoiceNote(noteId: string): Promise<ApiResponse<void>> {
-        return this.makeRequest(`/voice/notes/${noteId}`, {
+        return this.makeRequest(`/voice-notes/${noteId}`, {
             method: 'DELETE',
         });
     }
@@ -220,16 +233,17 @@ export class ApiService {
     }
 
     public async getLatestDailySummary(): Promise<ApiResponse<DailyEntry>> {
-        return this.makeRequest('/daily/summary/latest');
+        // TODO: Implement when backend has this endpoint
+        throw new Error('Daily summary endpoint not implemented yet');
     }
 
     // User settings methods
     public async getUserSettings(): Promise<ApiResponse<UserSettings>> {
-        return this.makeRequest('/user/settings');
+        return this.makeRequest('/users/me/settings');
     }
 
     public async updateUserSettings(settings: Partial<UserSettings>): Promise<ApiResponse<UserSettings>> {
-        return this.makeRequest('/user/settings', {
+        return this.makeRequest('/users/me/settings', {
             method: 'PATCH',
             body: JSON.stringify(settings),
         });
@@ -257,25 +271,38 @@ export class ApiService {
     }
 
     // Activity tracking methods
-    public async uploadVoiceNoteWithContext(audioUri: string, userId: string, context?: string): Promise<ApiResponse<VoiceNoteResponse & { extractedActivities?: any[] }>> {
-        const formData = new FormData();
-        formData.append('audio', {
-            uri: audioUri,
-            type: 'audio/m4a',
-            name: 'voice_note.m4a',
-        } as any);
-        formData.append('userId', userId);
-        if (context) {
-            formData.append('context', context);
-        }
+    public async uploadVoiceNoteWithContext(audioUri: string, context?: string, title?: string): Promise<ApiResponse<VoiceNoteResponse & { extractedActivities?: any[] }>> {
+        try {
+            if (!await this.checkBackendAvailability()) {
+                throw new NetworkError('Backend server is not available');
+            }
 
-        return this.makeRequest('/voice-notes/upload-with-context', {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Content-Type': 'multipart/form-data',
-            },
-        });
+            const formData = new FormData();
+            formData.append('audio', {
+                uri: audioUri,
+                type: 'audio/m4a',
+                name: 'voice_recording_with_context.m4a',
+            } as any);
+
+            if (context) {
+                formData.append('metadata', JSON.stringify({ context }));
+            }
+            if (title) {
+                formData.append('title', title);
+            }
+
+            return this.makeRequest('/voice-notes', {
+                method: 'POST',
+                body: formData,
+                // Don't set Content-Type - let fetch handle multipart boundary
+            });
+        } catch (error) {
+            console.error('🚨 Voice note upload with context failed:', error);
+            return {
+                success: false,
+                error: ErrorHandler.handleError(error).message,
+            };
+        }
     }
 
     public async getActivities(userId: string): Promise<ApiResponse<any[]>> {
@@ -290,28 +317,28 @@ export class ApiService {
     }
 
     public async getDailyMetrics(userId: string, date: string): Promise<ApiResponse<any>> {
-        return this.makeRequest(`/metrics/daily?userId=${userId}&date=${date}`);
+        // TODO: Map to existing analytics endpoint when needed
+        throw new Error('Daily metrics endpoint not implemented yet');
     }
 
     public async getWeeklyInsights(userId: string): Promise<ApiResponse<any>> {
-        return this.makeRequest(`/insights/weekly?userId=${userId}`);
+        // TODO: Map to existing analytics endpoint when needed  
+        throw new Error('Weekly insights endpoint not implemented yet');
     }
 
     public async getProgressMetrics(userId: string): Promise<ApiResponse<any>> {
-        return this.makeRequest(`/metrics/progress?userId=${userId}`);
+        // TODO: Map to existing analytics endpoint when needed
+        throw new Error('Progress metrics endpoint not implemented yet');
     }
 
     public async generatePersonalizedRecommendations(userId: string): Promise<ApiResponse<any[]>> {
-        return this.makeRequest(`/recommendations/generate?userId=${userId}`, {
-            method: 'POST',
-        });
+        // TODO: Implement when backend has this endpoint
+        throw new Error('Personalized recommendations endpoint not implemented yet');
     }
 
     public async generateDailySummary(userId: string, date: string): Promise<ApiResponse<DailyEntry>> {
-        return this.makeRequest('/daily-entries/generate', {
-            method: 'POST',
-            body: JSON.stringify({ userId, date }),
-        });
+        // TODO: Map to existing analytics endpoint when needed
+        throw new Error('Daily summary generation endpoint not implemented yet');
     }
 
     // Health check
@@ -364,6 +391,53 @@ export class ApiService {
 
     public getOfflineQueueSize(): number {
         return this.offlineQueue.length;
+    }
+
+    // ========== ENTERPRISE VOICE RECORDING FEATURES ==========
+
+    /**
+     * Upload daily report voice note with enterprise-grade categorization
+     */
+    public async uploadDailyReportVoice(audioUri: string, reportType: 'morning' | 'evening' | 'summary'): Promise<ApiResponse<VoiceNoteResponse>> {
+        const title = `Daily ${reportType} report - ${new Date().toLocaleDateString()}`;
+        const metadata = {
+            category: 'daily-report',
+            reportType,
+            timestamp: new Date().toISOString(),
+            context: `User's daily ${reportType} voice report`
+        };
+
+        return this.uploadVoiceNoteWithContext(audioUri, JSON.stringify(metadata), title);
+    }
+
+    /**
+     * Upload sleep experience voice note with enterprise categorization
+     */
+    public async uploadSleepReportVoice(audioUri: string, sleepType: 'dream' | 'insomnia' | 'morning-reflection' | 'sleep-quality'): Promise<ApiResponse<VoiceNoteResponse>> {
+        const title = `Sleep ${sleepType} report - ${new Date().toLocaleDateString()}`;
+        const metadata = {
+            category: 'sleep-report',
+            sleepType,
+            timestamp: new Date().toISOString(),
+            context: `User's sleep-related voice note about ${sleepType}`
+        };
+
+        return this.uploadVoiceNoteWithContext(audioUri, JSON.stringify(metadata), title);
+    }
+
+    /**
+     * Upload general life experience voice note
+     */
+    public async uploadLifeExperienceVoice(audioUri: string, category: 'reflection' | 'gratitude' | 'emotion' | 'achievement' | 'challenge'): Promise<ApiResponse<VoiceNoteResponse>> {
+        const title = `Life ${category} - ${new Date().toLocaleDateString()}`;
+        const metadata = {
+            category: 'life-experience',
+            experienceType: category,
+            timestamp: new Date().toISOString(),
+            context: `User's personal voice note about ${category}`
+        };
+
+        return this.uploadVoiceNoteWithContext(audioUri, JSON.stringify(metadata), title);
     }
 }
 
