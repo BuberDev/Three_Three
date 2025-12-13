@@ -31,6 +31,10 @@ export class ApiService {
         this.authToken = token;
     }
 
+    public getAuthToken(): string | null {
+        return this.authToken;
+    }
+
     private async checkBackendAvailability(): Promise<boolean> {
         const now = Date.now();
         if (this.backendAvailable !== null && now - this.lastBackendCheck < this.BACKEND_CHECK_INTERVAL) {
@@ -183,30 +187,54 @@ export class ApiService {
                 formData.append('tags', JSON.stringify(tags));
             }
 
-            const response = await fetch(`${this.baseURL}/voice-notes`, {
-                method: 'POST',
-                headers: {
-                    Authorization: this.authToken ? `Bearer ${this.authToken}` : '',
-                    // Don't set Content-Type - let fetch set it with boundary
-                },
-                body: formData,
-            });
+            // Add AbortController with 30-second timeout for voice processing
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => {
+                console.warn('⚠️ Voice note upload timed out after 60 seconds');
+                controller.abort();
+            }, 30000); // 30 seconds timeout
 
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({}));
+            try {
+                const response = await fetch(`${this.baseURL}/voice-notes`, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: this.authToken ? `Bearer ${this.authToken}` : '',
+                        // Don't set Content-Type - let fetch set it with boundary
+                    },
+                    body: formData,
+                    signal: controller.signal, // Add timeout signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    return {
+                        success: false,
+                        error: errorData.message || `Upload failed: ${response.statusText}`,
+                    };
+                }
+
+                const data = await response.json();
+                console.log('✅ Voice note API response received successfully');
                 return {
-                    success: false,
-                    error: errorData.message || `Upload failed: ${response.statusText}`,
+                    success: true,
+                    data,
                 };
-            }
+            } catch (fetchError) {
+                clearTimeout(timeoutId);
 
-            const data = await response.json();
-            return {
-                success: true,
-                data,
-            };
+                if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+                    console.error('🕐 Voice note upload timed out');
+                    return {
+                        success: false,
+                        error: 'Upload timed out. The recording is being processed in the background.',
+                    };
+                }
+                throw fetchError;
+            }
         } catch (error) {
-            console.error('Voice note upload failed:', error);
+            console.error('❌ Voice note upload failed:', error);
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Upload error',

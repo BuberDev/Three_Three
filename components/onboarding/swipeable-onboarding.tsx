@@ -40,8 +40,18 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
             return;
         }
 
+        // SECURITY: Double-check authentication before completing
+        const { isAuthenticated, user } = useAppStore.getState();
+        if (!isAuthenticated || !user) {
+            console.error('🚫 SECURITY: Attempted to complete onboarding without authentication!');
+            console.log('📋 Authentication required - redirecting to login screen');
+            // Redirect to auth screen instead of completing
+            pagerRef.current?.setPage(1);
+            return;
+        }
+
         setIsCompletingOnboarding(true);
-        console.log('🎉 Onboarding completed, entering main application');
+        console.log('🎉 Onboarding completed safely - user authenticated, entering main application');
 
         // Use setTimeout to ensure state update and prevent rapid calls
         setTimeout(() => {
@@ -288,11 +298,31 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
     const handleFinalComplete = async () => {
         try {
             console.log('📋 Final onboarding screen reached');
+
+            // SECURITY: Ensure user is properly authenticated before completing onboarding
+            const { isAuthenticated, user } = useAppStore.getState();
+
+            if (!isAuthenticated || !user) {
+                console.error('❌ Cannot complete onboarding: User not authenticated');
+                console.log('📋 Redirecting to authentication screen...');
+                // Go back to auth screen (page 1)
+                pagerRef.current?.setPage(1);
+                return;
+            }
+
+            console.log('✅ User authenticated, completing onboarding safely');
             completeOnboardingSafely();
         } catch (error) {
             console.error('❌ Failed to complete final onboarding step:', error);
-            // Use safe completion even on error
-            completeOnboardingSafely();
+            // SECURITY: Don't complete onboarding on error without authentication
+            const { isAuthenticated, user } = useAppStore.getState();
+            if (isAuthenticated && user) {
+                console.log('✅ Error but user authenticated, completing anyway');
+                completeOnboardingSafely();
+            } else {
+                console.error('❌ Error and user not authenticated, redirecting to auth');
+                pagerRef.current?.setPage(1);
+            }
         }
     }; return (
         <View style={styles.container}>

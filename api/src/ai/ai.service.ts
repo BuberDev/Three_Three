@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ChatService } from '../chat/chat.service';
+import { MessageRole } from '../chat/entities/chat-message.entity';
 import { ChatCompletionDto } from './dto/chat-completion.dto';
 
 interface OpenRouterResponse {
@@ -24,7 +26,10 @@ export class AiService {
     private readonly openRouterApiKey: string;
     private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
 
-    constructor(private configService: ConfigService) {
+    constructor(
+        private configService: ConfigService,
+        private chatService: ChatService,
+    ) {
         this.openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
 
         if (!this.openRouterApiKey) {
@@ -133,6 +138,117 @@ export class AiService {
         } catch (error) {
             this.logger.error('Failed to fetch available models', error);
             return { models: [] };
+        }
+    }
+
+    /**
+     * Enterprise method: Create chat completion with database persistence
+     */
+    async createChatCompletionWithPersistence(
+        userId: string,
+        sessionId: string,
+        request: ChatCompletionDto,
+    ): Promise<any> {
+        const startTime = Date.now();
+
+        try {
+            // Save user message to database
+            const userMessage = await this.chatService.addStreamingMessage(
+                userId,
+                sessionId,
+                MessageRole.USER,
+                request.messages[request.messages.length - 1].content,
+                request.model,
+            );
+
+            // Get AI response
+            const response = await this.createChatCompletion(request);
+            const processingTime = Date.now() - startTime;
+
+            // Save assistant response to database
+            const assistantMessage = await this.chatService.addStreamingMessage(
+                userId,
+                sessionId,
+                MessageRole.ASSISTANT,
+                response.choices[0].message.content,
+                request.model,
+                response.usage,
+                processingTime,
+            );
+
+            return {
+                ...response,
+                userMessage,
+                assistantMessage,
+            };
+        } catch (error) {
+            this.logger.error('Failed to create chat completion with persistence', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Enterprise method: Stream chat completion with database persistence
+     */
+    async streamChatCompletionWithPersistence(
+        userId: string,
+        sessionId: string,
+        request: ChatCompletionDto,
+    ): Promise<{
+        stream: Response;
+        userMessage: any;
+        processingStart: number;
+    }> {
+        const startTime = Date.now();
+
+        try {
+            // Save user message to database immediately
+            const userMessage = await this.chatService.addStreamingMessage(
+                userId,
+                sessionId,
+                MessageRole.USER,
+                request.messages[request.messages.length - 1].content,
+                request.model,
+            );
+
+            // Get streaming response from OpenRouter
+            const stream = await this.streamChatCompletion(request);
+
+            return {
+                stream,
+                userMessage,
+                processingStart: startTime,
+            };
+        } catch (error) {
+            this.logger.error('Failed to start streaming chat completion with persistence', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Enterprise method: Save assistant response after streaming completes
+     */
+    async saveStreamingResponse(
+        userId: string,
+        sessionId: string,
+        content: string,
+        model: string,
+        usage: any,
+        processingTimeMs: number,
+    ): Promise<any> {
+        try {
+            return await this.chatService.addStreamingMessage(
+                userId,
+                sessionId,
+                MessageRole.ASSISTANT,
+                content,
+                model,
+                usage,
+                processingTimeMs,
+            );
+        } catch (error) {
+            this.logger.error('Failed to save streaming response', error);
+            throw error;
         }
     }
 }

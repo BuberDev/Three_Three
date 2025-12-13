@@ -64,6 +64,7 @@ interface AppStore {
 
     // Voice notes actions
     addVoiceNote: (voiceNote: VoiceNote) => void;
+    loadVoiceNotes: () => Promise<void>;
     updateRecordingState: (state: RecordingState) => void;
     setProcessingVoiceNote: (processing: boolean) => void;
     uploadVoiceNote: (audioUri: string) => Promise<boolean>;
@@ -199,25 +200,277 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
+            loadVoiceNotes: async () => {
+                const { user, setError } = get();
+                if (!user) {
+                    console.log('❌ No user found, cannot load voice notes');
+                    set({ voiceNotes: [] });
+                    return;
+                }
+
+                // 🚨 Rate limiting protection - prevent spam requests
+                const now = Date.now();
+                const lastCallKey = `lastVoiceNotesCall_${user.id}`;
+                const lastCall = get()[lastCallKey] || 0;
+                const timeSinceLastCall = now - lastCall;
+
+                if (timeSinceLastCall < 2000) { // 2 second minimum between calls
+                    console.log(`⏳ Rate limiting: Skipping loadVoiceNotes (${timeSinceLastCall}ms since last call)`);
+                    return;
+                }
+
+                // Mark this call
+                set({ [lastCallKey]: now });
+
+                try {
+                    console.log(`🔍 Loading voice notes for user: ${user.id} (email: ${user.email})`);
+
+                    // 🔄 Load from backend API instead of local SQLite
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getVoiceNotes(user.id, 50);
+
+                    console.log('🔍 Raw API response:', {
+                        success: response.success,
+                        hasData: !!response.data,
+                        dataType: typeof response.data,
+                        dataLength: response.data?.length,
+                        error: response.error
+                    });
+
+                    // 🔍 DEBUG: Full response structure
+                    console.log('🔍 Full response structure:', {
+                        responseKeys: Object.keys(response),
+                        dataKeys: response.data ? Object.keys(response.data) : null,
+                        dataContent: response.data,
+                        isDataArray: Array.isArray(response.data)
+                    });
+
+                    // 🏢 ENTERPRISE: Response Validation & Transformation
+                    const parseVoiceNotesResponse = (apiResponse: any): {
+                        success: boolean;
+                        data: VoiceNote[];
+                        error?: string;
+                        metadata?: any
+                    } => {
+                        // Type Guards
+                        const isValidVoiceNote = (item: any): item is VoiceNote => {
+                            return item &&
+                                typeof item.id === 'string' &&
+                                typeof item.userId === 'string' &&
+                                typeof item.createdAt === 'string';
+                        };
+
+                        const validateVoiceNoteArray = (arr: any[]): VoiceNote[] => {
+                            return arr.filter(isValidVoiceNote);
+                        };
+
+                        // Response Success Validation
+                        if (!apiResponse.success) {
+                            return {
+                                success: false,
+                                data: [],
+                                error: apiResponse.error || 'API response indicated failure',
+                                metadata: { responseType: 'failed_request' }
+                            };
+                        }
+
+                        // Data Extraction Strategies (Enterprise Fallback Chain)
+                        const extractionStrategies = [
+                            // Strategy 1: Triple nested (response.data.data.data) - PRIORITY for current API
+                            () => apiResponse.data?.data?.data && Array.isArray(apiResponse.data.data.data) ? apiResponse.data.data.data : null,
+
+                            // Strategy 2: Direct array
+                            () => Array.isArray(apiResponse.data) ? apiResponse.data : null,
+
+                            // Strategy 3: Double nested data property
+                            () => apiResponse.data?.data && Array.isArray(apiResponse.data.data) ? apiResponse.data.data : null,
+
+                            // Strategy 4: Named collection property
+                            () => apiResponse.data?.voiceNotes && Array.isArray(apiResponse.data.voiceNotes) ? apiResponse.data.voiceNotes : null,
+
+                            // Strategy 5: Items property (REST standard)
+                            () => apiResponse.data?.items && Array.isArray(apiResponse.data.items) ? apiResponse.data.items : null,
+
+                            // Strategy 6: Results property
+                            () => apiResponse.data?.results && Array.isArray(apiResponse.data.results) ? apiResponse.data.results : null,
+
+                            // Strategy 7: Empty response handling
+                            () => (apiResponse.data === null || apiResponse.data === undefined) ? [] : null
+                        ];
+
+                        for (const [index, strategy] of extractionStrategies.entries()) {
+                            try {
+                                const extracted = strategy();
+                                if (extracted !== null) {
+                                    const validatedData = validateVoiceNoteArray(extracted);
+                                    const invalidCount = extracted.length - validatedData.length;
+
+                                    console.log(`✅ Enterprise Parser: Strategy ${index + 1} successful`, {
+                                        extractedCount: extracted.length,
+                                        validCount: validatedData.length,
+                                        invalidCount,
+                                        strategy: strategy.name || `Strategy ${index + 1}`
+                                    });
+
+                                    if (invalidCount > 0) {
+                                        console.warn(`⚠️ Enterprise Warning: ${invalidCount} invalid voice notes filtered out`);
+                                    }
+
+                                    return {
+                                        success: true,
+                                        data: validatedData,
+                                        metadata: {
+                                            strategy: index + 1,
+                                            totalExtracted: extracted.length,
+                                            validatedCount: validatedData.length,
+                                            filteredCount: invalidCount
+                                        }
+                                    };
+                                }
+                            } catch (strategyError) {
+                                console.warn(`⚠️ Strategy ${index + 1} failed:`, strategyError);
+                                continue;
+                            }
+                        }
+
+                        // All strategies failed
+                        return {
+                            success: false,
+                            data: [],
+                            error: 'No valid data extraction strategy succeeded',
+                            metadata: {
+                                responseType: typeof apiResponse.data,
+                                strategiesAttempted: extractionStrategies.length,
+                                rawDataStructure: apiResponse.data ? Object.keys(apiResponse.data) : null
+                            }
+                        };
+                    };
+
+                    const parsedResponse = parseVoiceNotesResponse(response);
+
+                    if (parsedResponse.success) {
+                        console.log(`🏢 Enterprise Success: Loaded ${parsedResponse.data.length} voice notes`, parsedResponse.metadata);
+                        if (parsedResponse.success) {
+                            console.log(`🏢 Enterprise Success: Loaded ${parsedResponse.data.length} voice notes`, parsedResponse.metadata);
+
+                            if (parsedResponse.data.length > 0) {
+                                console.log('📋 Sample voice note (validated):', {
+                                    id: parsedResponse.data[0].id,
+                                    userId: parsedResponse.data[0].userId,
+                                    hasTranscription: !!parsedResponse.data[0].transcription,
+                                    hasAudioUrl: !!parsedResponse.data[0].audioUrl,
+                                    createdAt: parsedResponse.data[0].createdAt
+                                });
+                            }
+
+                            set({ voiceNotes: parsedResponse.data });
+                        } else {
+                            console.error('🏢 Enterprise Error: Voice notes parsing failed', {
+                                error: parsedResponse.error,
+                                metadata: parsedResponse.metadata
+                            });
+
+                            // Enterprise Error Recovery: Use cached data if available
+                            const cachedVoiceNotes = get().voiceNotes || [];
+                            if (cachedVoiceNotes.length > 0) {
+                                console.log(`🏢 Enterprise Recovery: Using ${cachedVoiceNotes.length} cached voice notes`);
+                            } else {
+                                set({ voiceNotes: [] });
+                            }
+                        }
+                    } else {
+                        // 🚨 Special handling for rate limiting
+                        if (response.error && response.error.includes('429')) {
+                            console.log('🚫 Rate limited - backing off for 5 seconds');
+                            set({ [lastCallKey]: now + 3000 }); // Extra delay for rate limiting
+                            return; // Don't clear voiceNotes on rate limiting
+                        }
+
+                        console.log('❌ API response invalid - setting empty array:', {
+                            success: response.success,
+                            dataType: typeof response.data,
+                            error: response.error
+                        });
+                        set({ voiceNotes: [] });
+                    }
+
+                    // 🔄 Also save to local database for offline access (secondary)
+                    try {
+                        const dbService = DatabaseService.getInstance();
+                        if (!dbService.isInitialized()) {
+                            await dbService.initialize();
+                        }
+
+                        if (response.success && Array.isArray(parsedResponse.data) && parsedResponse.data.length > 0) {
+                            // Save API results to local database
+                            for (const voiceNote of parsedResponse.data) {
+                                await dbService.saveVoiceNote(voiceNote);
+                            }
+                            console.log('💾 Voice notes synced to local database');
+                        }
+                    } catch (syncError) {
+                        console.log('⚠️ Local database sync failed (non-critical):', syncError);
+                        // Don't fail the main operation if local sync fails
+                    }
+                } catch (error) {
+                    console.error('❌ Failed to load voice notes from API:', error);
+
+                    // 📱 Fallback to local database if API fails
+                    try {
+                        const dbService = DatabaseService.getInstance();
+                        if (!dbService.isInitialized()) {
+                            await dbService.initialize();
+                        }
+
+                        const localVoiceNotes = await dbService.getVoiceNotesByUserId(user.id, 50);
+                        console.log(`📱 Fallback: Loaded ${localVoiceNotes.length} voice notes from local database`);
+                        set({ voiceNotes: localVoiceNotes });
+                    } catch (fallbackError) {
+                        console.error('❌ Both API and local fallback failed:', fallbackError);
+                        set({ voiceNotes: [] });
+                    }
+                }
+            },
+
             updateRecordingState: (currentRecording) => set({ currentRecording }),
 
             setProcessingVoiceNote: (isProcessingVoiceNote) => set({ isProcessingVoiceNote }),
 
             uploadVoiceNote: async (audioUri: string) => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes, loadTasks } = get();
                 if (!user) {
                     setError('User not authenticated');
+                    setProcessingVoiceNote(false); // Ensure state is reset
                     return false;
                 }
 
                 try {
                     setProcessingVoiceNote(true);
                     setError(null);
+                    console.log('🎙️ Starting voice note upload...');
 
-                    const apiService = ApiService.getInstance();
-                    const response = await apiService.uploadVoiceNote(audioUri);
+                    // Add a timeout wrapper around the API call - Extended for voice processing
+                    const uploadPromise = ApiService.getInstance().uploadVoiceNote(audioUri);
+                    const timeoutPromise = new Promise<never>((_, reject) => {
+                        setTimeout(() => {
+                            reject(new Error('Upload timeout after 60 seconds'));
+                        }, 60000); // Extended from 30s to 60s for voice processing
+                    });
+
+                    const response = await Promise.race([uploadPromise, timeoutPromise]);
+
+                    console.log('🔍 Upload response debug:', {
+                        success: response.success,
+                        hasData: !!response.data,
+                        dataKeys: response.data ? Object.keys(response.data) : [],
+                        error: response.error,
+                        responseType: typeof response,
+                        fullResponse: response
+                    });
 
                     if (response.success && response.data) {
+                        console.log('✅ Voice note uploaded successfully!');
+
                         // Add voice note to local state
                         addVoiceNote(response.data.voiceNote);
 
@@ -234,36 +487,75 @@ export const useAppStore = create<AppStore>()(
                             await dbService.createTask(task);
                         }
 
+                        // Reload data to ensure UI consistency
+                        await Promise.allSettled([
+                            loadVoiceNotes(),
+                            loadTasks()
+                        ]);
+
                         return true;
                     } else {
+                        console.error('❌ Voice note upload failed:', response.error);
                         setError(response.error || 'Failed to upload voice note');
                         return false;
                     }
                 } catch (error) {
-                    console.error('Upload voice note error:', error);
-                    setError(error instanceof Error ? error.message : 'Upload failed');
+                    console.error('❌ Upload voice note error:', error);
+
+                    if (error instanceof Error && error.message.includes('timeout')) {
+                        console.warn('⏰ Upload timeout - checking if processed in background...');
+                        setError('Processing is taking longer than usual. Checking for completion...');
+
+                        // Check for background processing completion
+                        setTimeout(async () => {
+                            console.log('🔄 Checking for background processing completion...');
+                            await loadVoiceNotes();
+
+                            const { voiceNotes: updatedNotes } = get();
+                            if (updatedNotes.length === 0) {
+                                setError('Processing is taking longer than expected. Please try again.');
+                            } else {
+                                setError(null); // Clear error if we found notes
+                                console.log('✅ Found processed voice notes after timeout!');
+                            }
+                        }, 3000);
+                    } else {
+                        setError(error instanceof Error ? error.message : 'Upload failed');
+                    }
                     return false;
                 } finally {
-                    setProcessingVoiceNote(false);
-                }
-            },
+                    // Reload data and reset processing state
+                    await Promise.allSettled([
+                        loadVoiceNotes(),
+                        loadTasks()
+                    ]);
 
-            // Nowa funkcja uploadVoiceNoteWithContext
+                    // Reset processing state after a short delay
+                    setTimeout(() => {
+                        setProcessingVoiceNote(false);
+                        console.log('🔄 Processing state reset');
+                    }, 1000);
+                }
+            },            // Nowa funkcja uploadVoiceNoteWithContext
             uploadVoiceNoteWithContext: async (audioUri: string, context?: string) => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes, loadTasks } = get();
                 if (!user) {
                     setError('User not authenticated');
+                    setProcessingVoiceNote(false); // Ensure state is reset
                     return false;
                 }
 
                 try {
                     setProcessingVoiceNote(true);
                     setError(null);
+                    console.log('🎙️ Starting voice note with context upload...');
 
                     const apiService = ApiService.getInstance();
                     const response = await apiService.uploadVoiceNoteWithContext(audioUri, context);
 
                     if (response.success && response.data) {
+                        console.log('✅ Voice note with context uploaded successfully!');
+
                         // Add voice note to local state
                         addVoiceNote(response.data.voiceNote);
 
@@ -289,17 +581,26 @@ export const useAppStore = create<AppStore>()(
                             await dbService.createTask(task);
                         }
 
+                        // Reload data to ensure UI consistency
+                        await Promise.allSettled([
+                            loadVoiceNotes(),
+                            loadTasks()
+                        ]);
+
                         return true;
                     } else {
+                        console.error('❌ Voice note with context upload failed:', response.error);
                         setError(response.error || 'Failed to upload voice note');
                         return false;
                     }
                 } catch (error) {
-                    console.error('Upload voice note error:', error);
+                    console.error('❌ Upload voice note with context error:', error);
                     setError(error instanceof Error ? error.message : 'Upload failed');
                     return false;
                 } finally {
+                    // Always reset processing state
                     setProcessingVoiceNote(false);
+                    console.log('🔄 Processing state reset');
                 }
             },
 
@@ -335,9 +636,10 @@ export const useAppStore = create<AppStore>()(
 
             // 🏢 ENTERPRISE Voice Recording Functions
             uploadDailyReportVoice: async (audioUri: string, reportType: 'morning' | 'evening' | 'summary') => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes } = get();
                 if (!user) {
                     setError('User not authenticated');
+                    setProcessingVoiceNote(false); // Ensure state is reset
                     return false;
                 }
 
@@ -352,8 +654,13 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         addVoiceNote(response.data.voiceNote);
                         console.log(`✅ Daily ${reportType} report uploaded successfully!`);
+
+                        // Reload voice notes to ensure UI consistency
+                        await loadVoiceNotes();
+
                         return true;
                     } else {
+                        console.error(`❌ Daily ${reportType} report upload failed:`, response.error);
                         setError(response.error || 'Failed to upload daily report');
                         return false;
                     }
@@ -362,14 +669,17 @@ export const useAppStore = create<AppStore>()(
                     setError(error instanceof Error ? error.message : 'Upload failed');
                     return false;
                 } finally {
+                    // Always reset processing state
                     setProcessingVoiceNote(false);
+                    console.log('🔄 Processing state reset');
                 }
             },
 
             uploadSleepReportVoice: async (audioUri: string, sleepType: 'dream' | 'insomnia' | 'morning-reflection' | 'sleep-quality') => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes } = get();
                 if (!user) {
                     setError('User not authenticated');
+                    setProcessingVoiceNote(false); // Ensure state is reset
                     return false;
                 }
 
@@ -384,8 +694,13 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         addVoiceNote(response.data.voiceNote);
                         console.log(`✅ Sleep ${sleepType} report uploaded successfully!`);
+
+                        // Reload voice notes to ensure UI consistency
+                        await loadVoiceNotes();
+
                         return true;
                     } else {
+                        console.error(`❌ Sleep ${sleepType} report upload failed:`, response.error);
                         setError(response.error || 'Failed to upload sleep report');
                         return false;
                     }
@@ -394,14 +709,17 @@ export const useAppStore = create<AppStore>()(
                     setError(error instanceof Error ? error.message : 'Upload failed');
                     return false;
                 } finally {
+                    // Always reset processing state
                     setProcessingVoiceNote(false);
+                    console.log('🔄 Processing state reset');
                 }
             },
 
             uploadLifeExperienceVoice: async (audioUri: string, category: 'reflection' | 'gratitude' | 'emotion' | 'achievement' | 'challenge') => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes } = get();
                 if (!user) {
                     setError('User not authenticated');
+                    setProcessingVoiceNote(false); // Ensure state is reset
                     return false;
                 }
 
@@ -416,8 +734,13 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         addVoiceNote(response.data.voiceNote);
                         console.log(`✅ Life ${category} experience uploaded successfully!`);
+
+                        // Reload voice notes to ensure UI consistency
+                        await loadVoiceNotes();
+
                         return true;
                     } else {
+                        console.error(`❌ Life ${category} experience upload failed:`, response.error);
                         setError(response.error || 'Failed to upload life experience');
                         return false;
                     }
@@ -426,7 +749,9 @@ export const useAppStore = create<AppStore>()(
                     setError(error instanceof Error ? error.message : 'Upload failed');
                     return false;
                 } finally {
+                    // Always reset processing state
                     setProcessingVoiceNote(false);
+                    console.log('🔄 Processing state reset');
                 }
             },
 
@@ -679,22 +1004,70 @@ export const useAppStore = create<AppStore>()(
 
                             // Try to fetch user profile to verify token is still valid
                             try {
-                                const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
-                                    method: 'POST',
-                                    headers: {
-                                        'Authorization': `Bearer ${accessToken}`,
-                                        'Content-Type': 'application/json',
-                                    },
-                                });
+                                console.log('🔍 Verifying stored token with backend...');
 
-                                if (response.ok) {
-                                    authenticatedUser = await response.json();
-                                    console.log('✅ User authenticated from stored token:', authenticatedUser.id);
+                                // 🔧 Development mode: Skip token validation and use fallback
+                                if (__DEV__) {
+                                    console.log('🔧 DEV MODE: Skipping token validation, using fallback user');
+                                    authenticatedUser = {
+                                        id: 'a6f7b841-208d-4b2c-aba0-fa1dfdd35bb3',
+                                        email: 'dawid.bubernak@gmail.com',
+                                        authProvider: 'email' as const,
+                                        createdAt: new Date().toISOString(),
+                                        updatedAt: new Date().toISOString()
+                                    };
+                                    console.log('✅ DEV User authenticated:', authenticatedUser.id);
                                 } else {
-                                    console.log('❌ Stored token is invalid, clearing...');
-                                    await AsyncStorage.removeItem('@access_token');
-                                    await AsyncStorage.removeItem('@refresh_token');
-                                    loadedTokens = { accessToken: null, refreshToken: null };
+                                    // Production: Validate token with backend
+                                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Authorization': `Bearer ${accessToken}`,
+                                            'Content-Type': 'application/json',
+                                        },
+                                    });
+
+                                    console.log('🔍 Token verification response:', {
+                                        status: response.status,
+                                        statusText: response.statusText,
+                                        ok: response.ok,
+                                        headers: Object.fromEntries(response.headers.entries())
+                                    });
+
+                                    if (response.ok) {
+                                        const responseData = await response.json();
+                                        console.log('🔍 Raw auth response:', responseData);
+
+                                        // Handle different response formats
+                                        authenticatedUser = responseData.user || responseData.data || responseData;
+
+                                        console.log('🔍 Parsed user object:', {
+                                            id: authenticatedUser?.id,
+                                            email: authenticatedUser?.email,
+                                            authProvider: authenticatedUser?.authProvider,
+                                            hasUser: !!authenticatedUser
+                                        });
+
+                                        if (authenticatedUser && authenticatedUser.id) {
+                                            console.log('✅ User authenticated from stored token:', authenticatedUser.id);
+                                        } else {
+                                            console.log('❌ Authentication response missing user data');
+                                            authenticatedUser = null;
+                                            await AsyncStorage.removeItem('@access_token');
+                                            await AsyncStorage.removeItem('@refresh_token');
+                                            loadedTokens = { accessToken: null, refreshToken: null };
+                                        }
+                                    } else {
+                                        const errorData = await response.text().catch(() => 'No error data');
+                                        console.log('❌ Stored token is invalid, clearing...', {
+                                            status: response.status,
+                                            statusText: response.statusText,
+                                            error: errorData
+                                        });
+                                        await AsyncStorage.removeItem('@access_token');
+                                        await AsyncStorage.removeItem('@refresh_token');
+                                        loadedTokens = { accessToken: null, refreshToken: null };
+                                    }
                                 }
                             } catch (error) {
                                 console.log('❌ Failed to verify token, clearing...', error);
@@ -757,6 +1130,7 @@ export const useAppStore = create<AppStore>()(
                         // Load data gracefully - don't throw on network errors
                         const loadPromises = [
                             get().loadTasks(),
+                            get().loadVoiceNotes(),
                             get().loadActivities(),
                             get().loadDailyMetrics(),
                             get().loadWeeklyInsights(),
@@ -769,7 +1143,7 @@ export const useAppStore = create<AppStore>()(
 
                         // Log which operations failed (for debugging)
                         results.forEach((result, index) => {
-                            const operations = ['loadTasks', 'loadActivities', 'loadDailyMetrics', 'loadWeeklyInsights', 'loadProgressMetrics', 'generateRecommendations'];
+                            const operations = ['loadTasks', 'loadVoiceNotes', 'loadActivities', 'loadDailyMetrics', 'loadWeeklyInsights', 'loadProgressMetrics', 'generateRecommendations'];
                             if (result.status === 'rejected') {
                                 console.log(`⚠️ ${operations[index]} failed:`, result.reason?.message || 'Unknown error');
                             }

@@ -97,13 +97,36 @@ export interface UserSettings {
 
 export interface VoiceNote {
     id: string;
-    userId: string;
-    audioUrl: string;
-    transcription: string;
-    rawTranscript: string;
-    sentimentScore: number;
-    topics: string[];
-    extractedItems: {
+    userId?: string;
+    user_id?: string; // Backend compatibility
+    title?: string;
+    transcription?: string;
+    transcript?: string; // Alternative name
+    summary?: string;
+    audioFilePath?: string;
+    audioUrl?: string; // Alternative name
+    duration?: number;
+    fileSize?: number;
+    mimeType?: string;
+    processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
+    processed?: boolean; // Computed field
+    processingStartedAt?: string;
+    processingCompletedAt?: string;
+    processingError?: string;
+    metadata?: Record<string, any>;
+    tags?: string[];
+    extractedEntities?: Array<{
+        type: string;
+        value: string;
+        confidence: number;
+    }>;
+    sentiment?: number;
+    insights?: Record<string, any>;
+    // Legacy fields for backward compatibility
+    rawTranscript?: string;
+    sentimentScore?: number;
+    topics?: string[];
+    extractedItems?: {
         tasks: Task[];
         insights: string[];
         mood?: string;

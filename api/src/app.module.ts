@@ -24,6 +24,7 @@ import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { ActivitiesModule } from './activities/activities.module';
 import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { ChatModule } from './chat/chat.module';
 import { EventsModule } from './events/events.module';
 import { JournalModule } from './journal/journal.module';
 import { SleepModule } from './sleep/sleep.module';
@@ -37,6 +38,8 @@ import { AIInsight } from './analytics/entities/ai-insight.entity';
 import { BehavioralPattern } from './analytics/entities/behavioral-pattern.entity';
 import { LifeCorrelation } from './analytics/entities/life-correlation.entity';
 import { PerformanceMetric } from './analytics/entities/performance-metric.entity';
+import { ChatMessage } from './chat/entities/chat-message.entity';
+import { ChatSession } from './chat/entities/chat-session.entity';
 import { Event } from './events/entities/event.entity';
 import { JournalEntry } from './journal/entities/journal-entry.entity';
 import { SleepTracking } from './sleep/entities/sleep-tracking.entity';
@@ -76,7 +79,9 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                     LifeCorrelation,
                     AIInsight,
                     PerformanceMetric,
-                    BehavioralPattern
+                    BehavioralPattern,
+                    ChatSession,
+                    ChatMessage
                 ],
                 migrations: ['dist/migrations/*.js'],
                 synchronize: configService.get('app.nodeEnv') === 'development',
@@ -138,6 +143,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         JournalModule,
         AnalyticsModule,
         AiModule,
+        ChatModule,
     ],
     providers: [
         // Global guards

@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import React, { useState } from 'react';
-import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModernCard } from '@/components/modern-card';
@@ -23,14 +23,59 @@ export default function VoiceScreen() {
     const {
         voiceNotes,
         isProcessingVoiceNote,
-        loadTasks
+        loadTasks,
+        loadVoiceNotes,
+        error,
+        clearError
     } = useAppStore();
 
-    const onRecordingComplete = React.useCallback(async () => {
-        await loadTasks();
-    }, [loadTasks]);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const recentNotes = voiceNotes
+    const onRecordingComplete = React.useCallback(async () => {
+        console.log('🔄 Recording completed, refreshing data...');
+        await Promise.allSettled([
+            loadTasks(),
+            loadVoiceNotes()
+        ]);
+        console.log('✅ Data refreshed after recording');
+    }, [loadTasks, loadVoiceNotes]);
+
+    const onRefresh = useCallback(async () => {
+        setIsRefreshing(true);
+        clearError(); // Clear any previous errors
+        try {
+            console.log('🔄 Refreshing voice notes and tasks...');
+            await Promise.allSettled([
+                loadVoiceNotes(),
+                loadTasks()
+            ]);
+            console.log('✅ Data refreshed successfully');
+        } catch (error) {
+            console.error('❌ Refresh failed:', error);
+        } finally {
+            setIsRefreshing(false);
+        }
+    }, [loadVoiceNotes, loadTasks, clearError]);
+
+    // Periodic refresh to catch recordings processed in background
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (isProcessingVoiceNote) {
+                console.log('🔄 Checking for background processing completion...');
+                loadVoiceNotes();
+            }
+        }, 5000); // Check every 5 seconds if processing
+
+        return () => clearInterval(interval);
+    }, [isProcessingVoiceNote, loadVoiceNotes]);
+
+    // 🚨 REMOVED: Auto-refresh useEffect that caused infinite loop
+    // The useEffect with voiceNotes dependency was triggering infinite refreshes
+    // when API calls failed and voiceNotes stayed empty
+
+    // 🛡️ Safety check for voiceNotes array
+    const safeVoiceNotes = Array.isArray(voiceNotes) ? voiceNotes : [];
+    const recentNotes = safeVoiceNotes
         .slice()
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
@@ -47,6 +92,16 @@ export default function VoiceScreen() {
                     paddingBottom: DesignSystem.spacing['4xl'],
                 }}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefreshing}
+                        onRefresh={onRefresh}
+                        colors={[colors.primary]}
+                        tintColor={colors.primary}
+                        title="Odświeżanie nagrań..."
+                        titleColor={colors.textSecondary}
+                    />
+                }
             >
                 {/* Header with Gradient */}
                 <LinearGradient
@@ -89,11 +144,97 @@ export default function VoiceScreen() {
                         }}
                     >
                         {isProcessingVoiceNote
-                            ? 'Przetwarzam Twoją notatkę...'
+                            ? 'Processing your voice note...'
                             : 'Nagraj swoją myśl lub zadanie'
                         }
                     </ThemedText>
+
+                    {/* Processing indicator */}
+                    {isProcessingVoiceNote && (
+                        <View style={{
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: DesignSystem.spacing.md,
+                            gap: DesignSystem.spacing.sm,
+                        }}>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: DesignSystem.spacing.sm,
+                            }}>
+                                <View style={{
+                                    width: 8,
+                                    height: 8,
+                                    backgroundColor: colors.primary,
+                                    borderRadius: 4,
+                                    opacity: 0.7,
+                                    transform: [{ scale: 1 }],
+                                }} />
+                                <ThemedText variant="bodySmall" color="secondary">
+                                    AI analizuje Twoją notatkę...
+                                </ThemedText>
+                            </View>
+                            <TouchableOpacity
+                                style={{
+                                    marginTop: DesignSystem.spacing.sm,
+                                    paddingVertical: DesignSystem.spacing.xs,
+                                    paddingHorizontal: DesignSystem.spacing.sm,
+                                    backgroundColor: colors.primary + '10',
+                                    borderRadius: DesignSystem.borderRadius.sm,
+                                }}
+                                onPress={() => {
+                                    console.log('🔄 Manual refresh requested');
+                                    onRefresh();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <ThemedText variant="bodySmall" style={{ color: colors.primary, fontWeight: '600' }}>
+                                    Sprawdź status
+                                </ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                 </LinearGradient>
+
+                {/* Error Display */}
+                {error && (
+                    <ModernCard
+                        title="Błąd"
+                        elevation={2}
+                        style={{
+                            marginBottom: DesignSystem.spacing.lg,
+                            backgroundColor: '#FFF5F5',
+                            borderLeftWidth: 4,
+                            borderLeftColor: '#F56565',
+                        }}
+                    >
+                        <View style={{
+                            flexDirection: 'row',
+                            alignItems: 'flex-start',
+                            gap: DesignSystem.spacing.md,
+                        }}>
+                            <IconSymbol name="exclamationmark.triangle" size={20} color="#F56565" />
+                            <View style={{ flex: 1 }}>
+                                <ThemedText variant="bodyMedium" style={{ color: '#C53030', lineHeight: 20 }}>
+                                    {error}
+                                </ThemedText>
+                                <TouchableOpacity
+                                    style={{
+                                        marginTop: DesignSystem.spacing.sm,
+                                        paddingVertical: DesignSystem.spacing.xs,
+                                    }}
+                                    onPress={clearError}
+                                    activeOpacity={0.7}
+                                >
+                                    <ThemedText variant="bodySmall" style={{ color: '#C53030', fontWeight: '600' }}>
+                                        Zamknij
+                                    </ThemedText>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    </ModernCard>
+                )}
 
                 {/* 🏢 ENTERPRISE Voice Recording Options */}
                 <ModernCard
@@ -128,9 +269,60 @@ export default function VoiceScreen() {
                 {/* Voice Recorder */}
                 <ModernCard
                     title="Szybkie nagranie"
+                    subtitle={isProcessingVoiceNote ? "Przetwarzanie w toku..." : undefined}
                     elevation={3}
-                    style={{ marginBottom: DesignSystem.spacing.xl }}
+                    style={{
+                        marginBottom: DesignSystem.spacing.xl,
+                        opacity: isProcessingVoiceNote ? 0.7 : 1
+                    }}
                 >
+                    {isProcessingVoiceNote && (
+                        <View style={{
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: DesignSystem.spacing.md,
+                            paddingVertical: DesignSystem.spacing.md,
+                            paddingHorizontal: DesignSystem.spacing.md,
+                            backgroundColor: colors.primary + '10',
+                            borderRadius: DesignSystem.borderRadius.md,
+                        }}>
+                            <View style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginBottom: DesignSystem.spacing.sm,
+                            }}>
+                                <IconSymbol name="hourglass" size={16} color={colors.primary} />
+                                <ThemedText
+                                    variant="bodySmall"
+                                    color="secondary"
+                                    style={{ marginLeft: DesignSystem.spacing.sm }}
+                                >
+                                    Processing your voice note...
+                                </ThemedText>
+                            </View>
+                            <ThemedText variant="bodySmall" color="tertiary" style={{ textAlign: 'center', marginBottom: DesignSystem.spacing.sm }}>
+                                Jeśli proces trwa długo, sprawdź status poniżej
+                            </ThemedText>
+                            <TouchableOpacity
+                                style={{
+                                    paddingVertical: DesignSystem.spacing.xs,
+                                    paddingHorizontal: DesignSystem.spacing.md,
+                                    backgroundColor: colors.primary,
+                                    borderRadius: DesignSystem.borderRadius.sm,
+                                }}
+                                onPress={() => {
+                                    console.log('🔄 Manual refresh from quick recording section');
+                                    onRefresh();
+                                }}
+                                activeOpacity={0.7}
+                            >
+                                <ThemedText variant="bodySmall" style={{ color: colors.background, fontWeight: '600' }}>
+                                    Sprawdź status
+                                </ThemedText>
+                            </TouchableOpacity>
+                        </View>
+                    )}
                     <VoiceRecorder onComplete={onRecordingComplete} />
                 </ModernCard>
 
@@ -195,7 +387,7 @@ export default function VoiceScreen() {
                 </ModernCard>
 
                 {/* Recent Notes */}
-                {recentNotes.length > 0 && (
+                {(Array.isArray(voiceNotes) ? voiceNotes.length : 0) > 0 ? (
                     <ModernCard
                         title="Ostatnie notatki"
                         subtitle={`${recentNotes.length} najnowszych nagrań`}
@@ -257,7 +449,53 @@ export default function VoiceScreen() {
                             ))}
                         </View>
                     </ModernCard>
-                )}
+                ) : !isProcessingVoiceNote ? (
+                    <ModernCard
+                        title="Brak nagrań"
+                        elevation={1}
+                        style={{
+                            backgroundColor: colors.surface + '50',
+                            borderWidth: 1,
+                            borderColor: colors.border + '30',
+                            borderStyle: 'dashed',
+                        }}
+                    >
+                        <View style={{
+                            alignItems: 'center',
+                            paddingVertical: DesignSystem.spacing.xl,
+                        }}>
+                            <View style={{
+                                backgroundColor: colors.iconSecondary + '10',
+                                borderRadius: DesignSystem.borderRadius.full,
+                                padding: DesignSystem.spacing.lg,
+                                marginBottom: DesignSystem.spacing.md,
+                            }}>
+                                <IconSymbol name="mic.slash" size={32} color={colors.iconSecondary} />
+                            </View>
+                            <ThemedText
+                                variant="bodyLarge"
+                                color="secondary"
+                                style={{
+                                    textAlign: 'center',
+                                    marginBottom: DesignSystem.spacing.sm,
+                                    fontWeight: '600'
+                                }}
+                            >
+                                Nie masz jeszcze żadnych nagrań
+                            </ThemedText>
+                            <ThemedText
+                                variant="bodyMedium"
+                                color="tertiary"
+                                style={{
+                                    textAlign: 'center',
+                                    lineHeight: 20
+                                }}
+                            >
+                                Nagraj swoją pierwszą notatkę głosową, aby zobaczyć ją tutaj
+                            </ThemedText>
+                        </View>
+                    </ModernCard>
+                ) : null}
             </ScrollView>
 
             {/* 🏢 ENTERPRISE Voice Recording Menu */}

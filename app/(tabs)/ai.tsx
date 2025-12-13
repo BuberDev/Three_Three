@@ -10,7 +10,7 @@ import { EnterpriseChatInterface } from '@/components/ai/enterprise-chat-interfa
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
-import { useAIChat } from '@/hooks/use-ai-chat-real';
+import { useEnterpriseAIChat } from '@/hooks/use-enterprise-ai-chat';
 import { useAppStore } from '@/stores/app-store';
 
 export default function AIScreen() {
@@ -23,7 +23,7 @@ export default function AIScreen() {
         voiceNotes
     } = useAppStore();
 
-    const aiChat = useAIChat();
+    const aiChat = useEnterpriseAIChat();
 
     // Analiza danych dla statystyk
     const completedTasks = todaysTasks.filter(t => t.completed);
@@ -90,16 +90,17 @@ export default function AIScreen() {
                         >
                             <IconSymbol
                                 name="message.circle.fill"
-                                size={currentView === 'chat' && aiChat.currentSession ? 16 : 20}
+                                size={currentView === 'chat' && aiChat.currentSession ? 14 : 20}
                                 color={currentView === 'chat' ? '#fff' : Colors.light.tint}
                             />
-                            <ThemedText style={[
-                                styles.navTabText,
-                                currentView === 'chat' && styles.activeNavTabText,
-                                currentView === 'chat' && aiChat.currentSession && { fontSize: 12 }
-                            ]}>
-                                Chat
-                            </ThemedText>
+                            {!(currentView === 'chat' && aiChat.currentSession) && (
+                                <ThemedText style={[
+                                    styles.navTabText,
+                                    currentView === 'chat' && styles.activeNavTabText
+                                ]}>
+                                    Chat
+                                </ThemedText>
+                            )}
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -108,24 +109,33 @@ export default function AIScreen() {
                         >
                             <IconSymbol
                                 name="chart.bar.fill"
-                                size={currentView === 'analytics' && aiChat.currentSession ? 16 : 20}
+                                size={currentView === 'analytics' && aiChat.currentSession ? 14 : 20}
                                 color={currentView === 'analytics' ? '#fff' : Colors.light.tint}
                             />
-                            <ThemedText style={[
-                                styles.navTabText,
-                                currentView === 'analytics' && styles.activeNavTabText,
-                                currentView === 'analytics' && aiChat.currentSession && { fontSize: 12 }
-                            ]}>
-                                Analiza
-                            </ThemedText>
+                            {!(currentView === 'chat' && aiChat.currentSession) && (
+                                <ThemedText style={[
+                                    styles.navTabText,
+                                    currentView === 'analytics' && styles.activeNavTabText
+                                ]}>
+                                    Analiza
+                                </ThemedText>
+                            )}
                         </TouchableOpacity>
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.settingsButton, { borderColor: Colors.light.tint + '30' }]}
+                        style={[
+                            styles.settingsButton,
+                            { borderColor: Colors.light.tint + '30' },
+                            currentView === 'chat' && aiChat.currentSession && styles.compactSettingsButton
+                        ]}
                         onPress={() => setShowSettings(true)}
                     >
-                        <IconSymbol name="gear" size={18} color={Colors.light.tint} />
+                        <IconSymbol
+                            name="gear"
+                            size={currentView === 'chat' && aiChat.currentSession ? 14 : 18}
+                            color={Colors.light.tint}
+                        />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -245,7 +255,8 @@ const styles = StyleSheet.create({
         backgroundColor: '#f8f9fa',
         borderRadius: 8,
         padding: 2,
-        height: 36,
+        height: 32,
+        minWidth: 80,
     },
     navTab: {
         flex: 1,
@@ -253,9 +264,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 6,
-        paddingHorizontal: 12,
+        paddingHorizontal: 8,
         borderRadius: 6,
-        gap: 6,
+        gap: 4,
+        minWidth: 36,
     },
     activeNavTab: {
         backgroundColor: Colors.light.tint,
@@ -267,5 +279,11 @@ const styles = StyleSheet.create({
     },
     activeNavTabText: {
         color: '#fff',
+    },
+    compactSettingsButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        marginLeft: 8,
     },
 });

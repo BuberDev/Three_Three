@@ -22,9 +22,29 @@ export class DatabaseService {
         try {
             this.db = await SQLite.openDatabaseAsync('threethree.db');
             await this.createTables();
+            await this.runMigrations();
         } catch (error) {
             console.error('Database initialization failed:', error);
             throw error;
+        }
+    }
+
+    private async runMigrations(): Promise<void> {
+        if (!this.db) throw new Error('Database not initialized');
+
+        try {
+            // 🔧 Migration: Add missing summary column if it doesn't exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN summary TEXT;
+            `);
+            console.log('✅ Database migration: Added summary column');
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes('duplicate column name')) {
+                console.log('✅ Database migration: summary column already exists');
+            } else {
+                console.warn('⚠️ Database migration warning:', error.message);
+            }
         }
     }
 
@@ -57,12 +77,17 @@ export class DatabaseService {
         audio_url TEXT NOT NULL,
         transcription TEXT,
         raw_transcript TEXT,
+        summary TEXT,
+        duration REAL DEFAULT 0,
+        file_size INTEGER,
+        mime_type TEXT DEFAULT 'audio/m4a',
+        processing_status TEXT DEFAULT 'pending',
+        processed_at TEXT,
         sentiment_score REAL,
         topics TEXT NOT NULL DEFAULT '[]',
         extracted_items TEXT NOT NULL DEFAULT '{}',
         embedding TEXT,
         created_at TEXT NOT NULL,
-        processed_at TEXT,
         FOREIGN KEY (user_id) REFERENCES users (id)
       );
 
@@ -163,39 +188,95 @@ export class DatabaseService {
 
         const id = this.generateId();
         const now = new Date().toISOString();
-        const newVoiceNote: VoiceNote = { ...voiceNote, id, createdAt: now };
+
+        // Map API response format to database format
+        const userId = voiceNote.userId || voiceNote.user_id;
+        const transcription = voiceNote.transcription || voiceNote.transcript || '';
+        const audioUrl = voiceNote.audioUrl || voiceNote.audioFilePath || '';
+        const summary = voiceNote.summary || '';
+        const duration = voiceNote.duration || 0;
+        const processed = voiceNote.processed || voiceNote.processingStatus === 'completed';
+
+        const newVoiceNote: VoiceNote = {
+            ...voiceNote,
+            id,
+            createdAt: now,
+            userId,
+            transcription,
+            audioUrl,
+            summary,
+            duration,
+            processed
+        };
+
+        console.log('💾 Saving voice note to database:', {
+            id: newVoiceNote.id,
+            userId,
+            hasTranscription: !!transcription,
+            hasSummary: !!summary,
+            duration,
+            processed
+        });
 
         await this.db.runAsync(
-            `INSERT INTO voice_notes (id, user_id, audio_url, transcription, raw_transcript, 
-       sentiment_score, topics, extracted_items, embedding, created_at, processed_at) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            `INSERT OR REPLACE INTO voice_notes (id, user_id, audio_url, transcription, raw_transcript, 
+       summary, duration, file_size, mime_type, processing_status, processed_at,
+       sentiment_score, topics, extracted_items, embedding, created_at) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 newVoiceNote.id,
-                newVoiceNote.userId,
-                newVoiceNote.audioUrl,
-                newVoiceNote.transcription || '',
-                newVoiceNote.rawTranscript || '',
-                newVoiceNote.sentimentScore || 0,
-                JSON.stringify(newVoiceNote.topics || []),
-                JSON.stringify(newVoiceNote.extractedItems || {}),
-                newVoiceNote.embedding ? JSON.stringify(newVoiceNote.embedding) : null,
-                newVoiceNote.createdAt,
-                newVoiceNote.processedAt || null
+                userId,
+                audioUrl,
+                transcription,
+                transcription, // Use transcription as rawTranscript
+                summary,
+                duration,
+                voiceNote.fileSize || 0,
+                voiceNote.mimeType || 'audio/m4a',
+                voiceNote.processingStatus || (processed ? 'completed' : 'pending'),
+                processed ? now : null,
+                voiceNote.sentimentScore || voiceNote.sentiment || 0,
+                JSON.stringify(voiceNote.topics || voiceNote.tags || []),
+                JSON.stringify(voiceNote.extractedItems || {}),
+                voiceNote.embedding ? JSON.stringify(voiceNote.embedding) : null,
+                newVoiceNote.createdAt
             ]
         );
 
+        console.log('✅ Voice note saved to database successfully');
         return newVoiceNote;
     }
 
     public async getVoiceNotesByUserId(userId: string, limit: number = 50): Promise<VoiceNote[]> {
         if (!this.db) throw new Error('Database not initialized');
 
-        const results = await this.db.getAllAsync<any>(
-            'SELECT * FROM voice_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
-            [userId, limit]
-        );
+        console.log(`🔍 Querying voice notes for user: ${userId}, limit: ${limit}`);
 
-        return results.map(this.mapVoiceNoteFromDb);
+        try {
+            const results = await this.db.getAllAsync<any>(
+                'SELECT * FROM voice_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
+                [userId, limit]
+            );
+
+            console.log(`📊 Raw database results: ${results.length} rows found`);
+
+            if (results.length > 0) {
+                console.log('📄 Sample voice note from DB:', {
+                    id: results[0].id,
+                    user_id: results[0].user_id,
+                    hasTranscription: !!results[0].transcription,
+                    created_at: results[0].created_at
+                });
+            }
+
+            const mappedResults = results.map(this.mapVoiceNoteFromDb);
+            console.log(`✅ Successfully mapped ${mappedResults.length} voice notes`);
+
+            return mappedResults;
+        } catch (error) {
+            console.error('❌ Error loading voice notes from database:', error);
+            return [];
+        }
     }
 
     // Tasks methods
@@ -312,13 +393,24 @@ export class DatabaseService {
         return {
             id: row.id,
             userId: row.user_id,
+            user_id: row.user_id, // Backend compatibility
             audioUrl: row.audio_url,
-            transcription: row.transcription,
-            rawTranscript: row.raw_transcript,
-            sentimentScore: row.sentiment_score,
+            audioFilePath: row.audio_url, // API compatibility
+            transcription: row.transcription || '',
+            transcript: row.transcription || '', // Alternative name
+            rawTranscript: row.raw_transcript || row.transcription || '',
+            summary: row.summary || '',
+            duration: row.duration || 0,
+            fileSize: row.file_size || 0,
+            mimeType: row.mime_type || 'audio/m4a',
+            processingStatus: row.processing_status || 'pending',
+            sentimentScore: row.sentiment_score || 0,
+            sentiment: row.sentiment_score || 0, // API compatibility
             topics: JSON.parse(row.topics || '[]'),
+            tags: JSON.parse(row.topics || '[]'), // API compatibility
             extractedItems: JSON.parse(row.extracted_items || '{}'),
             embedding: row.embedding ? JSON.parse(row.embedding) : undefined,
+            processed: row.processing_status === 'completed' || !!row.processed_at,
             createdAt: row.created_at,
             processedAt: row.processed_at
         };

@@ -11,6 +11,8 @@ import { AIInsight } from '../../analytics/entities/ai-insight.entity';
 import { BehavioralPattern } from '../../analytics/entities/behavioral-pattern.entity';
 import { LifeCorrelation } from '../../analytics/entities/life-correlation.entity';
 import { PerformanceMetric } from '../../analytics/entities/performance-metric.entity';
+import { ChatMessage } from '../../chat/entities/chat-message.entity';
+import { ChatSession } from '../../chat/entities/chat-session.entity';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { Event } from '../../events/entities/event.entity';
 import { JournalEntry } from '../../journal/entities/journal-entry.entity';
@@ -143,6 +145,12 @@ export class User extends BaseEntity {
 
     @OneToMany(() => AIInsight, (insight) => insight.user)
     aiInsights: AIInsight[];
+
+    @OneToMany(() => ChatSession, (session) => session.user)
+    chatSessions: ChatSession[];
+
+    @OneToMany(() => ChatMessage, (message) => message.user)
+    chatMessages: ChatMessage[];
 
     // Virtual properties
     get fullName(): string {
