@@ -190,15 +190,15 @@ export class PersonalizationEngine {
     }
 
     private classifyIntent(voiceNote: VoiceNote): UserIntent {
-        const transcript = voiceNote.transcription.toLowerCase();
+        const transcript = (voiceNote.transcription || '').toLowerCase();
         const extractedItems = voiceNote.extractedItems;
 
         // Simple intent classification based on content
-        if (extractedItems.tasks?.length > 0 || transcript.includes('need to') || transcript.includes('should')) {
+        if ((extractedItems?.tasks?.length || 0) > 0 || transcript.includes('need to') || transcript.includes('should')) {
             return {
                 type: 'task_creation',
                 confidence: 0.8,
-                entities: extractedItems.tasks || [],
+                entities: extractedItems?.tasks || [],
                 context: { hasDeadline: transcript.includes('by') || transcript.includes('until') }
             };
         }
@@ -217,7 +217,7 @@ export class PersonalizationEngine {
                 type: 'reflection',
                 confidence: 0.6,
                 entities: [],
-                context: { mood: voiceNote.extractedItems.mood }
+                context: { mood: voiceNote.extractedItems?.mood || 'neutral' }
             };
         }
 

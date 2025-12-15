@@ -19,6 +19,7 @@ import {
     VoiceNote,
     WeeklyInsights
 } from '../lib/types';
+import { SubscriptionFeature, SubscriptionPlan, SubscriptionStatus } from '../lib/types/subscription';
 
 interface AppStore {
     // User state
@@ -27,6 +28,11 @@ interface AppStore {
     isAuthenticated: boolean;
     accessToken: string | null;
     refreshToken: string | null;
+
+    // Subscription state
+    subscriptionStatus: SubscriptionStatus | null;
+    subscription: any | null;
+    availablePlans: SubscriptionPlan[];
 
     // Voice notes state
     voiceNotes: VoiceNote[];
@@ -61,6 +67,15 @@ interface AppStore {
     setAuthenticated: (auth: boolean) => void;
     setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
     clearTokens: () => Promise<void>;
+
+    // Subscription actions
+    loadSubscriptionStatus: () => Promise<void>;
+    loadAvailablePlans: () => Promise<void>;
+    startTrial: () => Promise<boolean>;
+    createSubscription: (planId: string, paymentMethodId?: string) => Promise<boolean>;
+    cancelSubscription: (reason?: string) => Promise<boolean>;
+    hasFeatureAccess: (feature: keyof SubscriptionFeature) => boolean;
+    checkUsageLimit: (limitType: string) => boolean;
 
     // Voice notes actions
     addVoiceNote: (voiceNote: VoiceNote) => void;
@@ -102,6 +117,7 @@ interface AppStore {
     clearError: () => void;
     setOnboardingComplete: () => void;
     logout: () => Promise<void>;
+    refreshUser: () => Promise<void>;
 }
 
 export const useAppStore = create<AppStore>()(
@@ -113,6 +129,12 @@ export const useAppStore = create<AppStore>()(
             isAuthenticated: false,
             accessToken: null,
             refreshToken: null,
+
+            // Subscription initial state
+            subscriptionStatus: null,
+            subscription: null,
+            availablePlans: [],
+
             voiceNotes: [],
             currentRecording: { isRecording: false, duration: 0 },
             isProcessingVoiceNote: false,
@@ -180,6 +202,124 @@ export const useAppStore = create<AppStore>()(
                 } catch (error) {
                     console.error('Error clearing tokens:', error);
                 }
+            },
+
+            // Subscription actions
+            loadSubscriptionStatus: async () => {
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.makeRequest('/subscriptions/current');
+                    if (response.success) {
+                        set({ subscriptionStatus: response.data as SubscriptionStatus | null });
+                    }
+                } catch (error) {
+                    console.error('Failed to load subscription status:', error);
+                    set({ subscriptionStatus: null });
+                }
+            },
+
+            loadAvailablePlans: async () => {
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.makeRequest('/subscriptions/plans');
+                    if (response.success) {
+                        set({ availablePlans: response.data as SubscriptionPlan[] });
+                    }
+                } catch (error) {
+                    console.error('Failed to load available plans:', error);
+                    set({ availablePlans: [] });
+                }
+            },
+
+            startTrial: async () => {
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.makeRequest('/subscriptions/trial', {
+                        method: 'POST'
+                    });
+
+                    if (response.success) {
+                        await get().loadSubscriptionStatus();
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('Failed to start trial:', error);
+                    return false;
+                }
+            },
+
+            createSubscription: async (stripePriceId: string, paymentMethodType?: string) => {
+                try {
+                    const { accessToken } = get();
+                    if (!accessToken) return false;
+
+                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/subscriptions`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                        body: JSON.stringify({
+                            stripePriceId,
+                            paymentMethodType
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const subscription = await response.json();
+                        set({ subscription: subscription });
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('Failed to create subscription:', error);
+                    return false;
+                }
+            },
+
+            cancelSubscription: async (reason?: string) => {
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.makeRequest('/subscriptions/current', {
+                        method: 'DELETE',
+                        body: JSON.stringify({ reason })
+                    });
+
+                    if (response.success) {
+                        await get().loadSubscriptionStatus();
+                        return true;
+                    }
+                    return false;
+                } catch (error) {
+                    console.error('Failed to cancel subscription:', error);
+                    return false;
+                }
+            },
+
+            hasFeatureAccess: (feature: keyof SubscriptionFeature) => {
+                const state = get();
+                const subscription = state.subscriptionStatus;
+
+                if (!subscription) {
+                    // Check if it's a free feature
+                    const freeFeatures = ['BASIC_VOICE_NOTES', 'BASIC_SLEEP_TRACKING', 'BASIC_TASKS'];
+                    return freeFeatures.includes(String(feature));
+                }
+
+                return subscription.isPremiumUser;
+            },
+
+            checkUsageLimit: (limitType: string) => {
+                const state = get();
+                const subscription = state.subscriptionStatus;
+
+                if (!subscription || !subscription.isPremiumUser) {
+                    return true; // Free users have limits
+                }
+
+                // Premium users typically have unlimited access
+                return false;
             },
 
             // Voice notes actions
@@ -474,8 +614,8 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         console.log('✅ Voice note uploaded successfully!');
 
-                        // Backend response is nested: response.data.data.data contains the actual VoiceNote
-                        const voiceNoteData = response.data?.data?.data;
+                        // Backend response structure
+                        const voiceNoteData = (response.data as any)?.voiceNote;
                         console.log('🔍 Voice note object structure:', {
                             id: voiceNoteData?.id,
                             userId: voiceNoteData?.userId,
@@ -593,7 +733,7 @@ export const useAppStore = create<AppStore>()(
                         await dbService.saveVoiceNote(response.data.voiceNote);
 
                         for (const task of response.data.extractedTasks) {
-                            await dbService.createTask(task);
+                            await dbService.createTask(task, get().user?.id || 'unknown');
                         }
 
                         // Reload data to ensure UI consistency
@@ -949,22 +1089,9 @@ export const useAppStore = create<AppStore>()(
                     });
 
                     if (response.success && response.data) {
-                        // Handle nested API response structure: {data: {data: {data: [Array]}}}
-                        let tasks = response.data;
-
-                        // Unwrap nested data structure
-                        if (tasks.data && tasks.data.data && Array.isArray(tasks.data.data)) {
-                            tasks = tasks.data.data;
-                            console.log('📋 Extracted tasks from nested structure:', tasks.length);
-                        } else if (tasks.data && Array.isArray(tasks.data)) {
-                            tasks = tasks.data;
-                            console.log('📋 Extracted tasks from single nested structure:', tasks.length);
-                        } else if (Array.isArray(tasks)) {
-                            console.log('📋 Tasks already in correct format:', tasks.length);
-                        } else {
-                            console.warn('⚠️ Unexpected API response structure, using empty array');
-                            tasks = [];
-                        }
+                        // Handle API response structure
+                        const tasks = Array.isArray(response.data) ? response.data : [];
+                        console.log('📋 Loaded tasks:', tasks.length);
 
                         const today = new Date().toISOString().split('T')[0];
                         const todaysTasks = tasks.filter(task => {
@@ -1265,6 +1392,8 @@ export const useAppStore = create<AppStore>()(
                         dailyMetrics: null,
                         weeklyInsights: null,
                         progressMetrics: null,
+                        subscriptionStatus: null,
+                        availablePlans: [],
                         error: null
                     });
 
@@ -1302,6 +1431,8 @@ export const useAppStore = create<AppStore>()(
                             get().loadDailyMetrics(),
                             get().loadWeeklyInsights(),
                             get().loadProgressMetrics(),
+                            get().loadSubscriptionStatus(),
+                            get().loadAvailablePlans(),
                             get().generatePersonalizedRecommendations()
                         ];
 
@@ -1310,7 +1441,7 @@ export const useAppStore = create<AppStore>()(
 
                         // Log which operations failed (for debugging)
                         results.forEach((result, index) => {
-                            const operations = ['loadTasks', 'loadVoiceNotes', 'loadActivities', 'loadDailyMetrics', 'loadWeeklyInsights', 'loadProgressMetrics', 'generateRecommendations'];
+                            const operations = ['loadTasks', 'loadVoiceNotes', 'loadActivities', 'loadDailyMetrics', 'loadWeeklyInsights', 'loadProgressMetrics', 'loadSubscriptionStatus', 'loadAvailablePlans', 'generateRecommendations'];
                             if (result.status === 'rejected') {
                                 console.log(`⚠️ ${operations[index]} failed:`, result.reason?.message || 'Unknown error');
                             }
@@ -1366,6 +1497,8 @@ export const useAppStore = create<AppStore>()(
                         isAuthenticated: false,
                         accessToken: null,
                         refreshToken: null,
+                        subscriptionStatus: null,
+                        subscription: null,
                         voiceNotes: [],
                         tasks: [],
                         todaysTasks: [],
@@ -1381,6 +1514,29 @@ export const useAppStore = create<AppStore>()(
 
                 } catch (error) {
                     console.error('Logout failed:', error);
+                }
+            },
+
+            refreshUser: async () => {
+                const { accessToken } = get();
+                if (!accessToken) return;
+
+                try {
+                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/me`, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`,
+                        },
+                    });
+
+                    if (response.ok) {
+                        const userData = await response.json();
+                        set({
+                            user: userData.user,
+                            subscription: userData.subscription
+                        });
+                    }
+                } catch (error) {
+                    console.error('Failed to refresh user:', error);
                 }
             }
         }),

@@ -85,11 +85,11 @@ export const useEnterpriseAIChat = () => {
         try {
             setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-            const newSession = await aiService.createSession(title, type);
+            const newSession = await aiService.createSession(title, type as any);
             console.log('🔍 Hook createSession response:', newSession);
 
             // Extract session data from nested response structure
-            const sessionData = newSession.data.data;
+            const sessionData = newSession;
 
             const mappedSession: ChatSession = {
                 id: sessionData.id,
@@ -97,7 +97,7 @@ export const useEnterpriseAIChat = () => {
                 type: sessionData.type as ChatSession['type'],
                 lastMessage: 'Konwersacja utworzona',
                 timestamp: new Date(sessionData.createdAt),
-                messageCount: sessionData.messageCount,
+                messageCount: 0, // Default to 0 for new sessions
             };
             console.log('🔍 Hook mappedSession:', mappedSession);
 
@@ -144,13 +144,15 @@ export const useEnterpriseAIChat = () => {
             const messages = await aiService.getSessionMessages(session.id);
             console.log('🔍 selectSession DEBUG: Received messages:', messages);
 
-            const mappedMessages: ChatMessage[] = messages.map(msg => ({
-                id: msg.id,
-                content: msg.content,
-                role: msg.role as 'user' | 'assistant' | 'system',
-                timestamp: new Date(msg.createdAt),
-                isTyping: false,
-            }));
+            const mappedMessages: ChatMessage[] = messages
+                .filter(msg => msg.role !== 'system') // Filter out system messages
+                .map(msg => ({
+                    id: msg.id,
+                    content: msg.content,
+                    role: msg.role as 'user' | 'assistant',
+                    timestamp: new Date(msg.createdAt),
+                    isTyping: false,
+                }));
 
             console.log('🔍 selectSession DEBUG: Mapped messages:', mappedMessages);
 

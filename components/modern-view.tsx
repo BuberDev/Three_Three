@@ -21,7 +21,7 @@ export function ModernView({
     darkColor,
     variant = 'default',
     gradient = false,
-    elevation = 0,
+    elevation = 1,
     borderRadius = 'md',
     padding,
     children,
@@ -41,8 +41,8 @@ export function ModernView({
     if (gradient) {
         return (
             <LinearGradient
-                colors={DesignSystem.gradients.surface.colors}
-                locations={DesignSystem.gradients.surface.locations}
+                colors={[backgroundColor, backgroundColor] as readonly [string, string, ...string[]]}
+                locations={[0, 1] as readonly [number, number, ...number[]]}
                 start={DesignSystem.gradients.surface.start}
                 end={DesignSystem.gradients.surface.end}
                 style={[baseStyle, style]}

@@ -293,7 +293,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
                                     style={[styles.dataItem, { backgroundColor: backgroundColor + '80' }]}
                                     onPress={() => {
                                         onClose();
-                                        router.push('/(tabs)/');
+                                        router.push('/(tabs)');
                                     }}
                                     activeOpacity={0.7}
                                 >
@@ -309,7 +309,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
                                                 style={[styles.activityTitle, { color: textColor }]}
                                                 numberOfLines={1}
                                             >
-                                                {activity.title || activity.activity || 'Aktywność'}
+                                                {activity.title || 'Aktywność'}
                                             </ThemedText>
                                             <ThemedText variant="bodySmall" style={[styles.activityMeta, { color: textSecondary }]}>
                                                 {activity.startTime ? new Date(activity.startTime).toLocaleTimeString('pl-PL', {
@@ -509,6 +509,37 @@ const styles = StyleSheet.create({
         paddingVertical: DesignSystem.spacing.xl,
         alignItems: 'center',
         gap: 4,
+    },
+    taskTextContainer: {
+        flex: 1,
+    },
+    taskTitle: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    completedTask: {
+        textDecorationLine: 'line-through',
+        opacity: 0.6,
+    },
+    taskMeta: {
+        fontSize: 12,
+        opacity: 0.8,
+    },
+    activityTextContainer: {
+        flex: 1,
+    },
+    activityTitle: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    activityMeta: {
+        fontSize: 12,
+        opacity: 0.8,
+    },
+    emptyText: {
+        fontSize: 12,
+        fontStyle: 'italic',
+        opacity: 0.6,
     },
     footerText: {
         fontSize: 11,

@@ -9,6 +9,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 // Configuration - import as default exports
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
+import { applePayConfig, googlePayConfig, stripeConfig } from './config/payments.config';
 import redisConfig from './config/redis.config';
 
 // Common
@@ -27,7 +28,9 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { ChatModule } from './chat/chat.module';
 import { EventsModule } from './events/events.module';
 import { JournalModule } from './journal/journal.module';
+import { PaymentsModule } from './payments/payments.module';
 import { SleepModule } from './sleep/sleep.module';
+import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { TasksModule } from './tasks/tasks.module';
 import { UsersModule } from './users/users.module';
 import { VoiceNotesModule } from './voice-notes/voice-notes.module';
@@ -43,6 +46,9 @@ import { ChatSession } from './chat/entities/chat-session.entity';
 import { Event } from './events/entities/event.entity';
 import { JournalEntry } from './journal/entities/journal-entry.entity';
 import { SleepTracking } from './sleep/entities/sleep-tracking.entity';
+import { SubscriptionPlanConfig } from './subscriptions/entities/subscription-plan-config.entity';
+import { SubscriptionTransaction } from './subscriptions/entities/subscription-transaction.entity';
+import { Subscription } from './subscriptions/entities/subscription.entity';
 import { Task } from './tasks/entities/task.entity';
 import { UserSettings } from './users/entities/user-settings.entity';
 import { User } from './users/entities/user.entity';
@@ -53,7 +59,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         // Configuration
         ConfigModule.forRoot({
             isGlobal: true,
-            load: [appConfig, databaseConfig, redisConfig],
+            load: [appConfig, databaseConfig, redisConfig, stripeConfig, applePayConfig, googlePayConfig],
             envFilePath: ['.env.local', '.env'],
         }),
 
@@ -81,7 +87,10 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                     PerformanceMetric,
                     BehavioralPattern,
                     ChatSession,
-                    ChatMessage
+                    ChatMessage,
+                    Subscription,
+                    SubscriptionPlanConfig,
+                    SubscriptionTransaction
                 ],
                 migrations: ['dist/migrations/*.js'],
                 synchronize: configService.get('app.nodeEnv') === 'development',
@@ -135,6 +144,8 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         // Application modules
         AuthModule,
         UsersModule,
+        SubscriptionsModule,
+        PaymentsModule,
         VoiceNotesModule,
         TasksModule,
         EventsModule,

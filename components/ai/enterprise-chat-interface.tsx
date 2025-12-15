@@ -769,10 +769,6 @@ const styles = StyleSheet.create({
     sessionInfo: {
         flex: 1,
     },
-    sessionTitle: {
-        fontWeight: '600',
-        marginBottom: 2,
-    },
     sessionMeta: {
         fontSize: 12,
         lineHeight: 16,

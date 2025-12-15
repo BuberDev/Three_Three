@@ -59,10 +59,13 @@ export function ModernCard({
     );
 
     if (gradient) {
+        const surfaceColor = useThemeColor({}, 'surface');
+        const surfaceSecondary = useThemeColor({}, 'surfaceSecondary');
+
         return (
             <LinearGradient
-                colors={DesignSystem.gradients.surface.colors}
-                locations={DesignSystem.gradients.surface.locations}
+                colors={[surfaceColor, surfaceSecondary] as readonly [string, string, ...string[]]}
+                locations={[0, 1] as readonly [number, number, ...number[]]}
                 start={DesignSystem.gradients.surface.start}
                 end={DesignSystem.gradients.surface.end}
                 style={[baseStyle, style]}

@@ -20,8 +20,8 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
 
     return (
         <LinearGradient
-            colors={DesignSystem.gradients.primary.colors}
-            locations={DesignSystem.gradients.primary.locations}
+            colors={[Colors.light.primary, Colors.light.primaryLight] as readonly [string, string, ...string[]]}
+            locations={[0, 1] as readonly [number, number, ...number[]]}
             start={DesignSystem.gradients.primary.start}
             end={DesignSystem.gradients.primary.end}
             style={{

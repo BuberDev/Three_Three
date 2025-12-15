@@ -281,7 +281,11 @@ export class AudioService {
             }
 
             // Sort by creation date, newest first
-            return recordingFiles.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+            return recordingFiles.sort((a, b) => {
+                const aTime = a.createdAt?.getTime() || 0;
+                const bTime = b.createdAt?.getTime() || 0;
+                return bTime - aTime;
+            });
         } catch (error) {
             console.error('Failed to get recordings:', error);
             return [];
@@ -329,36 +333,6 @@ export class AudioService {
         };
 
         console.log('Audio service cleaned up');
-    }
-
-    private startDurationTracking(): void {
-        this.stopDurationTracking();
-        this.durationInterval = setInterval(() => {
-            if (this.recordingState.isRecording && !this.recordingState.isPaused) {
-                this.recordingState = {
-                    ...this.recordingState,
-                    duration: (Date.now() - this.startTime) / 1000
-                };
-                this.notifyListeners();
-            }
-        }, 100);
-    }
-
-    private stopDurationTracking(): void {
-        if (this.durationInterval) {
-            clearInterval(this.durationInterval);
-            this.durationInterval = null;
-        }
-    }
-
-    private notifyListeners(): void {
-        this.listeners.forEach(listener => {
-            try {
-                listener({ ...this.recordingState });
-            } catch (error) {
-                console.error('Error in audio service listener:', error);
-            }
-        });
     }
 
     // Sleep recording methods

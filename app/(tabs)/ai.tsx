@@ -151,7 +151,7 @@ export default function AIScreen() {
                             error={aiChat.error}
                             onSendMessage={aiChat.sendMessage}
                             onBackToSessions={() => aiChat.selectSession(null)}
-                            onNewSession={aiChat.newSession}
+                            onNewSession={() => aiChat.createSession('Nowa sesja', 'general')}
                         />
                     ) : (
                         <ChatSessionManager

@@ -10,7 +10,46 @@ const PRIMARY = '#6366F1'; // Indigo-500
 const PRIMARY_LIGHT = '#8B5CF6'; // Purple-500 
 const PRIMARY_DARK = '#4F46E5'; // Indigo-600
 
-export const Colors = {
+interface ColorTheme {
+  text: string;
+  textSecondary: string;
+  textTertiary: string;
+  background: string;
+  backgroundSecondary: string;
+  backgroundTertiary: string;
+  surface: string;
+  surfaceSecondary: string;
+  cardBackground: string;
+  border: string;
+  borderLight: string;
+  tint: string;
+  primary: string;
+  primaryLight: string;
+  primaryDark: string;
+  gray: string;
+  shadow: string;
+  icon: string;
+  iconSecondary: string;
+  tabIconDefault: string;
+  tabIconSelected: string;
+  success: string;
+  warning: string;
+  error: string;
+}
+
+interface ColorsType {
+  light: ColorTheme;
+  dark: ColorTheme;
+  primary?: string;
+  gray?: string;
+  text?: string;
+  background?: string;
+  surface?: string;
+  shadow?: string;
+  cardBackground?: string;
+}
+
+export const Colors: ColorsType = {
   light: {
     text: '#0F172A', // Slate-900
     textSecondary: '#475569', // Slate-600
@@ -20,12 +59,15 @@ export const Colors = {
     backgroundTertiary: '#F1F5F9', // Slate-100
     surface: '#FFFFFF',
     surfaceSecondary: '#F8FAFC',
+    cardBackground: '#FFFFFF', // Card background color
     border: '#E2E8F0', // Slate-200
     borderLight: '#F1F5F9', // Slate-100
     tint: PRIMARY,
     primary: PRIMARY,
     primaryLight: PRIMARY_LIGHT,
     primaryDark: PRIMARY_DARK,
+    gray: '#94A3B8', // Slate-400
+    shadow: '#000000', // Shadow color
     icon: '#64748B', // Slate-500
     iconSecondary: '#94A3B8', // Slate-400
     tabIconDefault: '#94A3B8',
@@ -43,12 +85,15 @@ export const Colors = {
     backgroundTertiary: '#334155', // Slate-700
     surface: '#1E293B', // Slate-800
     surfaceSecondary: '#334155', // Slate-700
+    cardBackground: '#1E293B', // Card background color
     border: '#334155', // Slate-700
     borderLight: '#475569', // Slate-600
     tint: PRIMARY_LIGHT,
     primary: PRIMARY_LIGHT,
     primaryLight: '#A855F7', // Purple-400
     primaryDark: PRIMARY,
+    gray: '#64748B', // Slate-500
+    shadow: '#000000', // Shadow color
     icon: '#94A3B8', // Slate-400
     iconSecondary: '#64748B', // Slate-500
     tabIconDefault: '#64748B',
@@ -58,6 +103,15 @@ export const Colors = {
     error: '#F87171', // Red-400
   },
 };
+
+// Global color exports for backward compatibility
+(Colors as any).primary = PRIMARY;
+(Colors as any).gray = Colors.light.gray;
+(Colors as any).text = Colors.light.text;
+(Colors as any).background = Colors.light.background;
+(Colors as any).surface = Colors.light.surface;
+(Colors as any).shadow = Colors.light.shadow;
+(Colors as any).cardBackground = Colors.light.cardBackground;
 
 export const Fonts = Platform.select({
   ios: {

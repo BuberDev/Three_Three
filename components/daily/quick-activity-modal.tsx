@@ -122,7 +122,7 @@ export function QuickActivityModal({ visible, onClose }: QuickActivityModalProps
                     <TouchableOpacity onPress={handleClose}>
                         <IconSymbol name="xmark" size={24} color={Colors.light.text} />
                     </TouchableOpacity>
-                    <ThemedText type="title" style={styles.title}>
+                    <ThemedText variant="titleLarge" style={styles.title}>
                         Dodaj aktywność
                     </ThemedText>
                     <TouchableOpacity onPress={handleSave}>

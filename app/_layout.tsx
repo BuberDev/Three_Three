@@ -8,6 +8,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { SwipeableOnboarding } from '@/components/onboarding/swipeable-onboarding';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { stripeManager } from '@/lib/services/stripe-manager';
 import { useAppStore } from '@/stores/app-store';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -23,7 +24,22 @@ export default function RootLayout() {
 
   useEffect(() => {
     // Initialize the app store and services
-    initialize();
+    const initializeApp = async () => {
+      try {
+        // Initialize Stripe first
+        await stripeManager.initialize();
+        console.log('✅ Stripe initialized in app layout');
+
+        // Then initialize app store
+        initialize();
+      } catch (error) {
+        console.error('❌ Failed to initialize app services:', error);
+        // Still initialize the app even if Stripe fails
+        initialize();
+      }
+    };
+
+    initializeApp();
   }, [initialize]);
 
   const handleOnboardingComplete = () => {
@@ -68,6 +84,14 @@ export default function RootLayout() {
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+            <Stack.Screen
+              name="subscription"
+              options={{
+                title: 'Subskrypcja',
+                presentation: 'modal',
+                headerBackTitle: 'Wstecz'
+              }}
+            />
           </Stack>
           <StatusBar style="auto" />
         </ThemeProvider>

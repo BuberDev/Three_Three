@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React from 'react';
-import { TouchableOpacity, TouchableOpacityProps, View } from 'react-native';
+import { DimensionValue, TouchableOpacity, TouchableOpacityProps, View, ViewStyle } from 'react-native';
 
 import { DesignSystem } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -65,18 +65,21 @@ export function ModernButton({
         }
     };
 
-    const baseStyle = {
+    const baseStyle: ViewStyle = {
         borderRadius: DesignSystem.borderRadius.lg,
-        flexDirection: 'row' as const,
-        alignItems: 'center' as const,
-        justifyContent: 'center' as const,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
         ...sizeStyles[size],
-        ...(fullWidth && { width: '100%' }),
+        ...(fullWidth && { width: '100%' as DimensionValue }),
         opacity: disabled || loading ? 0.6 : 1,
         ...DesignSystem.elevation[1],
     };
 
     if (variant === 'primary') {
+        const primaryColor = useThemeColor({}, 'primary');
+        const primaryLight = useThemeColor({}, 'primaryLight');
+
         return (
             <TouchableOpacity
                 onPress={handlePress}
@@ -85,8 +88,8 @@ export function ModernButton({
                 {...props}
             >
                 <LinearGradient
-                    colors={DesignSystem.gradients.primary.colors}
-                    locations={DesignSystem.gradients.primary.locations}
+                    colors={[primaryColor, primaryLight] as readonly [string, string, ...string[]]}
+                    locations={[0, 1] as readonly [number, number, ...number[]]}
                     start={DesignSystem.gradients.primary.start}
                     end={DesignSystem.gradients.primary.end}
                     style={baseStyle}
@@ -143,7 +146,7 @@ export function ModernButton({
                 baseStyle,
                 {
                     backgroundColor: 'transparent',
-                    ...DesignSystem.elevation[0],
+                    ...(DesignSystem.elevation[1] || {}),
                 },
                 style
             ]}

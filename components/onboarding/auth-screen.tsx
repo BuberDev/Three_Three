@@ -14,7 +14,18 @@ import { Colors } from '../../constants/theme';
 import GoogleAuthService from '../../lib/services/google-auth';
 
 interface AuthScreenProps {
-    onContinue: (authData: { email: string; password?: string; authProvider: string }) => void;
+    onContinue: (authData: {
+        email: string;
+        password?: string;
+        authProvider: string;
+        googleAuth?: {
+            accessToken?: string;
+            refreshToken?: string;
+            idToken?: string;
+            user?: any;
+        };
+        authData?: any;
+    }) => void;
     onBack: () => void;
 }
 
@@ -142,7 +153,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                 });
             }
         } catch (error) {
-            Alert.alert('Błąd', error.message || 'Wystąpił błąd podczas uwierzytelniania');
+            const errorMessage = error instanceof Error ? error.message : 'Wystąpił błąd podczas uwierzytelniania';
+            Alert.alert('Błąd', errorMessage);
         } finally {
             setIsLoading(false);
         }

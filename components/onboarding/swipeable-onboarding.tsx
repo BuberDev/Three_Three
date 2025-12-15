@@ -17,10 +17,11 @@ interface SwipeableOnboardingProps {
 }
 
 interface UserData {
-    email: string;
-    authProvider: string;
-    voiceProcessingConsent: boolean;
-    personalizationConsent: boolean;
+    email?: string;
+    password?: string;
+    authProvider?: string;
+    voiceProcessingConsent?: boolean;
+    personalizationConsent?: boolean;
     goals: string[];
 }
 
@@ -276,13 +277,13 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                 break;
 
             } catch (error) {
-                console.error(`❌ Registration attempt ${registrationAttempts} failed:`, error.message);
+                console.error(`❌ Registration attempt ${registrationAttempts} failed:`, error instanceof Error ? error.message : 'Unknown error');
 
                 if (registrationAttempts >= maxRetries) {
                     console.error('❌ All registration attempts exhausted');
                     // Continue to completion screen even on failure - let user know about the issue
                     // They can try again later or contact support
-                    throw new Error(`Registration failed after ${maxRetries} attempts: ${error.message}`);
+                    throw new Error(`Registration failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
                 }
 
                 // Wait before retry (exponential backoff)

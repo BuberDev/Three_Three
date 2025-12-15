@@ -32,10 +32,26 @@ export default function SleepScreen() {
         startSleepRecording,
         stopSleepRecording,
         updateSleepConfig,
-        lastSleepAnalysis,
+        getCurrentSleepSession,
     } = useSleepRecording();
 
     const { user } = useAppStore();
+
+    // Mock last sleep analysis for now
+    const getLastSleepAnalysis = () => {
+        // In production, this would fetch the latest sleep analysis from the backend
+        const currentSession = getCurrentSleepSession();
+        if (!currentSession) return null;
+
+        return {
+            snoringEvents: [],
+            sleepTalkingEvents: [],
+            sleepQuality: 0.85,
+            totalSleepDuration: 480, // 8 hours in minutes
+        };
+    };
+
+    const lastSleepAnalysis = getLastSleepAnalysis();
 
     const handleToggleSleepRecording = async () => {
         if (isRecordingEnabled) {

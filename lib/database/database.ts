@@ -306,6 +306,9 @@ export class DatabaseService {
 
         // Map API response format to database format
         const userId = voiceNote.userId || voiceNote.user_id;
+        if (!userId) {
+            throw new Error('User ID is required for voice note creation');
+        }
         const transcription = voiceNote.transcription || voiceNote.transcript || '';
         const audioUrl = voiceNote.audioUrl || voiceNote.audioFilePath || '';
         const summary = voiceNote.summary || '';

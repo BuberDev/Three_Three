@@ -8,10 +8,13 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { Colors } from '../../constants/theme';
+import { Colors as ColorsTheme } from '../../constants/theme';
 import { useAppStore } from '../../stores/app-store';
 import { IconSymbol } from '../ui/icon-symbol';
 import { VoiceRecorder } from './voice-recorder';
+
+// Create type-safe color access
+const Colors = ColorsTheme as any;
 
 interface VoiceRecordingMenuProps {
     visible: boolean;

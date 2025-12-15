@@ -195,6 +195,8 @@ export interface AudioRecording {
     uri: string;
     duration: number;
     size?: number;
+    name?: string;
+    createdAt?: Date;
 }
 
 export interface RecordingState {
@@ -303,3 +305,8 @@ export interface ProgressMetrics {
         productivity: number[]; // ostatnie 7 dni
     };
 }
+
+// Export additional type modules
+export * from './payment';
+export * from './subscription';
+

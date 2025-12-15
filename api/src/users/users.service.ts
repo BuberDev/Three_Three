@@ -161,4 +161,14 @@ export class UsersService {
 
         await this.userRepository.softDelete(id);
     }
+
+    async findByStripeCustomerId(stripeCustomerId: string): Promise<User | null> {
+        return this.userRepository.findOne({
+            where: {
+                metadata: {
+                    stripeCustomerId
+                } as any
+            }
+        });
+    }
 }

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
@@ -10,7 +11,36 @@ import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const { user, userSettings, setUserSettings, logout } = useAppStore();
+    const { user, userSettings, setUserSettings, logout, subscription, subscriptionStatus } = useAppStore();
+
+    // Get subscription details for enterprise display
+    const getSubscriptionDisplayInfo = () => {
+        if (!subscription) {
+            return {
+                planName: 'Plan Podstawowy',
+                status: 'Aktywny',
+                renewalDate: null,
+                isActive: false,
+                isPremium: false
+            };
+        }
+
+        const planNames = {
+            'basic': 'Basic',
+            'premium': 'Premium',
+            'premium-yearly': 'Premium Roczny'
+        };
+
+        return {
+            planName: planNames[subscription.id as keyof typeof planNames] || subscription.name,
+            status: subscription.isActive ? 'Aktywny' : 'Nieaktywny',
+            renewalDate: subscription.nextBillingDate,
+            isActive: subscription.isActive,
+            isPremium: subscription.id !== 'basic'
+        };
+    };
+
+    const subscriptionInfo = getSubscriptionDisplayInfo();
 
     // Lokalne stany dla ustawień
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(
@@ -55,6 +85,20 @@ export default function ProfileScreen() {
     };
 
     const profileMenuItems = [
+        {
+            title: 'Zarządzanie subskrypcją',
+            description: `${subscriptionInfo.planName} • ${subscriptionInfo.status}`,
+            icon: 'creditcard.fill' as const,
+            onPress: () => router.push('/subscription' as any),
+            isPremium: true,
+        },
+        {
+            title: 'Historia płatności',
+            description: 'Zobacz historię transakcji i faktury',
+            icon: 'doc.text.fill' as const,
+            onPress: () => Alert.alert('Historia płatności', 'Funkcja zostanie wkrótce dodana'),
+            isPremium: true,
+        },
         {
             title: 'Cele osobiste',
             description: 'Ustaw swoje cele i prioryty',
@@ -132,22 +176,38 @@ export default function ProfileScreen() {
                     </View>
                 </View>
 
-                {/* Premium Section */}
+                {/* Subscription Status Section */}
                 <View style={styles.section}>
-                    <View style={styles.premiumCard}>
-                        <View style={styles.premiumHeader}>
-                            <IconSymbol name="brain" size={24} color="#FFD700" />
-                            <ThemedText style={styles.premiumTitle}>AI Premium</ThemedText>
-                            <View style={styles.premiumBadge}>
-                                <ThemedText style={styles.premiumBadgeText}>PRO</ThemedText>
+                    <View style={[styles.subscriptionCard, !subscriptionInfo.isPremium && styles.subscriptionCardFree]}>
+                        <View style={styles.subscriptionHeader}>
+                            <IconSymbol
+                                name={subscriptionInfo.isPremium ? "crown.fill" : "creditcard"}
+                                size={24}
+                                color={subscriptionInfo.isPremium ? "#FFD700" : Colors.light.tint}
+                            />
+                            <ThemedText style={styles.subscriptionTitle}>{subscriptionInfo.planName}</ThemedText>
+                            <View style={[styles.subscriptionBadge, subscriptionInfo.isActive ? styles.activeBadge : styles.inactiveBadge]}>
+                                <ThemedText style={[styles.subscriptionBadgeText, subscriptionInfo.isActive ? styles.activeBadgeText : styles.inactiveBadgeText]}>
+                                    {subscriptionInfo.status}
+                                </ThemedText>
                             </View>
                         </View>
-                        <ThemedText style={styles.premiumDescription}>
-                            Odblokuj zaawansowane funkcje AI i nieograniczone analizy
+                        {subscriptionInfo.renewalDate && (
+                            <ThemedText style={styles.subscriptionRenewal}>
+                                Odnowienie: {new Date(subscriptionInfo.renewalDate).toLocaleDateString('pl-PL')}
+                            </ThemedText>
+                        )}
+                        <ThemedText style={styles.subscriptionDescription}>
+                            {subscriptionInfo.isPremium
+                                ? 'Masz dostęp do wszystkich funkcji Premium'
+                                : 'Przejdź na Premium aby odblokować zaawansowane funkcje'
+                            }
                         </ThemedText>
-                        <TouchableOpacity style={styles.premiumButton}>
-                            <ThemedText style={styles.premiumButtonText}>Upgrade to Premium</ThemedText>
-                        </TouchableOpacity>
+                        {!subscriptionInfo.isPremium && (
+                            <TouchableOpacity style={styles.subscriptionButton} onPress={() => router.push('/subscription' as any)}>
+                                <ThemedText style={styles.subscriptionButtonText}>Przejdź na Premium</ThemedText>
+                            </TouchableOpacity>
+                        )}
                     </View>
                 </View>
 
@@ -244,7 +304,14 @@ export default function ProfileScreen() {
                                 <View style={styles.menuItemLeft}>
                                     <IconSymbol name={item.icon} size={20} color={Colors.light.tint} />
                                     <View style={styles.menuItemText}>
-                                        <ThemedText style={styles.menuItemTitle}>{item.title}</ThemedText>
+                                        <View style={styles.menuItemTitleRow}>
+                                            <ThemedText style={styles.menuItemTitle}>{item.title}</ThemedText>
+                                            {item.isPremium && !subscriptionInfo.isPremium && (
+                                                <View style={styles.premiumIndicator}>
+                                                    <ThemedText style={styles.premiumIndicatorText}>PRO</ThemedText>
+                                                </View>
+                                            )}
+                                        </View>
                                         <ThemedText style={styles.menuItemDescription}>
                                             {item.description}
                                         </ThemedText>
@@ -477,6 +544,98 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '500',
         marginBottom: 2,
+    },
+    menuItemTitleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        marginBottom: 2,
+    },
+    premiumIndicator: {
+        backgroundColor: '#FFD700',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+        marginLeft: 8,
+    },
+    premiumIndicatorText: {
+        fontSize: 10,
+        fontWeight: '700',
+        color: '#000',
+    },
+    subscriptionCard: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 20,
+        marginBottom: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
+        elevation: 4,
+        borderWidth: 2,
+        borderColor: '#FFD700',
+    },
+    subscriptionCardFree: {
+        borderColor: '#E5E5E5',
+        backgroundColor: '#FAFAFA',
+    },
+    subscriptionHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        gap: 12,
+    },
+    subscriptionTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        flex: 1,
+        color: '#1A1A1A',
+    },
+    subscriptionBadge: {
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    activeBadge: {
+        backgroundColor: '#10B981',
+    },
+    inactiveBadge: {
+        backgroundColor: '#F87171',
+    },
+    subscriptionBadgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+    },
+    activeBadgeText: {
+        color: 'white',
+    },
+    inactiveBadgeText: {
+        color: 'white',
+    },
+    subscriptionRenewal: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 8,
+        fontWeight: '500',
+    },
+    subscriptionDescription: {
+        fontSize: 14,
+        color: '#888',
+        lineHeight: 20,
+        marginBottom: 16,
+    },
+    subscriptionButton: {
+        backgroundColor: Colors.light.tint,
+        paddingVertical: 12,
+        paddingHorizontal: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+    },
+    subscriptionButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
     },
     menuItemDescription: {
         fontSize: 13,

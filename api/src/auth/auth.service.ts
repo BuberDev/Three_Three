@@ -7,6 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { AuthProvider, User } from '../users/entities/user.entity';
 import { UsersService } from '../users/users.service';
@@ -30,6 +31,7 @@ export class AuthService {
         private readonly usersService: UsersService,
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
+        private readonly subscriptionsService: SubscriptionsService,
     ) { }
 
     async register(createUserDto: CreateUserDto): Promise<AuthResponse> {
@@ -50,6 +52,14 @@ export class AuthService {
             password: hashedPassword,
             authProvider: AuthProvider.LOCAL,
         });
+
+        // Auto-start 7-day trial for new users
+        try {
+            await this.subscriptionsService.startTrial(user.id);
+        } catch (error) {
+            // Log error but don't fail registration
+            console.error('Failed to start trial for new user:', error);
+        }
 
         return this.generateTokens(user);
     }

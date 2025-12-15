@@ -17,6 +17,7 @@ import { BaseEntity } from '../../common/entities/base.entity';
 import { Event } from '../../events/entities/event.entity';
 import { JournalEntry } from '../../journal/entities/journal-entry.entity';
 import { SleepTracking } from '../../sleep/entities/sleep-tracking.entity';
+import { Subscription } from '../../subscriptions/entities/subscription.entity';
 import { Task } from '../../tasks/entities/task.entity';
 import { VoiceNote } from '../../voice-notes/entities/voice-note.entity';
 import { UserSettings } from './user-settings.entity';
@@ -97,6 +98,7 @@ export class User extends BaseEntity {
     metadata: {
         onboardingCompleted?: boolean;
         lastLoginAt?: string;
+        stripeCustomerId?: string;
         deviceInfo?: {
             platform?: string;
             version?: string;
@@ -152,6 +154,9 @@ export class User extends BaseEntity {
     @OneToMany(() => ChatMessage, (message) => message.user)
     chatMessages: ChatMessage[];
 
+    @OneToMany(() => Subscription, (subscription) => subscription.user)
+    subscriptions: Subscription[];
+
     // Virtual properties
     get fullName(): string {
         return [this.firstName, this.lastName].filter(Boolean).join(' ');
@@ -175,5 +180,25 @@ export class User extends BaseEntity {
             ...this.preferences,
             ...newPreferences,
         };
+    }
+
+    // Subscription helper methods
+    get currentSubscription(): Subscription | undefined {
+        return this.subscriptions?.find(sub =>
+            sub.isActive || sub.isTrialActive
+        );
+    }
+
+    get hasActiveSubscription(): boolean {
+        return !!this.currentSubscription;
+    }
+
+    get isOnTrial(): boolean {
+        return this.currentSubscription?.isTrialActive || false;
+    }
+
+    get isPremiumUser(): boolean {
+        const subscription = this.currentSubscription;
+        return subscription?.isActive || subscription?.isTrialActive || false;
     }
 }

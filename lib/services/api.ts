@@ -76,7 +76,7 @@ export class ApiService {
         return this.backendAvailable;
     }
 
-    private async makeRequest<T>(
+    public async makeRequest<T>(
         endpoint: string,
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
@@ -180,16 +180,16 @@ export class ApiService {
             const fileInfo = await FileSystem.getInfoAsync(audioUri);
             console.log('📋 File info:', {
                 exists: fileInfo.exists,
-                size: fileInfo.size,
+                size: fileInfo.exists ? (fileInfo as any).size : undefined,
                 isDirectory: fileInfo.isDirectory,
-                modificationTime: fileInfo.modificationTime
+                modificationTime: fileInfo.exists ? (fileInfo as any).modificationTime : undefined
             });
 
             if (!fileInfo.exists) {
                 throw new Error('Audio file does not exist at provided URI');
             }
 
-            if (fileInfo.size === 0) {
+            if (fileInfo.exists && (fileInfo as any).size === 0) {
                 throw new Error('Audio file is empty (0 bytes)');
             }
 
@@ -236,7 +236,7 @@ export class ApiService {
                 audioUri,
                 hasUri: !!audioUri,
                 uriLength: audioUri?.length || 0,
-                fileSize: fileInfo.size
+                fileSize: fileInfo.exists && (fileInfo as any).size ? (fileInfo as any).size : 0
             });
 
             if (duration !== undefined) formData.append('duration', duration.toString());
@@ -255,7 +255,7 @@ export class ApiService {
             try {
                 console.log('🚀 Making POST request to:', `${this.baseURL}/voice-notes`);
                 console.log('🔑 Auth token available:', !!this.authToken);
-                console.log('📦 FormData keys:', Array.from(formData.keys()));
+                console.log('📦 FormData prepared with audio file');
 
                 const response = await fetch(`${this.baseURL}/voice-notes`, {
                     method: 'POST',
@@ -485,7 +485,7 @@ export class ApiService {
             console.error('🚨 Voice note upload with context failed:', error);
             return {
                 success: false,
-                error: ErrorHandler.handleError(error).message,
+                error: ErrorHandler.getInstance().handleError(error as Error).message,
             };
         }
     }
