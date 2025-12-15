@@ -63,15 +63,26 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
         // Use custom upload callback if provided
         if (onCompleteWithAudio) {
+            console.log('🎯 VoiceRecorder: Using onCompleteWithAudio callback');
+            const wasRecording = isRecording; // Capture state before calling recordOnly
+            console.log('🎯 Was recording before recordOnly:', wasRecording);
+
             const result = await recordOnly();
-            if (result && result !== 'recording-started' && !isRecording) {
-                // Recording completed, call custom upload
+            console.log('🎯 RecordOnly result:', result, 'type:', typeof result);
+
+            if (result && result !== 'recording-started') {
+                console.log('🎙️ Recording completed, calling onCompleteWithAudio with:', result);
+                // Recording completed (was recording and now stopped), call custom upload
                 const success = await onCompleteWithAudio(result);
+                console.log('✅ Upload result:', success);
                 if (success && onComplete) {
                     onComplete();
                 }
+            } else {
+                console.log('⚠️ Not calling onCompleteWithAudio - result:', result);
             }
         } else {
+            console.log('🎯 VoiceRecorder: Using default recordAndUpload');
             // Use default upload behavior
             const success = await recordAndUpload();
             if (success && !isRecording && onComplete) {

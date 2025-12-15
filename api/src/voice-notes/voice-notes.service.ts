@@ -2,6 +2,7 @@ import { InjectQueue } from '@nestjs/bull';
 import {
     BadRequestException,
     Injectable,
+    Logger,
     NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -17,6 +18,8 @@ import { ProcessingStatus, VoiceNote } from './entities/voice-note.entity';
 
 @Injectable()
 export class VoiceNotesService {
+    private readonly logger = new Logger(VoiceNotesService.name);
+
     constructor(
         @InjectRepository(VoiceNote)
         private readonly voiceNoteRepository: Repository<VoiceNote>,
@@ -34,15 +37,51 @@ export class VoiceNotesService {
             throw new BadRequestException('Audio file is required');
         }
 
+        // Debug audio file details
+        this.logger.log(`📁 Processing audio file:`, {
+            originalname: audioFile.originalname,
+            mimetype: audioFile.mimetype,
+            size: audioFile.size,
+            bufferLength: audioFile.buffer?.length || 0,
+            hasBuffer: !!audioFile.buffer,
+            encoding: audioFile.encoding,
+            fieldname: audioFile.fieldname
+        });
+
         // Validate file type and size
-        const allowedMimeTypes = ['audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/m4a'];
+        const allowedMimeTypes = [
+            'audio/wav',
+            'audio/mp3',
+            'audio/mpeg',
+            'audio/aac',
+            'audio/m4a',
+            'audio/x-m4a',
+            'audio/mp4',
+            'audio/flac',
+            'audio/ogg',
+            'audio/webm',
+            'application/octet-stream'
+        ];
+
+        console.log('🎵 Service validation - File MIME type:', audioFile.mimetype);
+        console.log('🎵 Service validation - Allowed types:', allowedMimeTypes);
+
         if (!allowedMimeTypes.includes(audioFile.mimetype)) {
+            console.log('❌ Service validation failed - MIME type not in allowed list');
             throw new BadRequestException('Invalid audio file format');
         }
+
+        console.log('✅ Service validation passed - MIME type accepted');
 
         const maxFileSize = 50 * 1024 * 1024; // 50MB
         if (audioFile.size > maxFileSize) {
             throw new BadRequestException('Audio file too large (max 50MB)');
+        }
+
+        // Check if buffer is empty
+        if (!audioFile.buffer || audioFile.buffer.length === 0) {
+            this.logger.error('❌ Audio file buffer is empty!');
+            throw new BadRequestException('Audio file is corrupted or empty');
         }
 
         // Save audio file
@@ -54,6 +93,20 @@ export class VoiceNotesService {
         const filePath = path.join(uploadsDir, fileName);
 
         await fs.writeFile(filePath, audioFile.buffer);
+
+        // Verify file was written correctly
+        const writtenFileStats = await fs.stat(filePath);
+        this.logger.log(`✅ Audio file saved:`, {
+            fileName,
+            filePath,
+            originalSize: audioFile.size,
+            writtenSize: writtenFileStats.size,
+            bufferSize: audioFile.buffer.length
+        });
+
+        if (writtenFileStats.size === 0) {
+            this.logger.error('❌ Warning: Written file is 0 bytes!');
+        }
 
         // Create voice note entity
         const voiceNote = this.voiceNoteRepository.create({
@@ -71,9 +124,12 @@ export class VoiceNotesService {
 
         const savedVoiceNote = await this.voiceNoteRepository.save(voiceNote);
 
-        // Queue for processing
-        await this.voiceProcessingQueue.add('process-voice-note', {
+        // Queue for processing (fire and forget - don't block response)
+        this.voiceProcessingQueue.add('process-voice-note', {
             voiceNoteId: savedVoiceNote.id,
+        }).catch(error => {
+            this.logger.error(`Failed to queue voice note ${savedVoiceNote.id} for processing:`, error);
+            // Note: Voice note is saved successfully, processing queue failure is logged
         });
 
         return savedVoiceNote;
@@ -101,6 +157,31 @@ export class VoiceNotesService {
         }
 
         return voiceNote;
+    }
+
+    async findByFilename(filename: string, userId: string): Promise<VoiceNote | null> {
+        // Extract UUID from filename (before the extension)
+        const nameWithoutExt = path.parse(filename).name;
+
+        // Find voice note by checking if audioFilePath contains this filename
+        const voiceNote = await this.voiceNoteRepository.findOne({
+            where: {
+                userId,
+            },
+        });
+
+        // Check if any voice note's audioFilePath ends with this filename
+        const voiceNotes = await this.voiceNoteRepository.find({
+            where: { userId },
+        });
+
+        for (const note of voiceNotes) {
+            if (note.audioFilePath && note.audioFilePath.includes(filename)) {
+                return note;
+            }
+        }
+
+        return null;
     }
 
     async update(

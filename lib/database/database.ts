@@ -46,6 +46,80 @@ export class DatabaseService {
                 console.warn('⚠️ Database migration warning:', error.message);
             }
         }
+
+        try {
+            // 🔧 Migration: Add missing duration column if it doesn't exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN duration REAL;
+            `);
+            console.log('✅ Database migration: Added duration column');
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes('duplicate column name')) {
+                console.log('✅ Database migration: duration column already exists');
+            } else {
+                console.warn('⚠️ Database migration warning:', error.message);
+            }
+        }
+
+        try {
+            // 🔧 Migration: Add missing audioUrl column if it doesn't exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN audioUrl TEXT;
+            `);
+            console.log('✅ Database migration: Added audioUrl column');
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes('duplicate column name')) {
+                console.log('✅ Database migration: audioUrl column already exists');
+            } else {
+                console.warn('⚠️ Database migration warning:', error.message);
+            }
+        }
+        try {
+            // 🔧 Migration: Add missing file_size column if it does not exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN file_size INTEGER;
+            `);
+            console.log("✅ Database migration: Added file_size column");
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes("duplicate column name")) {
+                console.log("✅ Database migration: file_size column already exists");
+            } else {
+                console.warn("⚠️ Database migration warning:", error.message);
+            }
+        }
+
+        try {
+            // �� Migration: Add missing mime_type column if it does not exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN mime_type TEXT;
+            `);
+            console.log("✅ Database migration: Added mime_type column");
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes("duplicate column name")) {
+                console.log("✅ Database migration: mime_type column already exists");
+            } else {
+                console.warn("⚠️ Database migration warning:", error.message);
+            }
+        }
+
+        try {
+            // 🔧 Migration: Add missing processing_status column if it does not exist
+            await this.db.execAsync(`
+                ALTER TABLE voice_notes ADD COLUMN processing_status TEXT;
+            `);
+            console.log("✅ Database migration: Added processing_status column");
+        } catch (error: any) {
+            // Column already exists - this is expected for new installations
+            if (error.message?.includes("duplicate column name")) {
+                console.log("✅ Database migration: processing_status column already exists");
+            } else {
+                console.warn("⚠️ Database migration warning:", error.message);
+            }
+        }
     }
 
     private async createTables(): Promise<void> {
@@ -333,6 +407,71 @@ export class DatabaseService {
             'UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?',
             [completed ? 1 : 0, new Date().toISOString(), taskId]
         );
+    }
+
+    public async saveTask(task: Task): Promise<void> {
+        if (!this.db) throw new Error('Database not initialized');
+
+        const now = new Date().toISOString();
+        await this.db.runAsync(
+            `INSERT OR REPLACE INTO tasks 
+            (id, user_id, title, description, priority, completed, due_date, category, extracted_from_voice_note_id, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+                task.id,
+                task.extractedFromVoiceNoteId || 'local-user', // Default user if not set
+                task.title,
+                task.description || null,
+                task.priority,
+                task.completed ? 1 : 0,
+                task.dueDate || null,
+                task.category || null,
+                task.extractedFromVoiceNoteId || null,
+                now,
+                now
+            ]
+        );
+    }
+
+    public async updateTask(taskId: string, updates: Partial<Task>): Promise<void> {
+        if (!this.db) throw new Error('Database not initialized');
+
+        const setParts: string[] = [];
+        const params: any[] = [];
+
+        if (updates.title !== undefined) {
+            setParts.push('title = ?');
+            params.push(updates.title);
+        }
+        if (updates.description !== undefined) {
+            setParts.push('description = ?');
+            params.push(updates.description);
+        }
+        if (updates.priority !== undefined) {
+            setParts.push('priority = ?');
+            params.push(updates.priority);
+        }
+        if (updates.completed !== undefined) {
+            setParts.push('completed = ?');
+            params.push(updates.completed ? 1 : 0);
+        }
+        if (updates.dueDate !== undefined) {
+            setParts.push('due_date = ?');
+            params.push(updates.dueDate);
+        }
+        if (updates.category !== undefined) {
+            setParts.push('category = ?');
+            params.push(updates.category);
+        }
+
+        if (setParts.length === 0) return; // No updates
+
+        setParts.push('updated_at = ?');
+        params.push(new Date().toISOString());
+        params.push(taskId);
+
+        const query = `UPDATE tasks SET ${setParts.join(', ')} WHERE id = ?`;
+        await this.db.runAsync(query, params);
     }
 
     // Daily Entries methods

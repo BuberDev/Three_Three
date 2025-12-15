@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system/legacy';
 import {
     ApiResponse,
     DailyEntry,
@@ -167,21 +168,78 @@ export class ApiService {
         });
     }
 
-    public async uploadVoiceNote(audioUri: string, title?: string, tags?: string[]): Promise<ApiResponse<VoiceNoteResponse>> {
+    public async uploadVoiceNote(audioUri: string, duration?: number, title?: string, tags?: string[]): Promise<ApiResponse<VoiceNoteResponse>> {
         try {
             if (!await this.checkBackendAvailability()) {
                 throw new NetworkError('Backend server is not available');
             }
 
+            console.log('📄 Audio URI to upload:', audioUri);
+
+            // Check if file exists and get its info
+            const fileInfo = await FileSystem.getInfoAsync(audioUri);
+            console.log('📋 File info:', {
+                exists: fileInfo.exists,
+                size: fileInfo.size,
+                isDirectory: fileInfo.isDirectory,
+                modificationTime: fileInfo.modificationTime
+            });
+
+            if (!fileInfo.exists) {
+                throw new Error('Audio file does not exist at provided URI');
+            }
+
+            if (fileInfo.size === 0) {
+                throw new Error('Audio file is empty (0 bytes)');
+            }
+
             const formData = new FormData();
 
-            // React Native file upload structure
+            // Get file extension to determine proper MIME type
+            const fileExtension = audioUri.split('.').pop()?.toLowerCase();
+            let mimeType = 'audio/m4a'; // Default for expo-av recordings
+
+            switch (fileExtension) {
+                case 'm4a':
+                    mimeType = 'audio/m4a';
+                    break;
+                case 'aac':
+                    mimeType = 'audio/aac';
+                    break;
+                case 'mp3':
+                    mimeType = 'audio/mpeg';
+                    break;
+                case 'wav':
+                    mimeType = 'audio/wav';
+                    break;
+                case 'mp4':
+                    mimeType = 'audio/mp4';
+                    break;
+                default:
+                    mimeType = 'audio/m4a';
+            }
+
+            console.log('🎵 File details:', {
+                extension: fileExtension,
+                detectedMimeType: mimeType,
+                fileName: `voice_recording.${fileExtension || 'm4a'}`
+            });
+
+            // React Native file upload - using the URI directly but with proper validation
             formData.append('audio', {
                 uri: audioUri,
-                type: 'audio/m4a',
-                name: 'voice_recording.m4a',
+                type: mimeType,
+                name: `voice_recording.${fileExtension || 'm4a'}`,
             } as any);
 
+            console.log('📦 FormData structure check:', {
+                audioUri,
+                hasUri: !!audioUri,
+                uriLength: audioUri?.length || 0,
+                fileSize: fileInfo.size
+            });
+
+            if (duration !== undefined) formData.append('duration', duration.toString());
             if (title) formData.append('title', title);
             if (tags && tags.length > 0) {
                 formData.append('tags', JSON.stringify(tags));
@@ -195,6 +253,10 @@ export class ApiService {
             }, 30000); // 30 seconds timeout
 
             try {
+                console.log('🚀 Making POST request to:', `${this.baseURL}/voice-notes`);
+                console.log('🔑 Auth token available:', !!this.authToken);
+                console.log('📦 FormData keys:', Array.from(formData.keys()));
+
                 const response = await fetch(`${this.baseURL}/voice-notes`, {
                     method: 'POST',
                     headers: {
@@ -205,10 +267,16 @@ export class ApiService {
                     signal: controller.signal, // Add timeout signal
                 });
 
+                console.log('📡 Response status:', response.status, response.statusText);
                 clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({}));
+                    console.error('❌ Upload request failed:', response.status, response.statusText);
+                    const errorData = await response.json().catch((e) => {
+                        console.error('❌ Failed to parse error response:', e);
+                        return {};
+                    });
+                    console.error('❌ Error details:', errorData);
                     return {
                         success: false,
                         error: errorData.message || `Upload failed: ${response.statusText}`,
@@ -223,6 +291,7 @@ export class ApiService {
                 };
             } catch (fetchError) {
                 clearTimeout(timeoutId);
+                console.error('❌ Fetch error during upload:', fetchError);
 
                 if (fetchError instanceof Error && fetchError.name === 'AbortError') {
                     console.error('🕐 Voice note upload timed out');
@@ -231,7 +300,13 @@ export class ApiService {
                         error: 'Upload timed out. The recording is being processed in the background.',
                     };
                 }
-                throw fetchError;
+
+                // Network or other fetch errors
+                console.error('❌ Network/fetch error:', fetchError);
+                return {
+                    success: false,
+                    error: fetchError instanceof Error ? fetchError.message : 'Network error during upload',
+                };
             }
         } catch (error) {
             console.error('❌ Voice note upload failed:', error);
@@ -253,6 +328,61 @@ export class ApiService {
         return this.makeRequest(`/voice-notes/${noteId}`, {
             method: 'DELETE',
         });
+    }
+
+    public async getAudioFile(filename: string): Promise<string | null> {
+        try {
+            const token = this.getAuthToken();
+            if (!token) {
+                throw new Error('No authentication token available');
+            }
+
+            const response = await fetch(`${this.baseURL}/voice-notes/audio/${filename}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Accept': 'audio/*',
+                },
+            });
+
+            if (!response.ok) {
+                console.error('❌ Audio file request failed:', response.status);
+                return null;
+            }
+
+            // Download audio as blob and create local URI
+            const blob = await response.blob();
+
+            // In React Native, we can create a temporary file
+            const FileSystem = await import('expo-file-system/legacy');
+            const tempUri = FileSystem.documentDirectory + `temp_audio_${Date.now()}.m4a`;
+
+            // Convert blob to base64 and write to file
+            const reader = new FileReader();
+            return new Promise((resolve) => {
+                reader.onloadend = async () => {
+                    try {
+                        const base64 = reader.result as string;
+                        const base64Data = base64.split(',')[1]; // Remove data:audio/... prefix
+
+                        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
+                            encoding: FileSystem.EncodingType.Base64,
+                        });
+
+                        console.log('📱 Audio file cached locally:', tempUri);
+                        resolve(tempUri);
+                    } catch (error) {
+                        console.error('❌ Failed to cache audio file:', error);
+                        resolve(null);
+                    }
+                };
+                reader.readAsDataURL(blob);
+            });
+
+        } catch (error) {
+            console.error('❌ Failed to fetch audio file:', error);
+            return null;
+        }
     }
 
     // Daily entries methods
@@ -283,6 +413,20 @@ export class ApiService {
         if (completed !== undefined) params.append('completed', completed.toString());
 
         return this.makeRequest(`/tasks?${params.toString()}`);
+    }
+
+    public async createTask(task: Omit<Task, 'id'>): Promise<ApiResponse<Task>> {
+        return this.makeRequest('/tasks', {
+            method: 'POST',
+            body: JSON.stringify({
+                title: task.title,
+                description: task.description,
+                priority: task.priority,
+                dueDate: task.dueDate,
+                category: task.category,
+                source: 'manual'
+            }),
+        });
     }
 
     public async updateTask(taskId: string, updates: Partial<Task>): Promise<ApiResponse<Task>> {

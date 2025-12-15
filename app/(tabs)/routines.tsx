@@ -1,20 +1,185 @@
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TaskList } from '@/components/daily/task-list';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { Task } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
 
 type FilterType = 'all' | 'today' | 'completed' | 'pending';
 
+interface AddTaskModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onAdd: (task: Omit<Task, 'id'>) => void;
+}
+
+function getPriorityConfig(priority: 'low' | 'medium' | 'high') {
+    switch (priority) {
+        case 'high':
+            return { color: '#FF4444', icon: 'exclamationmark.triangle' as const, label: 'Wysoki' };
+        case 'medium':
+            return { color: '#FFA500', icon: 'minus.circle' as const, label: 'Średni' };
+        case 'low':
+            return { color: '#4CAF50', icon: 'checkmark.circle' as const, label: 'Niski' };
+        default:
+            return { color: '#4CAF50', icon: 'checkmark.circle' as const, label: 'Niski' };
+    }
+}
+
+function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
+    const [title, setTitle] = React.useState('');
+    const [description, setDescription] = React.useState('');
+    const [priority, setPriority] = React.useState<'low' | 'medium' | 'high'>('medium');
+    const [dueDate, setDueDate] = React.useState<string>('');
+
+    const resetForm = () => {
+        setTitle('');
+        setDescription('');
+        setPriority('medium');
+        setDueDate('');
+    };
+
+    const handleSave = () => {
+        if (!title.trim()) {
+            Alert.alert('Błąd', 'Tytuł zadania jest wymagany');
+            return;
+        }
+
+        const task: Omit<Task, 'id'> = {
+            title: title.trim(),
+            description: description.trim() || undefined,
+            priority,
+            completed: false,
+            dueDate: dueDate || undefined,
+        };
+
+        onAdd(task);
+        resetForm();
+        onClose();
+    };
+
+    if (!visible) return null;
+
+    return (
+        <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <ThemedText style={styles.modalTitle}>Dodaj nowe zadanie</ThemedText>
+                    <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
+                        <IconSymbol size={24} name="xmark" color={Colors.light.text} />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.formContainer}>
+                    {/* Title Input */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Tytuł zadania *</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.textInput}
+                                value={title}
+                                onChangeText={setTitle}
+                                placeholder="Wprowadź tytuł zadania..."
+                                placeholderTextColor={Colors.light.textSecondary}
+                                maxLength={100}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Description Input */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Opis (opcjonalnie)</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={[styles.textInput, styles.multilineInput]}
+                                value={description}
+                                onChangeText={setDescription}
+                                placeholder="Dodaj szczegóły zadania..."
+                                placeholderTextColor={Colors.light.textSecondary}
+                                multiline
+                                numberOfLines={3}
+                                maxLength={500}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Priority Selection */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Priorytet</ThemedText>
+                        <View style={styles.priorityContainer}>
+                            {(['low', 'medium', 'high'] as const).map((p) => {
+                                const priorityConfig = getPriorityConfig(p);
+                                const isSelected = priority === p;
+                                const backgroundColor = isSelected ? priorityConfig.color + '20' : Colors.light.background;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={p}
+                                        style={[
+                                            styles.priorityButton,
+                                            isSelected && styles.priorityButtonActive,
+                                            { backgroundColor }
+                                        ]}
+                                        onPress={() => setPriority(p)}
+                                    >
+                                        <IconSymbol
+                                            size={16}
+                                            name={priorityConfig.icon}
+                                            color={priorityConfig.color}
+                                        />
+                                        <ThemedText style={[styles.priorityText, { color: isSelected ? Colors.light.text : Colors.light.textSecondary }]}>
+                                            {priorityConfig.label}
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+
+                    {/* Due Date Input */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Termin (opcjonalnie)</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.textInput}
+                                value={dueDate}
+                                onChangeText={setDueDate}
+                                placeholder="YYYY-MM-DD np. 2025-12-20"
+                                placeholderTextColor={Colors.light.textSecondary}
+                            />
+                        </View>
+                    </View>
+                </ScrollView>
+
+                <View style={styles.modalActions}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.cancelButton]}
+                        onPress={() => { resetForm(); onClose(); }}
+                    >
+                        <ThemedText style={styles.cancelButtonText}>Anuluj</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.saveButton]}
+                        onPress={handleSave}
+                    >
+                        <ThemedText style={styles.saveButtonText}>Dodaj zadanie</ThemedText>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </View>
+    );
+}
+
 export default function RoutinesScreen() {
     const insets = useSafeAreaInsets();
-    const { tasks, todaysTasks, loadTasks } = useAppStore();
+    const { tasks, todaysTasks, loadTasks, addTask } = useAppStore();
     const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
+    const [showAddModal, setShowAddModal] = React.useState(false);
 
     React.useEffect(() => {
         loadTasks();
@@ -43,11 +208,21 @@ export default function RoutinesScreen() {
     ] as const;
 
     const handleAddTask = () => {
-        Alert.alert(
-            'Dodaj zadanie',
-            'Ta funkcja zostanie wkrótce dodana',
-            [{ text: 'OK' }]
-        );
+        setShowAddModal(true);
+    };
+
+    const handleTaskAdd = async (task: Omit<Task, 'id'>) => {
+        try {
+            const taskWithId: Task = {
+                ...task,
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+            };
+            await addTask(taskWithId);
+            Alert.alert('Sukces', 'Zadanie zostało dodane');
+        } catch (error) {
+            console.error('Błąd przy dodawaniu zadania:', error);
+            Alert.alert('Błąd', 'Nie udało się dodać zadania');
+        }
     };
 
     const handleAddRoutine = () => {
@@ -200,6 +375,13 @@ export default function RoutinesScreen() {
                     </View>
                 </View>
             </ScrollView>
+
+            {/* Add Task Modal */}
+            <AddTaskModal
+                visible={showAddModal}
+                onClose={() => setShowAddModal(false)}
+                onAdd={handleTaskAdd}
+            />
         </View>
     );
 }
@@ -393,5 +575,120 @@ const styles = StyleSheet.create({
         opacity: 0.5,
         textAlign: 'center',
         lineHeight: 20,
+    },
+    // Modal styles
+    modalOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 16,
+        padding: 24,
+        width: '90%',
+        maxWidth: 400,
+        maxHeight: '80%',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.25,
+        shadowRadius: 8,
+        elevation: 10,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: Colors.light.text,
+    },
+    formContainer: {
+        maxHeight: 300,
+    },
+    inputGroup: {
+        marginBottom: 16,
+    },
+    inputLabel: {
+        fontSize: 14,
+        fontWeight: '500',
+        marginBottom: 8,
+        color: Colors.light.text,
+    },
+    inputContainer: {
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        backgroundColor: Colors.light.background,
+    },
+    textInput: {
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        fontSize: 16,
+        color: Colors.light.text,
+    },
+    multilineInput: {
+        minHeight: 80,
+        textAlignVertical: 'top',
+    },
+    priorityContainer: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    priorityButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 8,
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    priorityButtonActive: {
+        borderColor: Colors.light.tint,
+    },
+    priorityText: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginTop: 20,
+    },
+    actionButton: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#f0f0f0',
+    },
+    saveButton: {
+        backgroundColor: Colors.light.tint,
+    },
+    cancelButtonText: {
+        color: '#666',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    saveButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '600',
     },
 });

@@ -12,6 +12,7 @@ import { VoiceRecorder } from '@/components/voice/voice-recorder';
 import { VoiceRecordingMenu } from '@/components/voice/voice-recording-menu';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { AudioService } from '@/lib/services/audio';
 import { useAppStore } from '@/stores/app-store';
 
 export default function VoiceScreen() {
@@ -19,17 +20,72 @@ export default function VoiceScreen() {
     const colors = Colors[colorScheme ?? 'light'];
     const insets = useSafeAreaInsets();
     const [showRecordingMenu, setShowRecordingMenu] = useState(false);
+    const [playingNoteId, setPlayingNoteId] = useState<string | null>(null);
+    const [audioService] = useState(() => AudioService.getInstance());
 
     const {
         voiceNotes,
         isProcessingVoiceNote,
         loadTasks,
         loadVoiceNotes,
+        uploadVoiceNote,
         error,
         clearError
     } = useAppStore();
 
     const [isRefreshing, setIsRefreshing] = useState(false);
+
+    // Playback functions
+    const playVoiceNote = useCallback(async (noteId: string, audioUrl?: string, audioFilePath?: string) => {
+        try {
+            if (playingNoteId === noteId) {
+                // Stop playback if already playing this note
+                await audioService.stopPlayback();
+                setPlayingNoteId(null);
+                return;
+            }
+
+            // Stop any current playback
+            if (playingNoteId) {
+                await audioService.stopPlayback();
+            }
+
+            // Get audio URL - prefer audioUrl over audioFilePath
+            const audioUri = audioUrl || audioFilePath;
+            if (!audioUri) {
+                console.error('No audio URL available for note:', noteId);
+                return;
+            }
+
+            console.log('Playing voice note:', noteId, 'from:', audioUri);
+            setPlayingNoteId(noteId);
+            await audioService.playRecording(audioUri);
+
+            // Auto-stop after some time (optional)
+            setTimeout(async () => {
+                try {
+                    await audioService.stopPlayback();
+                    setPlayingNoteId(null);
+                } catch (error) {
+                    console.log('Auto-stop completed or failed silently');
+                    setPlayingNoteId(null);
+                }
+            }, 60000); // Stop after 1 minute max
+
+        } catch (error) {
+            console.error('Failed to play voice note:', error);
+            setPlayingNoteId(null);
+        }
+    }, [audioService, playingNoteId]);
+
+    const stopPlayback = useCallback(async () => {
+        try {
+            await audioService.stopPlayback();
+            setPlayingNoteId(null);
+        } catch (error) {
+            console.error('Failed to stop playback:', error);
+        }
+    }, [audioService]);
 
     const onRecordingComplete = React.useCallback(async () => {
         console.log('🔄 Recording completed, refreshing data...');
@@ -39,6 +95,26 @@ export default function VoiceScreen() {
         ]);
         console.log('✅ Data refreshed after recording');
     }, [loadTasks, loadVoiceNotes]);
+
+    const onRecordingCompleteWithAudio = React.useCallback(async (audioUri: string) => {
+        console.log('🎙️ Voice recording completed with URI:', audioUri);
+        if (!audioUri) {
+            console.error('❌ No audio URI provided');
+            return false;
+        }
+
+        try {
+            const success = await uploadVoiceNote(audioUri);
+            if (success) {
+                console.log('✅ Voice note uploaded successfully');
+                await onRecordingComplete(); // Refresh data after successful upload
+            }
+            return success;
+        } catch (error) {
+            console.error('❌ Failed to upload voice note:', error);
+            return false;
+        }
+    }, [uploadVoiceNote, onRecordingComplete]);
 
     const onRefresh = useCallback(async () => {
         setIsRefreshing(true);
@@ -76,6 +152,7 @@ export default function VoiceScreen() {
     // 🛡️ Safety check for voiceNotes array
     const safeVoiceNotes = Array.isArray(voiceNotes) ? voiceNotes : [];
     const recentNotes = safeVoiceNotes
+        .filter(note => note && note.id) // Filter out notes without valid id
         .slice()
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
         .slice(0, 5);
@@ -323,7 +400,7 @@ export default function VoiceScreen() {
                             </TouchableOpacity>
                         </View>
                     )}
-                    <VoiceRecorder onComplete={onRecordingComplete} />
+                    <VoiceRecorder onCompleteWithAudio={onRecordingCompleteWithAudio} />
                 </ModernCard>
 
                 {/* Quick Tips */}
@@ -394,9 +471,9 @@ export default function VoiceScreen() {
                         elevation={2}
                     >
                         <View style={{ gap: DesignSystem.spacing.md }}>
-                            {recentNotes.map((note) => (
+                            {recentNotes.map((note, index) => (
                                 <ModernView
-                                    key={note.id}
+                                    key={note.id || `note-${index}-${note.createdAt}`}
                                     variant="surfaceSecondary"
                                     borderRadius="lg"
                                     padding="md"
@@ -424,6 +501,23 @@ export default function VoiceScreen() {
                                             <ThemedText variant="bodySmall" color="tertiary">
                                                 {Math.round(note.duration || 0)}s
                                             </ThemedText>
+                                            {(note.audioUrl || note.audioFilePath) && (
+                                                <TouchableOpacity
+                                                    onPress={() => playVoiceNote(note.id, note.audioUrl, note.audioFilePath)}
+                                                    style={{
+                                                        backgroundColor: playingNoteId === note.id ? colors.error + '20' : colors.primary + '20',
+                                                        borderRadius: 12,
+                                                        padding: 6,
+                                                        marginLeft: 8
+                                                    }}
+                                                >
+                                                    <IconSymbol
+                                                        name={playingNoteId === note.id ? "stop.fill" : "play.fill"}
+                                                        size={14}
+                                                        color={playingNoteId === note.id ? colors.error : colors.primary}
+                                                    />
+                                                </TouchableOpacity>
+                                            )}
                                         </View>
                                     </View>
                                     {note.transcript && (
@@ -515,7 +609,7 @@ const styles = StyleSheet.create({
         paddingVertical: DesignSystem.spacing.md,
         paddingHorizontal: DesignSystem.spacing.lg,
         borderRadius: DesignSystem.borderRadius.lg,
-        shadowColor: Colors.shadow,
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3,

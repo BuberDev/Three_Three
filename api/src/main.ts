@@ -1,6 +1,6 @@
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { ClassSerializerInterceptor, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { NestFactory } from '@nestjs/core';
+import { NestFactory, Reflector } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as compression from 'compression';
 import rateLimit from 'express-rate-limit';
@@ -62,6 +62,7 @@ async function bootstrap() {
     app.useGlobalInterceptors(
         new LoggingInterceptor(),
         new TransformInterceptor(),
+        new ClassSerializerInterceptor(app.get(Reflector)),
     );
 
     // Swagger documentation

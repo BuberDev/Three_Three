@@ -77,8 +77,8 @@ interface AppStore {
     uploadLifeExperienceVoice: (audioUri: string, category: 'reflection' | 'gratitude' | 'emotion' | 'achievement' | 'challenge') => Promise<boolean>;
 
     // Tasks actions
-    addTask: (task: Task) => void;
-    updateTask: (taskId: string, updates: Partial<Task>) => void;
+    addTask: (task: Task) => Promise<void>;
+    updateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
     toggleTaskCompletion: (taskId: string) => void;
     deleteTask: (taskId: string) => void;
     loadTasks: () => Promise<void>;
@@ -211,7 +211,8 @@ export const useAppStore = create<AppStore>()(
                 // 🚨 Rate limiting protection - prevent spam requests
                 const now = Date.now();
                 const lastCallKey = `lastVoiceNotesCall_${user.id}`;
-                const lastCall = get()[lastCallKey] || 0;
+                const state = get() as any;
+                const lastCall = state[lastCallKey] || 0;
                 const timeSinceLastCall = now - lastCall;
 
                 if (timeSinceLastCall < 2000) { // 2 second minimum between calls
@@ -220,7 +221,7 @@ export const useAppStore = create<AppStore>()(
                 }
 
                 // Mark this call
-                set({ [lastCallKey]: now });
+                set((state: any) => ({ ...state, [lastCallKey]: now }));
 
                 try {
                     console.log(`🔍 Loading voice notes for user: ${user.id} (email: ${user.email})`);
@@ -382,7 +383,7 @@ export const useAppStore = create<AppStore>()(
                         // 🚨 Special handling for rate limiting
                         if (response.error && response.error.includes('429')) {
                             console.log('🚫 Rate limited - backing off for 5 seconds');
-                            set({ [lastCallKey]: now + 3000 }); // Extra delay for rate limiting
+                            set((state: any) => ({ ...state, [lastCallKey]: now + 3000 })); // Extra delay for rate limiting
                             return; // Don't clear voiceNotes on rate limiting
                         }
 
@@ -437,7 +438,7 @@ export const useAppStore = create<AppStore>()(
             setProcessingVoiceNote: (isProcessingVoiceNote) => set({ isProcessingVoiceNote }),
 
             uploadVoiceNote: async (audioUri: string) => {
-                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes, loadTasks } = get();
+                const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes, loadTasks, currentRecording } = get();
                 if (!user) {
                     setError('User not authenticated');
                     setProcessingVoiceNote(false); // Ensure state is reset
@@ -450,7 +451,7 @@ export const useAppStore = create<AppStore>()(
                     console.log('🎙️ Starting voice note upload...');
 
                     // Add a timeout wrapper around the API call - Extended for voice processing
-                    const uploadPromise = ApiService.getInstance().uploadVoiceNote(audioUri);
+                    const uploadPromise = ApiService.getInstance().uploadVoiceNote(audioUri, currentRecording.duration);
                     const timeoutPromise = new Promise<never>((_, reject) => {
                         setTimeout(() => {
                             reject(new Error('Upload timeout after 60 seconds'));
@@ -468,24 +469,38 @@ export const useAppStore = create<AppStore>()(
                         fullResponse: response
                     });
 
+                    console.log('🔍 Response.data content:', response.data);
+
                     if (response.success && response.data) {
                         console.log('✅ Voice note uploaded successfully!');
 
-                        // Add voice note to local state
-                        addVoiceNote(response.data.voiceNote);
+                        // Backend response is nested: response.data.data.data contains the actual VoiceNote
+                        const voiceNoteData = response.data?.data?.data;
+                        console.log('🔍 Voice note object structure:', {
+                            id: voiceNoteData?.id,
+                            userId: voiceNoteData?.userId,
+                            hasId: !!voiceNoteData?.id,
+                            hasUserId: !!voiceNoteData?.userId,
+                            allKeys: Object.keys(voiceNoteData || {})
+                        });
 
-                        // Add extracted tasks to local state
-                        const { tasks } = get();
-                        const newTasks = [...response.data.extractedTasks, ...tasks];
-                        set({ tasks: newTasks });
+                        // Ensure voiceNote has required properties
+                        if (!voiceNoteData || !voiceNoteData.id) {
+                            throw new Error('Invalid voice note response: missing id');
+                        }
+
+                        // Set userId if missing (use current user)
+                        if (!voiceNoteData.userId && user) {
+                            voiceNoteData.userId = user.id;
+                            console.log('🔧 Fixed voice note userId:', user.id);
+                        }
+
+                        // Add voice note to local state
+                        addVoiceNote(voiceNoteData);
 
                         // Save to local database
                         const dbService = DatabaseService.getInstance();
-                        await dbService.saveVoiceNote(response.data.voiceNote);
-
-                        for (const task of response.data.extractedTasks) {
-                            await dbService.createTask(task);
-                        }
+                        await dbService.saveVoiceNote(voiceNoteData);
 
                         // Reload data to ensure UI consistency
                         await Promise.allSettled([
@@ -756,20 +771,52 @@ export const useAppStore = create<AppStore>()(
             },
 
             // Tasks actions
-            addTask: (task) => {
-                const { user } = get();
-                const isToday = (date: Date) => {
-                    const today = new Date();
-                    return date.toDateString() === today.toDateString();
-                };
+            addTask: async (task) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
 
-                set((state) => ({
-                    tasks: [task, ...state.tasks],
-                    todaysTasks: isToday(new Date()) ? [task, ...state.todaysTasks] : state.todaysTasks
-                }));
+                try {
+                    // First add to local state for immediate UI update
+                    const isToday = (date: Date) => {
+                        const today = new Date();
+                        return date.toDateString() === today.toDateString();
+                    };
 
-                // Log task creation event
-                if (user) {
+                    set((state) => ({
+                        tasks: [task, ...state.tasks],
+                        todaysTasks: isToday(new Date()) ? [task, ...state.todaysTasks] : state.todaysTasks
+                    }));
+
+                    // Then sync with backend API
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.createTask(task);
+
+                    if (!response.success) {
+                        // Rollback local state if API failed
+                        set((state) => ({
+                            tasks: state.tasks.filter(t => t.id !== task.id),
+                            todaysTasks: state.todaysTasks.filter(t => t.id !== task.id)
+                        }));
+                        throw new Error(response.error || 'Failed to create task');
+                    }
+
+                    // Update local state with server response
+                    if (response.data) {
+                        const serverTask = response.data;
+                        set((state) => ({
+                            tasks: state.tasks.map(t => t.id === task.id ? serverTask : t),
+                            todaysTasks: state.todaysTasks.map(t => t.id === task.id ? serverTask : t)
+                        }));
+                    }
+
+                    // Save to local database
+                    const dbService = DatabaseService.getInstance();
+                    await dbService.saveTask(response.data || task);
+
+                    // Log task creation event
                     const eventService = EventService.getInstance();
                     eventService.dispatchEvent(EventType.TASK_CREATED, user.id, {
                         taskId: task.id,
@@ -777,18 +824,77 @@ export const useAppStore = create<AppStore>()(
                         priority: task.priority,
                         extractedFromVoiceNote: !!task.extractedFromVoiceNoteId
                     });
+                } catch (error) {
+                    console.error('Failed to add task:', error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    setError(`Failed to add task: ${errorMessage}`);
+                    // Remove from local state if it was added
+                    set((state) => ({
+                        tasks: state.tasks.filter(t => t.id !== task.id),
+                        todaysTasks: state.todaysTasks.filter(t => t.id !== task.id)
+                    }));
+                    throw error;
                 }
             },
 
-            updateTask: (taskId, updates) =>
-                set((state) => ({
-                    tasks: state.tasks.map(task =>
-                        task.id === taskId ? { ...task, ...updates } : task
-                    ),
-                    todaysTasks: state.todaysTasks.map(task =>
-                        task.id === taskId ? { ...task, ...updates } : task
-                    )
-                })),
+            updateTask: async (taskId, updates) => {
+                const { setError } = get();
+
+                // Store original state for rollback
+                const { tasks, todaysTasks } = get();
+                const originalTask = tasks.find(t => t.id === taskId);
+
+                if (!originalTask) {
+                    setError('Task not found');
+                    return;
+                }
+
+                try {
+                    // Update local state immediately
+                    set((state) => ({
+                        tasks: state.tasks.map(task =>
+                            task.id === taskId ? { ...task, ...updates } : task
+                        ),
+                        todaysTasks: state.todaysTasks.map(task =>
+                            task.id === taskId ? { ...task, ...updates } : task
+                        )
+                    }));
+
+                    // Sync with backend API
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.updateTask(taskId, updates);
+
+                    if (!response.success) {
+                        // Rollback to original state
+                        set((state) => ({
+                            tasks: state.tasks.map(task =>
+                                task.id === taskId ? originalTask : task
+                            ),
+                            todaysTasks: state.todaysTasks.map(task =>
+                                task.id === taskId ? originalTask : task
+                            )
+                        }));
+                        throw new Error(response.error || 'Failed to update task');
+                    }
+
+                    // Update local database
+                    const dbService = DatabaseService.getInstance();
+                    await dbService.updateTask(taskId, updates);
+                } catch (error) {
+                    console.error('Failed to update task:', error);
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    setError(`Failed to update task: ${errorMessage}`);
+                    // Rollback to original state
+                    set((state) => ({
+                        tasks: state.tasks.map(task =>
+                            task.id === taskId ? originalTask : task
+                        ),
+                        todaysTasks: state.todaysTasks.map(task =>
+                            task.id === taskId ? originalTask : task
+                        )
+                    }));
+                }
+            },
 
             toggleTaskCompletion: async (taskId) => {
                 const { tasks, updateTask } = get();
@@ -829,6 +935,38 @@ export const useAppStore = create<AppStore>()(
                 }
 
                 try {
+                    // Try to load from API first
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getTasks();
+
+                    if (response.success && response.data) {
+                        const tasks = response.data;
+                        const today = new Date().toISOString().split('T')[0];
+                        const todaysTasks = tasks.filter(task => {
+                            const taskDate = task.dueDate?.split('T')[0];
+                            return taskDate === today || !task.completed;
+                        });
+
+                        set({ tasks, todaysTasks });
+
+                        // Update local database cache
+                        const dbService = DatabaseService.getInstance();
+                        if (!dbService.isInitialized()) {
+                            await dbService.initialize();
+                        }
+
+                        // Save tasks to local cache
+                        for (const task of tasks) {
+                            await dbService.saveTask(task);
+                        }
+                        return;
+                    }
+                } catch (error) {
+                    console.warn('Failed to load tasks from API, falling back to local database:', error);
+                }
+
+                // Fallback to local database
+                try {
                     const dbService = DatabaseService.getInstance();
 
                     // Sprawdź czy baza jest zainicjalizowana
@@ -846,7 +984,7 @@ export const useAppStore = create<AppStore>()(
 
                     set({ tasks, todaysTasks });
                 } catch (error) {
-                    console.error('Failed to load tasks:', error);
+                    console.error('Failed to load tasks from database:', error);
                     // Nie pokazuj błędu użytkownikowi jeśli to tylko brak danych
                     set({ tasks: [], todaysTasks: [] });
                 }
@@ -988,7 +1126,7 @@ export const useAppStore = create<AppStore>()(
                     set({ isLoading: true });
 
                     // Load JWT tokens from storage and verify authentication
-                    let loadedTokens = { accessToken: null, refreshToken: null };
+                    let loadedTokens: { accessToken: string | null; refreshToken: string | null } = { accessToken: null, refreshToken: null };
                     let authenticatedUser = null;
 
                     try {

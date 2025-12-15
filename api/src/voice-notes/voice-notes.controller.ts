@@ -11,6 +11,7 @@ import {
     Patch,
     Post,
     Query,
+    Res,
     UploadedFile,
     UseGuards,
     UseInterceptors,
@@ -26,6 +27,9 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
+import { Response } from 'express';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../users/entities/user.entity';
@@ -54,18 +58,36 @@ export class VoiceNotesController {
                 fileSize: 50 * 1024 * 1024, // 50MB
             },
             fileFilter: (req, file, cb) => {
+                console.log('🔍 Incoming file validation:', {
+                    fieldname: file.fieldname,
+                    originalname: file.originalname,
+                    mimetype: file.mimetype,
+                    size: file.size,
+                    encoding: file.encoding
+                });
+
                 const allowedMimeTypes = [
                     'audio/wav',
                     'audio/mp3',
                     'audio/mpeg',
+                    'audio/aac',
                     'audio/m4a',
                     'audio/mp4',
+                    'audio/x-m4a',
                     'audio/flac',
                     'audio/ogg',
+                    'audio/webm',
+                    'application/octet-stream', // Sometimes files come without proper MIME type
                 ];
+
+                console.log('🎵 Allowed MIME types:', allowedMimeTypes);
+                console.log('📄 File MIME type:', file.mimetype);
+
                 if (allowedMimeTypes.includes(file.mimetype)) {
+                    console.log('✅ File MIME type accepted');
                     cb(null, true);
                 } else {
+                    console.log('❌ File MIME type rejected');
                     cb(new BadRequestException('Invalid audio file format'), false);
                 }
             },
@@ -296,5 +318,108 @@ export class VoiceNotesController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<void> {
         return this.voiceNotesService.remove(id, user.id);
+    }
+
+    @Get('audio/:filename')
+    @ApiOperation({ summary: 'Serve audio file' })
+    @ApiParam({ name: 'filename', type: 'string', description: 'Audio filename' })
+    @ApiResponse({
+        status: 200,
+        description: 'Audio file served successfully',
+        headers: {
+            'Content-Type': {
+                description: 'Audio MIME type',
+                schema: { type: 'string' }
+            }
+        }
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Audio file not found',
+    })
+    async serveAudio(
+        @Param('filename') filename: string,
+        @CurrentUser() user: User,
+        @Res() res: Response,
+    ): Promise<void> {
+        try {
+            // Security: Verify user owns this file
+            const voiceNote = await this.voiceNotesService.findByFilename(filename, user.id);
+            if (!voiceNote) {
+                res.status(404).json({
+                    message: 'Audio file not found or access denied',
+                    code: 'AUDIO_NOT_FOUND'
+                });
+                return;
+            }
+
+            // Security: Only allow specific extensions
+            const allowedExtensions = ['.wav', '.mp3', '.m4a', '.mp4', '.flac', '.ogg'];
+            const ext = path.extname(filename).toLowerCase();
+
+            if (!allowedExtensions.includes(ext)) {
+                throw new BadRequestException('Invalid audio file format');
+            }
+
+            // Build file path
+            const uploadsDir = path.join(process.cwd(), 'uploads', 'voice-notes');
+            const filePath = path.join(uploadsDir, filename);
+
+            // Security: Prevent path traversal
+            if (!filePath.startsWith(uploadsDir)) {
+                throw new BadRequestException('Invalid file path');
+            }
+
+            // Check if file exists
+            try {
+                await fs.access(filePath);
+            } catch {
+                res.status(404).json({
+                    statusCode: 404,
+                    message: 'Audio file not found',
+                    error: 'Not Found'
+                });
+                return;
+            }
+
+            // Get file stats
+            const stats = await fs.stat(filePath);
+
+            // Set appropriate headers
+            const mimeTypes: Record<string, string> = {
+                '.wav': 'audio/wav',
+                '.mp3': 'audio/mpeg',
+                '.m4a': 'audio/mp4',
+                '.mp4': 'audio/mp4',
+                '.flac': 'audio/flac',
+                '.ogg': 'audio/ogg',
+            };
+
+            res.set({
+                'Content-Type': mimeTypes[ext] || 'audio/mpeg',
+                'Content-Length': stats.size.toString(),
+                'Accept-Ranges': 'bytes',
+                'Cache-Control': 'public, max-age=31536000', // 1 year cache
+            });
+
+            // Stream the file
+            const fileBuffer = await fs.readFile(filePath);
+            res.send(fileBuffer);
+
+        } catch (error) {
+            if (error instanceof BadRequestException) {
+                res.status(400).json({
+                    statusCode: 400,
+                    message: error.message,
+                    error: 'Bad Request'
+                });
+            } else {
+                res.status(500).json({
+                    statusCode: 500,
+                    message: 'Internal server error',
+                    error: 'Internal Server Error'
+                });
+            }
+        }
     }
 }

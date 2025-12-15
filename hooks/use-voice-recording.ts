@@ -60,14 +60,21 @@ export const useVoiceRecording = () => {
 
     const stopRecording = useCallback(async (): Promise<AudioRecording | null> => {
         try {
-            const recording = await audioService.stopRecording();
+            const uri = await audioService.stopRecording();
+            if (!uri) return null;
+
+            // Create AudioRecording object with current duration
+            const recording: AudioRecording = {
+                uri,
+                duration: currentRecording.duration
+            };
             return recording;
         } catch (error) {
             console.error('Failed to stop recording:', error);
             setError(error instanceof Error ? error.message : 'Failed to stop recording');
             return null;
         }
-    }, [audioService, setError]);
+    }, [audioService, setError, currentRecording.duration]);
 
     const playRecording = useCallback(async (uri: string): Promise<void> => {
         try {
@@ -126,14 +133,21 @@ export const useVoiceRecording = () => {
 
     // NEW: Record only without auto-upload for custom handling
     const recordOnly = useCallback(async (): Promise<string | null> => {
+        console.log('🎯 recordOnly called, isRecording:', currentRecording.isRecording);
         if (currentRecording.isRecording) {
             // Stop recording and return URI
+            console.log('🛑 Stopping recording...');
             const recording = await stopRecording();
-            return recording?.uri || null;
+            const uri = recording?.uri || null;
+            console.log('📝 Recording stopped, URI:', uri);
+            return uri;
         } else {
             // Start recording
+            console.log('▶️ Starting recording...');
             const success = await startRecording();
-            return success ? 'recording-started' : null;
+            const result = success ? 'recording-started' : null;
+            console.log('🎬 Recording start result:', result);
+            return result;
         }
     }, [currentRecording.isRecording, startRecording, stopRecording]);
 

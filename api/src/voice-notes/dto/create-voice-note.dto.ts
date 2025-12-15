@@ -1,8 +1,10 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
     IsArray,
+    IsNumber,
     IsObject,
     IsOptional,
+    IsPositive,
     IsString,
     MaxLength,
 } from 'class-validator';
@@ -18,6 +20,26 @@ export class CreateVoiceNoteDto {
     @IsString()
     @MaxLength(500)
     title?: string;
+
+    @ApiProperty({
+        description: 'Duration of the voice note in seconds',
+        example: 45.5,
+        required: false,
+    })
+    @IsOptional()
+    @IsNumber()
+    @IsPositive()
+    duration?: number;
+
+    @ApiProperty({
+        description: 'File size in bytes',
+        example: 1024000,
+        required: false,
+    })
+    @IsOptional()
+    @IsNumber()
+    @IsPositive()
+    fileSize?: number;
 
     @ApiProperty({
         description: 'Optional tags for categorization',

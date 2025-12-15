@@ -1,3 +1,4 @@
+import { Expose } from 'class-transformer';
 import {
     Column,
     Entity,
@@ -107,5 +108,17 @@ export class VoiceNote extends BaseEntity {
             );
         }
         return null;
+    }
+
+    // Generate public audio URL for frontend
+    @Expose()
+    get audioUrl(): string | null {
+        if (!this.audioFilePath) return null;
+
+        // Extract filename from path
+        const filename = this.audioFilePath.split('/').pop() || this.audioFilePath;
+
+        // Return public URL that will be served by the backend with /api prefix
+        return `${process.env.API_BASE_URL || 'http://localhost:3000'}/api/voice-notes/audio/${filename}`;
     }
 }

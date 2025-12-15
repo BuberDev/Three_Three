@@ -1,5 +1,5 @@
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { AudioRecording, RecordingState } from '../types';
 
 export class AudioService {
@@ -141,11 +141,31 @@ export class AudioService {
                 await this.player.unloadAsync();
             }
 
-            const { sound } = await Audio.Sound.createAsync({ uri });
+            let playableUri = uri;
+
+            // If it's a HTTP URL, download it with authentication
+            if (uri.startsWith('http')) {
+                const ApiService = await import('./api');
+                const apiService = ApiService.ApiService.getInstance();
+
+                // Extract filename from URL
+                const filename = uri.split('/').pop();
+                if (filename) {
+                    const localUri = await apiService.getAudioFile(filename);
+                    if (localUri) {
+                        playableUri = localUri;
+                        console.log('🎵 Using authenticated local audio file:', playableUri);
+                    } else {
+                        throw new Error('Failed to download authenticated audio file');
+                    }
+                }
+            }
+
+            const { sound } = await Audio.Sound.createAsync({ uri: playableUri });
             this.player = sound;
             await this.player.playAsync();
 
-            console.log('Playing recording from:', uri);
+            console.log('Playing recording from:', playableUri);
         } catch (error) {
             console.error('Failed to play recording:', error);
             throw error;
@@ -270,11 +290,25 @@ export class AudioService {
 
     public async deleteRecording(uri: string): Promise<void> {
         try {
+            // Enhanced validation and debugging
+            console.log('🗑️ Delete recording called with URI:', uri, 'type:', typeof uri);
+
+            if (!uri || typeof uri !== 'string' || uri.trim() === '') {
+                console.warn('⚠️ Skipping delete: Invalid URI provided:', {
+                    uri,
+                    type: typeof uri,
+                    isNull: uri === null,
+                    isUndefined: uri === undefined,
+                    isEmpty: uri === ''
+                });
+                return;
+            }
+
             await FileSystem.deleteAsync(uri);
-            console.log('Recording deleted:', uri);
+            console.log('✅ Recording deleted successfully:', uri);
         } catch (error) {
-            console.error('Failed to delete recording:', error);
-            throw error;
+            console.error('❌ Failed to delete recording:', error);
+            // Don't throw error - file deletion failure shouldn't break the flow
         }
     }
 
