@@ -1,18 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import React, { useRef, useState } from 'react';
 import {
+    Animated,
+    Dimensions,
     FlatList,
     Keyboard,
     KeyboardAvoidingView,
     Platform,
+    ScrollView,
     StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DesignSystem } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { ThemedText } from '../themed-text';
+import { IconSymbol } from '../ui/icon-symbol';
 
 export interface ChatMessage {
     id: string;
@@ -31,7 +37,12 @@ interface EnterpriseChatInterfaceProps {
     error?: string | null;
     onBackToSessions: () => void;
     onNewSession: () => void;
+    chatSessions?: Array<{ id: string; title: string; lastMessage?: string; timestamp: Date }>;
+    onSelectSession?: (sessionId: string) => void;
 }
+
+const { width: screenWidth } = Dimensions.get('window');
+const SIDEBAR_WIDTH = screenWidth * 0.75;
 
 export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = ({
     session,
@@ -41,12 +52,48 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
     error,
     onBackToSessions,
     onNewSession,
+    chatSessions = [],
+    onSelectSession,
 }) => {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
     const [inputText, setInputText] = useState('');
+    const [sidebarVisible, setSidebarVisible] = useState(false);
     const flatListRef = useRef<FlatList>(null);
     const inputRef = useRef<TextInput>(null);
+    const insets = useSafeAreaInsets();
+    const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
+    const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+    React.useEffect(() => {
+        if (sidebarVisible) {
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: 0,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(overlayOpacity, {
+                    toValue: 1,
+                    duration: 300,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        } else {
+            Animated.parallel([
+                Animated.timing(slideAnim, {
+                    toValue: -SIDEBAR_WIDTH,
+                    duration: 250,
+                    useNativeDriver: true,
+                }),
+                Animated.timing(overlayOpacity, {
+                    toValue: 0,
+                    duration: 250,
+                    useNativeDriver: true,
+                }),
+            ]).start();
+        }
+    }, [sidebarVisible]);
 
     const handleSend = async () => {
         if (!inputText.trim() || isLoading) return;
@@ -180,7 +227,7 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                 <View style={styles.headerLeft}>
                     <TouchableOpacity
                         style={styles.headerButton}
-                        onPress={onBackToSessions}
+                        onPress={() => setSidebarVisible(true)}
                     >
                         <Ionicons name="menu-outline" size={24} color={colors.text} />
                     </TouchableOpacity>
@@ -256,6 +303,198 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                     {inputText.length}/4000 • Shift+Enter dla nowej linii
                 </Text>
             </View>
+
+            {/* Sidebar */}
+            {sidebarVisible && (
+                <View style={styles.sidebarContainer}>
+                    {/* Overlay */}
+                    <Animated.View
+                        style={[
+                            styles.overlay,
+                            {
+                                opacity: overlayOpacity,
+                            },
+                        ]}
+                    >
+                        <TouchableOpacity
+                            style={styles.overlayTouchable}
+                            onPress={() => setSidebarVisible(false)}
+                            activeOpacity={1}
+                        />
+                    </Animated.View>
+
+                    {/* Sidebar Content */}
+                    <Animated.View
+                        style={[
+                            styles.sidebar,
+                            {
+                                backgroundColor: colors.surface,
+                                transform: [{ translateX: slideAnim }],
+                                paddingTop: insets.top,
+                            },
+                        ]}
+                    >
+                        <View style={styles.sidebarContent}>
+                            {/* Header */}
+                            <View style={styles.sidebarHeader}>
+                                <View style={styles.sidebarHeaderContent}>
+                                    <View style={styles.logoContainer}>
+                                        <IconSymbol
+                                            name="sparkles"
+                                            size={28}
+                                            color={colors.primary}
+                                        />
+                                        <ThemedText variant="titleLarge" style={[styles.appTitle, { color: colors.text }]}>
+                                            AI Chat
+                                        </ThemedText>
+                                    </View>
+                                    <TouchableOpacity
+                                        onPress={() => setSidebarVisible(false)}
+                                        style={styles.closeButton}
+                                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                                    >
+                                        <Ionicons name="close-outline" size={24} color={colors.textSecondary} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                                {/* Current Session Info */}
+                                <View style={styles.section}>
+                                    <ThemedText variant="titleSmall" style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                                        AKTUALNA SESJA
+                                    </ThemedText>
+                                    <View style={[styles.currentSessionCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
+                                        <View style={styles.sessionInfo}>
+                                            <ThemedText variant="bodyLarge" style={[styles.sessionTitle, { color: colors.text }]} numberOfLines={1}>
+                                                {session.title}
+                                            </ThemedText>
+                                            <ThemedText variant="bodySmall" style={[styles.sessionMeta, { color: colors.textSecondary }]}>
+                                                {messages.length} wiadomości • {session.type}
+                                            </ThemedText>
+                                        </View>
+                                        <TouchableOpacity
+                                            style={[styles.newSessionButton, { backgroundColor: colors.primary }]}
+                                            onPress={() => {
+                                                setSidebarVisible(false);
+                                                onNewSession();
+                                            }}
+                                        >
+                                            <Ionicons name="add" size={16} color={colors.background} />
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+
+                                {/* Chat History */}
+                                <View style={styles.section}>
+                                    <ThemedText variant="titleSmall" style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                                        HISTORIA ROZMÓW
+                                    </ThemedText>
+                                    {chatSessions.slice(0, 6).map((chatSession) => (
+                                        <TouchableOpacity
+                                            key={chatSession.id}
+                                            style={[styles.chatHistoryItem, {
+                                                backgroundColor: chatSession.id === session.id ? colors.primary + '10' : colors.background + '80',
+                                                borderColor: chatSession.id === session.id ? colors.primary + '20' : 'transparent',
+                                            }]}
+                                            onPress={() => {
+                                                if (onSelectSession && chatSession.id !== session.id) {
+                                                    setSidebarVisible(false);
+                                                    onSelectSession(chatSession.id);
+                                                }
+                                            }}
+                                            activeOpacity={0.7}
+                                        >
+                                            <View style={styles.chatHistoryContent}>
+                                                <View style={[styles.chatIcon, { backgroundColor: colors.primary + '15' }]}>
+                                                    <Ionicons name="chatbubble" size={14} color={colors.primary} />
+                                                </View>
+                                                <View style={styles.chatTextContainer}>
+                                                    <ThemedText
+                                                        variant="bodyMedium"
+                                                        style={[styles.chatTitle, { color: colors.text }]}
+                                                        numberOfLines={1}
+                                                    >
+                                                        {chatSession.title}
+                                                    </ThemedText>
+                                                    {chatSession.lastMessage && (
+                                                        <ThemedText
+                                                            variant="bodySmall"
+                                                            style={[styles.lastMessage, { color: colors.textSecondary }]}
+                                                            numberOfLines={1}
+                                                        >
+                                                            {chatSession.lastMessage}
+                                                        </ThemedText>
+                                                    )}
+                                                    <ThemedText variant="bodySmall" style={[styles.chatTimestamp, { color: colors.textTertiary }]}>
+                                                        {chatSession.timestamp.toLocaleDateString('pl-PL')}
+                                                    </ThemedText>
+                                                </View>
+                                            </View>
+                                            {chatSession.id === session.id && (
+                                                <View style={[styles.activeIndicator, { backgroundColor: colors.primary }]} />
+                                            )}
+                                        </TouchableOpacity>
+                                    ))}
+                                    {chatSessions.length === 0 && (
+                                        <View style={styles.emptySection}>
+                                            <ThemedText variant="bodySmall" style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                                Brak historii rozmów
+                                            </ThemedText>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Quick Actions */}
+                                <View style={styles.section}>
+                                    <ThemedText variant="titleSmall" style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+                                        SZYBKIE AKCJE
+                                    </ThemedText>
+                                    <TouchableOpacity
+                                        style={[styles.quickActionItem, { backgroundColor: colors.background + '80' }]}
+                                        onPress={() => {
+                                            setSidebarVisible(false);
+                                            onNewSession();
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                                        <ThemedText variant="bodyMedium" style={[styles.quickActionTitle, { color: colors.text }]}>
+                                            Nowa rozmowa
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.quickActionItem, { backgroundColor: colors.background + '80' }]}
+                                        onPress={() => {
+                                            setSidebarVisible(false);
+                                            // Add export functionality
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="download-outline" size={20} color={colors.primary} />
+                                        <ThemedText variant="bodyMedium" style={[styles.quickActionTitle, { color: colors.text }]}>
+                                            Eksportuj rozmowę
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.quickActionItem, { backgroundColor: colors.background + '80' }]}
+                                        onPress={() => {
+                                            setSidebarVisible(false);
+                                            onBackToSessions();
+                                        }}
+                                        activeOpacity={0.7}
+                                    >
+                                        <Ionicons name="settings-outline" size={20} color={colors.primary} />
+                                        <ThemedText variant="bodyMedium" style={[styles.quickActionTitle, { color: colors.text }]}>
+                                            Ustawienia AI
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        </View>
+                    </Animated.View>
+                </View>
+            )}
         </KeyboardAvoidingView>
     );
 };
@@ -263,6 +502,7 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
 const styles = StyleSheet.create({
     container: {
         flex: 1,
+        marginTop: 10
     },
     header: {
         flexDirection: 'row',
@@ -445,5 +685,167 @@ const styles = StyleSheet.create({
     inputHint: {
         fontSize: 11,
         textAlign: 'center',
+    },
+    // Sidebar styles
+    sidebarContainer: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 1000,
+    },
+    overlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    overlayTouchable: {
+        flex: 1,
+    },
+    sidebar: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        bottom: 0,
+        width: SIDEBAR_WIDTH,
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 0 },
+        shadowOpacity: 0.25,
+        shadowRadius: 10,
+        elevation: 5,
+    },
+    sidebarContent: {
+        flex: 1,
+    },
+    sidebarHeader: {
+        paddingHorizontal: DesignSystem.spacing.lg,
+        paddingVertical: DesignSystem.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: '#00000010',
+    },
+    sidebarHeaderContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    logoContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: DesignSystem.spacing.sm,
+    },
+    appTitle: {
+        fontWeight: '700',
+    },
+    closeButton: {
+        padding: DesignSystem.spacing.xs,
+    },
+    scrollContent: {
+        flex: 1,
+    },
+    section: {
+        paddingHorizontal: DesignSystem.spacing.lg,
+        marginBottom: DesignSystem.spacing.xl,
+    },
+    sectionTitle: {
+        marginBottom: DesignSystem.spacing.md,
+        fontSize: 12,
+        fontWeight: '700',
+        letterSpacing: 0.5,
+        textTransform: 'uppercase',
+    },
+    currentSessionCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: DesignSystem.spacing.md,
+        paddingVertical: DesignSystem.spacing.md,
+        borderRadius: DesignSystem.borderRadius.lg,
+        borderWidth: 1,
+        gap: DesignSystem.spacing.sm,
+    },
+    sessionInfo: {
+        flex: 1,
+    },
+    sessionTitle: {
+        fontWeight: '600',
+        marginBottom: 2,
+    },
+    sessionMeta: {
+        fontSize: 12,
+        lineHeight: 16,
+    },
+    newSessionButton: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    chatHistoryItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: DesignSystem.spacing.md,
+        paddingVertical: DesignSystem.spacing.sm,
+        borderRadius: DesignSystem.borderRadius.md,
+        marginBottom: DesignSystem.spacing.xs,
+        borderWidth: 1,
+        gap: DesignSystem.spacing.sm,
+    },
+    chatHistoryContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+        gap: DesignSystem.spacing.sm,
+    },
+    chatIcon: {
+        width: 24,
+        height: 24,
+        borderRadius: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    chatTextContainer: {
+        flex: 1,
+    },
+    chatTitle: {
+        fontWeight: '500',
+        marginBottom: 2,
+    },
+    lastMessage: {
+        fontSize: 12,
+        lineHeight: 16,
+        marginBottom: 2,
+    },
+    chatTimestamp: {
+        fontSize: 10,
+    },
+    activeIndicator: {
+        width: 4,
+        height: 4,
+        borderRadius: 2,
+    },
+    quickActionItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: DesignSystem.spacing.md,
+        paddingVertical: DesignSystem.spacing.sm,
+        borderRadius: DesignSystem.borderRadius.md,
+        marginBottom: DesignSystem.spacing.xs,
+        gap: DesignSystem.spacing.sm,
+    },
+    quickActionTitle: {
+        fontWeight: '500',
+    },
+    emptySection: {
+        paddingHorizontal: DesignSystem.spacing.md,
+        paddingVertical: DesignSystem.spacing.lg,
+        alignItems: 'center',
+        opacity: 0.5,
+    },
+    emptyText: {
+        fontSize: 12,
     },
 });

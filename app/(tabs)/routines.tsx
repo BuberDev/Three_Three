@@ -1,12 +1,15 @@
+import * as Crypto from 'expo-crypto';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CompactStats } from '@/components/compact-stats';
 import { TaskList } from '@/components/daily/task-list';
+import { Sidebar } from '@/components/sidebar';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { Colors, DesignSystem } from '@/constants/theme';
 import { Task } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
 
@@ -15,7 +18,194 @@ type FilterType = 'all' | 'today' | 'completed' | 'pending';
 interface AddTaskModalProps {
     visible: boolean;
     onClose: () => void;
-    onAdd: (task: Omit<Task, 'id'>) => void;
+    onAdd: (task: Omit<Task, 'id'>) => Promise<void>;
+}
+
+interface AddRoutineModalProps {
+    visible: boolean;
+    onClose: () => void;
+    onSave: (routine: Omit<Task, 'id'>) => Promise<void>;
+}
+
+function AddRoutineModal({ visible, onClose, onSave }: AddRoutineModalProps) {
+    const [title, setTitle] = React.useState('');
+    const [description, setDescription] = React.useState('');
+    const [priority, setPriority] = React.useState<'low' | 'medium' | 'high'>('medium');
+    const [routineType, setRoutineType] = React.useState<'morning' | 'evening' | 'exercise' | 'custom'>('custom');
+
+    const resetForm = () => {
+        setTitle('');
+        setDescription('');
+        setPriority('medium');
+        setRoutineType('custom');
+    };
+
+    const handleSave = () => {
+        if (!title.trim()) {
+            Alert.alert('Błąd', 'Wprowadź nazwę rutyny');
+            return;
+        }
+
+        const routine: Omit<Task, 'id'> = {
+            title: title.trim(),
+            description: description.trim() || `Moja ${title.toLowerCase()}`,
+            priority,
+            completed: false,
+            category: 'routine',
+            dueDate: new Date().toISOString().split('T')[0]
+        };
+
+        onSave(routine);
+        resetForm();
+        onClose();
+    };
+
+    const handlePresetSelect = (preset: 'morning' | 'evening' | 'exercise') => {
+        setRoutineType(preset);
+        switch (preset) {
+            case 'morning':
+                setTitle('Poranna rutyna');
+                setDescription('Moja codzienna poranna rutyna');
+                break;
+            case 'evening':
+                setTitle('Wieczorna rutyna');
+                setDescription('Moja codzienna wieczorna rutyna');
+                break;
+            case 'exercise':
+                setTitle('Rutyna ćwiczeń');
+                setDescription('Moja rutyna treningowa');
+                break;
+        }
+    };
+
+    if (!visible) return null;
+
+    return (
+        <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+                <View style={styles.modalHeader}>
+                    <ThemedText style={styles.modalTitle}>Dodaj rutynę</ThemedText>
+                    <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
+                        <IconSymbol name="xmark" size={24} color="#666" />
+                    </TouchableOpacity>
+                </View>
+
+                <ScrollView style={styles.formContainer}>
+                    {/* Preset buttons */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Szybkie presety:</ThemedText>
+                        <View style={styles.presetButtons}>
+                            <TouchableOpacity
+                                style={[styles.presetButton, routineType === 'morning' && styles.presetButtonActive]}
+                                onPress={() => handlePresetSelect('morning')}
+                            >
+                                <IconSymbol name="sunrise" size={20} color={routineType === 'morning' ? '#fff' : '#666'} />
+                                <Text style={[styles.presetButtonText, routineType === 'morning' && styles.presetButtonTextActive]}>
+                                    Poranek
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.presetButton, routineType === 'evening' && styles.presetButtonActive]}
+                                onPress={() => handlePresetSelect('evening')}
+                            >
+                                <IconSymbol name="moon" size={20} color={routineType === 'evening' ? '#fff' : '#666'} />
+                                <Text style={[styles.presetButtonText, routineType === 'evening' && styles.presetButtonTextActive]}>
+                                    Wieczór
+                                </Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.presetButton, routineType === 'exercise' && styles.presetButtonActive]}
+                                onPress={() => handlePresetSelect('exercise')}
+                            >
+                                <IconSymbol name="figure.run" size={20} color={routineType === 'exercise' ? '#fff' : '#666'} />
+                                <Text style={[styles.presetButtonText, routineType === 'exercise' && styles.presetButtonTextActive]}>
+                                    Ćwiczenia
+                                </Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+
+                    {/* Title Input */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Nazwa rutyny *</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={styles.textInput}
+                                value={title}
+                                onChangeText={setTitle}
+                                placeholder="np. Poranna rutyna, Stretching..."
+                                placeholderTextColor="#999"
+                            />
+                        </View>
+                    </View>
+
+                    {/* Description Input */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Opis (opcjonalnie)</ThemedText>
+                        <View style={styles.inputContainer}>
+                            <TextInput
+                                style={[styles.textInput, styles.multilineInput]}
+                                value={description}
+                                onChangeText={setDescription}
+                                placeholder="Opisz szczegóły swojej rutyny..."
+                                placeholderTextColor="#999"
+                                multiline
+                                numberOfLines={3}
+                            />
+                        </View>
+                    </View>
+
+                    {/* Priority Selection */}
+                    <View style={styles.inputGroup}>
+                        <ThemedText style={styles.inputLabel}>Priorytet</ThemedText>
+                        <View style={styles.priorityContainer}>
+                            {(['low', 'medium', 'high'] as const).map((p) => {
+                                const priorityConfig = getPriorityConfig(p);
+                                const isSelected = priority === p;
+                                const backgroundColor = isSelected ? priorityConfig.color + '20' : Colors.light.background;
+
+                                return (
+                                    <TouchableOpacity
+                                        key={p}
+                                        style={[
+                                            styles.priorityButton,
+                                            isSelected && styles.priorityButtonActive,
+                                            { backgroundColor }
+                                        ]}
+                                        onPress={() => setPriority(p)}
+                                    >
+                                        <IconSymbol
+                                            size={16}
+                                            name={priorityConfig.icon}
+                                            color={priorityConfig.color}
+                                        />
+                                        <ThemedText style={[styles.priorityText, { color: isSelected ? Colors.light.text : Colors.light.textSecondary }]}>
+                                            {priorityConfig.label}
+                                        </ThemedText>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    </View>
+                </ScrollView>
+
+                <View style={styles.modalActions}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.cancelButton]}
+                        onPress={() => { resetForm(); onClose(); }}
+                    >
+                        <ThemedText style={styles.cancelButtonText}>Anuluj</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.saveButton]}
+                        onPress={handleSave}
+                    >
+                        <ThemedText style={styles.saveButtonText}>Dodaj rutynę</ThemedText>
+                    </TouchableOpacity>
+                </View>
+            </View>
+        </View>
+    );
 }
 
 function getPriorityConfig(priority: 'low' | 'medium' | 'high') {
@@ -56,6 +246,7 @@ function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
             priority,
             completed: false,
             dueDate: dueDate || undefined,
+            category: 'general', // Dodanie kategorii
         };
 
         onAdd(task);
@@ -180,6 +371,8 @@ export default function RoutinesScreen() {
     const { tasks, todaysTasks, loadTasks, addTask } = useAppStore();
     const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
     const [showAddModal, setShowAddModal] = React.useState(false);
+    const [showAddRoutineModal, setShowAddRoutineModal] = React.useState(false);
+    const [showSidebar, setShowSidebar] = React.useState(false);
 
     React.useEffect(() => {
         loadTasks();
@@ -215,7 +408,7 @@ export default function RoutinesScreen() {
         try {
             const taskWithId: Task = {
                 ...task,
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+                id: Crypto.randomUUID()
             };
             await addTask(taskWithId);
             Alert.alert('Sukces', 'Zadanie zostało dodane');
@@ -226,11 +419,21 @@ export default function RoutinesScreen() {
     };
 
     const handleAddRoutine = () => {
-        Alert.alert(
-            'Dodaj rutynę',
-            'Ta funkcja zostanie wkrótce dodana',
-            [{ text: 'OK' }]
-        );
+        setShowAddRoutineModal(true);
+    };
+
+    const handleRoutineAdd = async (routine: Omit<Task, 'id'>) => {
+        try {
+            const taskWithId: Task = {
+                ...routine,
+                id: Crypto.randomUUID()
+            };
+            await addTask(taskWithId);
+            Alert.alert('Sukces', 'Rutyna została dodana');
+        } catch (error) {
+            console.error('Błąd przy dodawaniu rutyny:', error);
+            Alert.alert('Błąd', 'Nie udało się dodać rutyny');
+        }
     };
 
     const renderFilterTab = (filter: { key: string; label: string; count: number }) => (
@@ -274,7 +477,16 @@ export default function RoutinesScreen() {
             <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
                 <View style={styles.headerContent}>
                     <View style={styles.headerLeft}>
-                        <IconSymbol name="list.bullet" size={28} color={Colors.light.tint} />
+                        <Pressable
+                            onPress={() => setShowSidebar(true)}
+                            style={({ pressed }) => [
+                                { padding: 4, borderRadius: 8 },
+                                pressed && { backgroundColor: Colors.light.tint + '20' }
+                            ]}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                        >
+                            <IconSymbol name="list.bullet" size={28} color={Colors.light.tint} />
+                        </Pressable>
                         <ThemedText variant="headlineMedium" style={styles.title}>
                             Lista & Rutyny
                         </ThemedText>
@@ -288,7 +500,56 @@ export default function RoutinesScreen() {
                 </ThemedText>
             </View>
 
-            {/* Filter Tabs */}
+            {/* Filter Stats */}
+            <View style={{
+                flexDirection: 'row',
+                gap: DesignSystem.spacing.sm,
+                paddingHorizontal: 20,
+                marginBottom: 16,
+                height: 110,
+                alignItems: 'flex-start',
+            }}>
+                {filters.map((filter) => (
+                    <CompactStats
+                        key={filter.key}
+                        title={filter.label}
+                        count={filter.count}
+                        icon={
+                            filter.key === 'all' ? 'list.bullet' :
+                                filter.key === 'today' ? 'clock' :
+                                    filter.key === 'pending' ? 'circle' :
+                                        'checkmark.circle'
+                        }
+                        isActive={activeFilter === filter.key}
+                        onPress={() => setActiveFilter(filter.key as FilterType)}
+                        showPreview={true}
+                        previewItems={
+                            filter.key === 'all' ? tasks.slice(0, 2).map(task => ({
+                                id: task.id,
+                                title: task.title,
+                                completed: task.completed
+                            })) :
+                                filter.key === 'today' ? todaysTasks.slice(0, 2).map(task => ({
+                                    id: task.id,
+                                    title: task.title,
+                                    completed: task.completed
+                                })) :
+                                    filter.key === 'pending' ? tasks.filter(t => !t.completed).slice(0, 2).map(task => ({
+                                        id: task.id,
+                                        title: task.title,
+                                        completed: task.completed
+                                    })) :
+                                        tasks.filter(t => t.completed).slice(0, 2).map(task => ({
+                                            id: task.id,
+                                            title: task.title,
+                                            completed: task.completed
+                                        }))
+                        }
+                    />
+                ))}
+            </View>
+
+            {/* Filter Tabs - Hidden for now as we use CompactStats above 
             <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -297,17 +558,18 @@ export default function RoutinesScreen() {
             >
                 {filters.map((filter) => renderFilterTab(filter))}
             </ScrollView>
+            */}
 
             {/* Content */}
             <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Quick Actions */}
-                <View style={styles.quickActionsSection}>
+                <View style={[styles.quickActionsSection, { paddingVertical: 12 }]}>
                     <View style={styles.quickActionsRow}>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={handleAddTask}>
+                        <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddTask}>
                             <IconSymbol name="paperplane.fill" size={18} color={Colors.light.tint} />
                             <ThemedText style={styles.quickActionText}>Dodaj zadanie</ThemedText>
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.quickActionButton} onPress={handleAddRoutine}>
+                        <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddRoutine}>
                             <IconSymbol name="brain" size={18} color={Colors.light.tint} />
                             <ThemedText style={styles.quickActionText}>Dodaj rutynę</ThemedText>
                         </TouchableOpacity>
@@ -315,7 +577,7 @@ export default function RoutinesScreen() {
                 </View>
 
                 {/* Tasks List */}
-                <View style={styles.tasksSection}>
+                <View style={[styles.tasksSection, { paddingHorizontal: 20, paddingVertical: 12 }]}>
                     <View style={styles.tasksSectionHeader}>
                         <ThemedText variant="titleMedium" style={styles.sectionTitle}>
                             {activeFilter === 'all' && 'Wszystkie zadania'}
@@ -360,16 +622,16 @@ export default function RoutinesScreen() {
                 </View>
 
                 {/* Rutyny Section (placeholder) */}
-                <View style={styles.routinesSection}>
+                <View style={[styles.routinesSection, { paddingHorizontal: 20, paddingVertical: 12, marginBottom: 20 }]}>
                     <ThemedText variant="titleMedium" style={styles.sectionTitle}>
                         Rutyny
                     </ThemedText>
-                    <View style={styles.routinesPlaceholder}>
-                        <IconSymbol name="brain" size={32} color="#ccc" />
-                        <ThemedText style={styles.placeholderText}>
+                    <View style={[styles.routinesPlaceholder, { paddingVertical: 16 }]}>
+                        <IconSymbol name="brain" size={24} color="#ccc" />
+                        <ThemedText style={[styles.placeholderText, { marginTop: 8 }]}>
                             Funkcja rutyn zostanie wkrótce dodana
                         </ThemedText>
-                        <ThemedText style={styles.placeholderSubtext}>
+                        <ThemedText style={[styles.placeholderSubtext, { marginTop: 4 }]}>
                             Będziesz mógł tworzyć powtarzalne zadania i nawyki
                         </ThemedText>
                     </View>
@@ -382,11 +644,165 @@ export default function RoutinesScreen() {
                 onClose={() => setShowAddModal(false)}
                 onAdd={handleTaskAdd}
             />
+
+            {/* Add Routine Modal */}
+            <AddRoutineModal
+                visible={showAddRoutineModal}
+                onClose={() => setShowAddRoutineModal(false)}
+                onSave={handleRoutineAdd}
+            />
+
+            {/* Sidebar */}
+            <Sidebar
+                visible={showSidebar}
+                onClose={() => setShowSidebar(false)}
+            />
         </View>
     );
 }
 
 const styles = StyleSheet.create({
+    // Modal styles for AddRoutineModal
+    modalContainer: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 20,
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderRadius: 12,
+        padding: 20,
+        width: '100%',
+        maxHeight: '80%',
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#333',
+    },
+    modalScrollContent: {
+        maxHeight: 400,
+    },
+    presetSection: {
+        marginBottom: 20,
+    },
+    presetButtons: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 8,
+    },
+    presetButton: {
+        flex: 1,
+        padding: 12,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        alignItems: 'center',
+        backgroundColor: '#f8f8f8',
+        gap: 4,
+    },
+    presetButtonActive: {
+        borderColor: Colors.light.tint,
+        backgroundColor: Colors.light.tint,
+    },
+    presetButtonText: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
+    },
+    presetButtonTextActive: {
+        color: 'white',
+        fontWeight: '600',
+    },
+    input: {
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        borderRadius: 8,
+        padding: 12,
+        fontSize: 16,
+        backgroundColor: '#f8f8f8',
+    },
+    textArea: {
+        height: 80,
+        textAlignVertical: 'top',
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 12,
+        marginTop: 20,
+    },
+    actionButton: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    cancelButton: {
+        backgroundColor: '#f0f0f0',
+    },
+    saveButton: {
+        backgroundColor: Colors.light.tint,
+    },
+    cancelButtonText: {
+        color: '#666',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    saveButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '500',
+    },
+    formSection: {
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#333',
+        marginBottom: 8,
+    },
+    prioritySelector: {
+        marginTop: 12,
+    },
+    priorityButtons: {
+        flexDirection: 'row',
+        gap: 8,
+        marginTop: 8,
+    },
+    priorityButton: {
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+        alignItems: 'center',
+        backgroundColor: '#f8f8f8',
+    },
+    selectedPriorityButton: {
+        borderColor: Colors.light.tint,
+        backgroundColor: Colors.light.tint + '20',
+    },
+    priorityButtonText: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#666',
+    },
+    selectedPriorityButtonText: {
+        color: Colors.light.tint,
+        fontWeight: '600',
+    },
+
+    // Original styles continue below
     container: {
         flex: 1,
         backgroundColor: Colors.light.background,
@@ -511,49 +927,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         marginBottom: 24,
     },
-    tasksSectionHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    sectionTitle: {
-        color: '#333',
-    },
-    tasksCount: {
-        fontSize: 14,
-        opacity: 0.6,
-    },
-    emptyState: {
-        alignItems: 'center',
-        padding: 40,
-        backgroundColor: 'white',
-        borderRadius: 12,
-        gap: 12,
-    },
-    emptyTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        opacity: 0.8,
-    },
-    emptyDescription: {
-        fontSize: 14,
-        opacity: 0.6,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
-    emptyActionButton: {
-        marginTop: 8,
-        paddingHorizontal: 20,
-        paddingVertical: 12,
-        backgroundColor: Colors.light.tint,
-        borderRadius: 20,
-    },
-    emptyActionText: {
-        color: 'white',
-        fontSize: 14,
-        fontWeight: '500',
-    },
     routinesSection: {
         paddingHorizontal: 20,
         marginBottom: 32,
@@ -588,30 +961,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         zIndex: 1000,
     },
-    modalContent: {
-        backgroundColor: 'white',
-        borderRadius: 16,
-        padding: 24,
-        width: '90%',
-        maxWidth: 400,
-        maxHeight: '80%',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
-        elevation: 10,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: Colors.light.text,
-    },
     formContainer: {
         maxHeight: 300,
     },
@@ -644,17 +993,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 8,
     },
-    priorityButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderRadius: 8,
-        gap: 6,
-        borderWidth: 1,
-        borderColor: '#e0e0e0',
-    },
     priorityButtonActive: {
         borderColor: Colors.light.tint,
     },
@@ -662,33 +1000,44 @@ const styles = StyleSheet.create({
         fontSize: 14,
         fontWeight: '500',
     },
-    modalActions: {
+    tasksSectionHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        gap: 12,
-        marginTop: 20,
-    },
-    actionButton: {
-        flex: 1,
-        paddingVertical: 12,
-        paddingHorizontal: 16,
-        borderRadius: 8,
         alignItems: 'center',
+        marginBottom: 16,
     },
-    cancelButton: {
-        backgroundColor: '#f0f0f0',
+    tasksCount: {
+        fontSize: 14,
+        opacity: 0.6,
     },
-    saveButton: {
-        backgroundColor: Colors.light.tint,
+    emptyState: {
+        alignItems: 'center',
+        padding: 40,
+        backgroundColor: 'white',
+        borderRadius: 12,
+        gap: 12,
     },
-    cancelButtonText: {
-        color: '#666',
-        fontSize: 16,
-        fontWeight: '500',
-    },
-    saveButtonText: {
-        color: 'white',
-        fontSize: 16,
+    emptyTitle: {
+        fontSize: 18,
         fontWeight: '600',
+        opacity: 0.8,
+    },
+    emptyDescription: {
+        fontSize: 14,
+        opacity: 0.6,
+        textAlign: 'center',
+        lineHeight: 20,
+    },
+    emptyActionButton: {
+        marginTop: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 12,
+        backgroundColor: Colors.light.tint,
+        borderRadius: 20,
+    },
+    emptyActionText: {
+        color: 'white',
+        fontSize: 14,
+        fontWeight: '500',
     },
 });

@@ -71,7 +71,7 @@ export default function AIScreen() {
             {/* Navigation Header */}
             <View style={[
                 currentView === 'chat' && aiChat.currentSession ? styles.compactHeader : styles.navigationHeader,
-                { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 10 : 20) }
+                { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 5 : 10) }
             ]}>
                 {!(currentView === 'chat' && aiChat.currentSession) && (
                     <View style={styles.navContent}>
@@ -190,10 +190,10 @@ export default function AIScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#f8f9fa',
+        backgroundColor: '#00000',
     },
     navigationHeader: {
-        backgroundColor: 'white',
+        backgroundColor: '#00000',
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
@@ -242,13 +242,7 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         paddingHorizontal: 20,
         paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
+
     },
     compactTabs: {
         flexDirection: 'row',

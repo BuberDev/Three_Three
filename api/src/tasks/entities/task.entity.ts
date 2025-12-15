@@ -145,6 +145,10 @@ export class Task extends BaseEntity {
         return this.status === TaskStatus.COMPLETED;
     }
 
+    get completed(): boolean {
+        return this.status === TaskStatus.COMPLETED;
+    }
+
     get urgencyScore(): number {
         let score = 0;
 

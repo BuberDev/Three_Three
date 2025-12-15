@@ -1,3 +1,4 @@
+import * as Crypto from 'expo-crypto';
 import * as SQLite from 'expo-sqlite';
 import { AppEvent, DailyEntry, Task, User, VoiceNote } from '../types';
 
@@ -76,6 +77,16 @@ export class DatabaseService {
                 console.warn('⚠️ Database migration warning:', error.message);
             }
         }
+
+        try {
+            // 🔧 Migration: Clean up tasks with invalid UUIDs (remove non-UUID format IDs)
+            await this.db.execAsync(`
+                DELETE FROM tasks WHERE id NOT LIKE '%-%-%-%-%' OR length(id) != 36;
+            `);
+            console.log('✅ Database migration: Cleaned up tasks with invalid UUIDs');
+        } catch (error: any) {
+            console.warn('⚠️ Database migration warning (tasks cleanup):', error.message);
+        }
         try {
             // 🔧 Migration: Add missing file_size column if it does not exist
             await this.db.execAsync(`
@@ -119,6 +130,36 @@ export class DatabaseService {
             } else {
                 console.warn("⚠️ Database migration warning:", error.message);
             }
+        }
+
+        try {
+            // 🔧 Migration: Clean old tasks with invalid UUID format
+            await this.db.execAsync(`
+                DELETE FROM tasks WHERE id NOT LIKE '%-%-%-%-%';
+            `);
+            console.log('✅ Database migration: Cleaned old tasks with invalid UUID format');
+        } catch (error: any) {
+            console.warn('⚠️ Database migration warning:', error.message);
+        }
+
+        try {
+            // 🔧 Migration: Clean old daily_entries with invalid UUID format  
+            await this.db.execAsync(`
+                DELETE FROM daily_entries WHERE id NOT LIKE '%-%-%-%-%';
+            `);
+            console.log('✅ Database migration: Cleaned old daily_entries with invalid UUID format');
+        } catch (error: any) {
+            console.warn('⚠️ Database migration warning:', error.message);
+        }
+
+        try {
+            // 🔧 Migration: Clean old voice_notes with invalid UUID format
+            await this.db.execAsync(`
+                DELETE FROM voice_notes WHERE id NOT LIKE '%-%-%-%-%';
+            `);
+            console.log('✅ Database migration: Cleaned old voice_notes with invalid UUID format');
+        } catch (error: any) {
+            console.warn('⚠️ Database migration warning:', error.message);
         }
     }
 
@@ -354,7 +395,7 @@ export class DatabaseService {
     }
 
     // Tasks methods
-    public async createTask(task: Omit<Task, 'id'>): Promise<Task> {
+    public async createTask(task: Omit<Task, 'id'>, userId: string): Promise<Task> {
         if (!this.db) throw new Error('Database not initialized');
 
         const id = this.generateId();
@@ -367,7 +408,7 @@ export class DatabaseService {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 newTask.id,
-                task.extractedFromVoiceNoteId ? task.extractedFromVoiceNoteId.split('-')[0] : '', // Extract userId from voiceNoteId
+                userId, // Use proper userId parameter
                 newTask.title,
                 newTask.description || null,
                 newTask.priority,
@@ -409,7 +450,7 @@ export class DatabaseService {
         );
     }
 
-    public async saveTask(task: Task): Promise<void> {
+    public async saveTask(task: Task, userId: string): Promise<void> {
         if (!this.db) throw new Error('Database not initialized');
 
         const now = new Date().toISOString();
@@ -419,7 +460,7 @@ export class DatabaseService {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 task.id,
-                task.extractedFromVoiceNoteId || 'local-user', // Default user if not set
+                userId, // Use proper userId parameter
                 task.title,
                 task.description || null,
                 task.priority,
@@ -525,7 +566,7 @@ export class DatabaseService {
 
     // Helper methods
     private generateId(): string {
-        return `${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+        return Crypto.randomUUID();
     }
 
     private mapVoiceNoteFromDb(row: any): VoiceNote {

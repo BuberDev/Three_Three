@@ -114,4 +114,13 @@ export class CreateTaskDto {
     })
     @IsOptional()
     metadata?: Record<string, any>;
+
+    @ApiProperty({
+        description: 'Task category',
+        required: false,
+        example: 'work',
+    })
+    @IsOptional()
+    @IsString()
+    category?: string;
 }

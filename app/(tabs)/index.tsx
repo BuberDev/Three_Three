@@ -4,6 +4,7 @@ import React from 'react';
 import { Alert, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CompactStats } from '@/components/compact-stats';
 import { QuickActivityModal } from '@/components/daily/quick-activity-modal';
 import { TaskList } from '@/components/daily/task-list';
 import { ModernButton } from '@/components/modern-button';
@@ -304,15 +305,61 @@ export default function HomeScreen() {
           </LinearGradient>
         </View>
 
+        {/* Compact Stats Overview */}
+        <View style={{
+          flexDirection: 'row',
+          gap: DesignSystem.spacing.sm,
+          paddingHorizontal: DesignSystem.spacing.lg,
+          marginBottom: DesignSystem.spacing.md,
+        }}>
+          <CompactStats
+            title="Wszystkie"
+            count={todaysTasks?.length || 0}
+            icon="list.bullet"
+            showPreview={true}
+            previewItems={todaysTasks?.slice(0, 3).map(task => ({
+              id: task.id,
+              title: task.title,
+              completed: task.completed
+            })) || []}
+          />
+          <CompactStats
+            title="Dzisiaj"
+            count={todaysTasks?.length || 0}
+            icon="clock"
+            showPreview={true}
+            previewItems={todaysTasks?.slice(0, 3).map(task => ({
+              id: task.id,
+              title: task.title,
+              completed: task.completed
+            })) || []}
+          />
+          <CompactStats
+            title="Do zrobienia"
+            count={todaysTasks?.filter(t => !t.completed).length || 0}
+            icon="circle"
+            showPreview={true}
+            previewItems={todaysTasks?.filter(t => !t.completed).slice(0, 3).map(task => ({
+              id: task.id,
+              title: task.title,
+              completed: task.completed
+            })) || []}
+          />
+        </View>
+
         {/* Quick Actions */}
         <ModernCard
           gradient
           elevation={2}
-          style={{ marginBottom: DesignSystem.spacing.xl }}
+          padding="md"
+          style={{
+            marginHorizontal: DesignSystem.spacing.lg,
+            marginBottom: DesignSystem.spacing.md
+          }}
         >
           <ThemedText
-            variant="titleLarge"
-            style={{ marginBottom: DesignSystem.spacing.lg }}
+            variant="titleMedium"
+            style={{ marginBottom: DesignSystem.spacing.md }}
           >
             Szybkie akcje
           </ThemedText>
@@ -358,8 +405,12 @@ export default function HomeScreen() {
         {/* Today's Tasks */}
         <ModernCard
           title="Dzisiejsze zadania"
-          elevation={2}
-          style={{ marginBottom: DesignSystem.spacing.xl }}
+          elevation={1}
+          padding="md"
+          style={{
+            marginHorizontal: DesignSystem.spacing.lg,
+            marginBottom: DesignSystem.spacing.md
+          }}
         >
           <TaskList
             tasks={todaysTasks || []}
@@ -371,26 +422,30 @@ export default function HomeScreen() {
         {/* Today's Activities */}
         <ModernCard
           title="Dzisiejsze aktywności"
-          elevation={2}
-          style={{ marginBottom: DesignSystem.spacing.xl }}
+          elevation={1}
+          padding="md"
+          style={{
+            marginHorizontal: DesignSystem.spacing.lg,
+            marginBottom: DesignSystem.spacing.lg
+          }}
         >
           {getTodaysActivityCount() > 0 ? (
             <View>
               <View style={{
                 flexDirection: 'row',
-                gap: DesignSystem.spacing.md,
-                marginBottom: DesignSystem.spacing.lg,
+                gap: DesignSystem.spacing.sm,
+                marginBottom: DesignSystem.spacing.md,
               }}>
                 <ModernView
                   variant="surfaceSecondary"
-                  borderRadius="lg"
-                  padding="md"
+                  borderRadius="md"
+                  padding="sm"
                   style={{ flex: 1, alignItems: 'center' }}
                 >
-                  <IconSymbol name="clock" size={24} color={colors.primary} />
+                  <IconSymbol name="clock" size={20} color={colors.primary} />
                   <ThemedText
-                    variant="titleMedium"
-                    style={{ marginTop: DesignSystem.spacing.xs, fontWeight: '600' }}
+                    variant="titleSmall"
+                    style={{ marginTop: DesignSystem.spacing.xs / 2, fontWeight: '600' }}
                   >
                     {getTodaysActivityCount()}
                   </ThemedText>
@@ -401,14 +456,14 @@ export default function HomeScreen() {
 
                 <ModernView
                   variant="surfaceSecondary"
-                  borderRadius="lg"
-                  padding="md"
+                  borderRadius="md"
+                  padding="sm"
                   style={{ flex: 1, alignItems: 'center' }}
                 >
-                  <IconSymbol name="battery.100" size={24} color={colors.primary} />
+                  <IconSymbol name="battery.100" size={20} color={colors.primary} />
                   <ThemedText
-                    variant="titleMedium"
-                    style={{ marginTop: DesignSystem.spacing.xs, fontWeight: '600' }}
+                    variant="titleSmall"
+                    style={{ marginTop: DesignSystem.spacing.xs / 2, fontWeight: '600' }}
                   >
                     {getAverageEnergyLevel()}/5
                   </ThemedText>
@@ -421,24 +476,24 @@ export default function HomeScreen() {
               {dailyMetrics?.topTags && (
                 <View>
                   <ThemedText
-                    variant="titleSmall"
-                    style={{ marginBottom: DesignSystem.spacing.md }}
+                    variant="bodyMedium"
+                    style={{ marginBottom: DesignSystem.spacing.sm }}
                   >
                     Główne aktywności
                   </ThemedText>
                   <View style={{
                     flexDirection: 'row',
                     flexWrap: 'wrap',
-                    gap: DesignSystem.spacing.sm,
+                    gap: DesignSystem.spacing.xs,
                   }}>
                     {dailyMetrics.topTags.slice(0, 4).map((tagInfo, index) => (
                       <View
                         key={index}
                         style={{
                           backgroundColor: colors.backgroundTertiary,
-                          paddingHorizontal: DesignSystem.spacing.md,
-                          paddingVertical: DesignSystem.spacing.sm,
-                          borderRadius: DesignSystem.borderRadius.lg,
+                          paddingHorizontal: DesignSystem.spacing.sm,
+                          paddingVertical: DesignSystem.spacing.xs,
+                          borderRadius: DesignSystem.borderRadius.md,
                         }}
                       >
                         <ThemedText variant="bodySmall" color="secondary">
@@ -453,15 +508,15 @@ export default function HomeScreen() {
           ) : (
             <View style={{
               alignItems: 'center',
-              paddingVertical: DesignSystem.spacing.xl,
+              paddingVertical: DesignSystem.spacing.lg,
             }}>
               <View style={{
                 backgroundColor: colors.backgroundTertiary,
                 borderRadius: DesignSystem.borderRadius.full,
-                padding: DesignSystem.spacing.lg,
-                marginBottom: DesignSystem.spacing.lg,
+                padding: DesignSystem.spacing.md,
+                marginBottom: DesignSystem.spacing.md,
               }}>
-                <IconSymbol name="chart.line.uptrend.xyaxis" size={32} color={colors.iconSecondary} />
+                <IconSymbol name="chart.line.uptrend.xyaxis" size={24} color={colors.iconSecondary} />
               </View>
               <ThemedText
                 variant="bodyLarge"
@@ -486,39 +541,44 @@ export default function HomeScreen() {
         {/* AI Recommendations */}
         <ModernCard
           title="Rekomendacje AI"
-          elevation={2}
+          elevation={1}
+          padding="md"
+          style={{
+            marginHorizontal: DesignSystem.spacing.lg,
+            marginBottom: DesignSystem.spacing.lg
+          }}
         >
           {(recommendations && recommendations.length > 0) ? (
-            <View style={{ gap: DesignSystem.spacing.md }}>
+            <View style={{ gap: DesignSystem.spacing.sm }}>
               {recommendations.slice(0, 3).map((recommendation, index) => (
                 <ModernView
                   key={index}
                   variant="surfaceSecondary"
-                  borderRadius="lg"
-                  padding="md"
-                  style={{ borderLeftWidth: 3, borderLeftColor: colors.primary }}
+                  borderRadius="md"
+                  padding="sm"
+                  style={{ borderLeftWidth: 2, borderLeftColor: colors.primary }}
                 >
                   <View style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    marginBottom: DesignSystem.spacing.sm,
+                    marginBottom: DesignSystem.spacing.xs,
                   }}>
-                    <IconSymbol name="brain" size={16} color={colors.primary} />
+                    <IconSymbol name="brain" size={14} color={colors.primary} />
                     <ThemedText
-                      variant="titleSmall"
-                      style={{ marginLeft: DesignSystem.spacing.sm, flex: 1 }}
+                      variant="bodyMedium"
+                      style={{ marginLeft: DesignSystem.spacing.xs, flex: 1, fontWeight: '500' }}
                     >
                       {recommendation.title}
                     </ThemedText>
                   </View>
                   <ThemedText
-                    variant="bodyMedium"
-                    style={{ marginBottom: DesignSystem.spacing.xs }}
+                    variant="bodySmall"
+                    style={{ marginBottom: DesignSystem.spacing.xs / 2 }}
                   >
                     {recommendation.description}
                   </ThemedText>
                   <ThemedText variant="bodySmall" color="tertiary">
-                    Dlaczego: {recommendation.reason}
+                    {recommendation.reason}
                   </ThemedText>
                 </ModernView>
               ))}

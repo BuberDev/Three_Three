@@ -430,9 +430,22 @@ export class ApiService {
     }
 
     public async updateTask(taskId: string, updates: Partial<Task>): Promise<ApiResponse<Task>> {
+        // Transform frontend Task structure to API DTO structure
+        const updateData: any = { ...updates };
+
+        // Convert completed boolean to status enum
+        if ('completed' in updates) {
+            updateData.status = updates.completed ? 'completed' : 'todo';
+            delete updateData.completed;
+        }
+
+        // Remove fields that API doesn't accept
+        delete updateData.id;
+        delete updateData.extractedFromVoiceNoteId;
+
         return this.makeRequest(`/tasks/${taskId}`, {
             method: 'PATCH',
-            body: JSON.stringify(updates),
+            body: JSON.stringify(updateData),
         });
     }
 

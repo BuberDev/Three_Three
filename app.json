@@ -7,10 +7,9 @@
     "icon": "./assets/images/icon.png",
     "scheme": "threethree",
     "extra": {
-      "googleClientId": {
-        "android": "YOUR_GOOGLE_CLIENT_ID_ANDROID",
-        "ios": "523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3.apps.googleusercontent.com",
-        "web": "523125599576-22q0ankb0upvkagqlp7qquknp7gcdnbu.apps.googleusercontent.com"
+      "router": {},
+      "eas": {
+        "projectId": "d055f204-0805-4fa9-8fa2-832464c185cf"
       }
     },
     "userInterfaceStyle": "automatic",
@@ -50,17 +49,12 @@
         }
       ],
       "expo-sqlite",
-      "expo-audio"
+      "expo-audio",
+      "expo-asset"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "d055f204-0805-4fa9-8fa2-832464c185cf"
-      }
     },
     "owner": "buber",
     "updates": {

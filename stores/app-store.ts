@@ -814,7 +814,7 @@ export const useAppStore = create<AppStore>()(
 
                     // Save to local database
                     const dbService = DatabaseService.getInstance();
-                    await dbService.saveTask(response.data || task);
+                    await dbService.saveTask(response.data || task, user.id);
 
                     // Log task creation event
                     const eventService = EventService.getInstance();
@@ -939,15 +939,40 @@ export const useAppStore = create<AppStore>()(
                     const apiService = ApiService.getInstance();
                     const response = await apiService.getTasks();
 
+                    console.log('🔍 API Response for tasks:', {
+                        success: response.success,
+                        hasData: !!response.data,
+                        dataType: typeof response.data,
+                        isArray: Array.isArray(response.data),
+                        dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+                        data: response.data
+                    });
+
                     if (response.success && response.data) {
-                        const tasks = response.data;
+                        // Handle nested API response structure: {data: {data: {data: [Array]}}}
+                        let tasks = response.data;
+
+                        // Unwrap nested data structure
+                        if (tasks.data && tasks.data.data && Array.isArray(tasks.data.data)) {
+                            tasks = tasks.data.data;
+                            console.log('📋 Extracted tasks from nested structure:', tasks.length);
+                        } else if (tasks.data && Array.isArray(tasks.data)) {
+                            tasks = tasks.data;
+                            console.log('📋 Extracted tasks from single nested structure:', tasks.length);
+                        } else if (Array.isArray(tasks)) {
+                            console.log('📋 Tasks already in correct format:', tasks.length);
+                        } else {
+                            console.warn('⚠️ Unexpected API response structure, using empty array');
+                            tasks = [];
+                        }
+
                         const today = new Date().toISOString().split('T')[0];
                         const todaysTasks = tasks.filter(task => {
                             const taskDate = task.dueDate?.split('T')[0];
                             return taskDate === today || !task.completed;
                         });
 
-                        set({ tasks, todaysTasks });
+                        set({ tasks: tasks, todaysTasks });
 
                         // Update local database cache
                         const dbService = DatabaseService.getInstance();
@@ -957,8 +982,12 @@ export const useAppStore = create<AppStore>()(
 
                         // Save tasks to local cache
                         for (const task of tasks) {
-                            await dbService.saveTask(task);
+                            await dbService.saveTask(task, user.id);
                         }
+                        return;
+                    } else if (response.success && response.data === null) {
+                        // API zwróciło null - ustaw puste tablice
+                        set({ tasks: [], todaysTasks: [] });
                         return;
                     }
                 } catch (error) {

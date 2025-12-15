@@ -99,6 +99,17 @@ export class TasksService {
             await this.handleStatusChange(task, updateTaskDto.status);
         }
 
+        // Handle completed boolean field (frontend compatibility)
+        if ('completed' in updateTaskDto) {
+            const newStatus = updateTaskDto.completed ? TaskStatus.COMPLETED : TaskStatus.TODO;
+            if (newStatus !== task.status) {
+                updateTaskDto.status = newStatus;
+                await this.handleStatusChange(task, newStatus);
+            }
+            // Don't pass completed to the entity as it doesn't have this field
+            delete updateTaskDto.completed;
+        }
+
         // Handle subtask updates
         if (updateTaskDto.subtasks) {
             updateTaskDto.subtasks = updateTaskDto.subtasks.map((st) => ({
