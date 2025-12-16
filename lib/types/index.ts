@@ -142,6 +142,8 @@ export interface Task {
     description?: string;
     priority: 'low' | 'medium' | 'high';
     completed: boolean;
+    createdAt: string;
+    updatedAt: string;
     dueDate?: string;
     category?: string;
     extractedFromVoiceNoteId?: string;

@@ -5,6 +5,8 @@ import { Alert, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompactStats } from '@/components/compact-stats';
+import { AddTaskModal } from '@/components/daily/add-task-modal';
+import { PlanningModal } from '@/components/daily/planning-modal';
 import { QuickActivityModal } from '@/components/daily/quick-activity-modal';
 import { TaskList } from '@/components/daily/task-list';
 import { ModernButton } from '@/components/modern-button';
@@ -39,6 +41,8 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = React.useState(false);
   const [showQuickActivityModal, setShowQuickActivityModal] = React.useState(false);
+  const [showAddTaskModal, setShowAddTaskModal] = React.useState(false);
+  const [showPlanningModal, setShowPlanningModal] = React.useState(false);
 
   const onRefresh = React.useCallback(async () => {
     setRefreshing(true);
@@ -129,10 +133,10 @@ export default function HomeScreen() {
         router.push('/voice');
         break;
       case 'add-task':
-        Alert.alert('Dodaj zadanie', 'Ta funkcja zostanie wkrótce dodana');
+        setShowAddTaskModal(true);
         break;
       case 'plan-now':
-        Alert.alert('Co planujesz?', 'Ta funkcja zostanie wkrótce dodana');
+        setShowPlanningModal(true);
         break;
       case 'quick-activity':
         setShowQuickActivityModal(true);
@@ -384,11 +388,11 @@ export default function HomeScreen() {
               style={{ flex: 1, minWidth: '45%' }}
             />
             <ModernButton
-              title="Szybka aktywność"
+              title="Planuj dzień"
               variant="ghost"
               size="medium"
-              leftIcon={<IconSymbol name="clock" size={16} color={colors.primary} />}
-              onPress={() => handleQuickAction('quick-activity')}
+              leftIcon={<IconSymbol name="calendar" size={16} color={colors.primary} />}
+              onPress={() => handleQuickAction('plan-now')}
               style={{ flex: 1, minWidth: '45%' }}
             />
             <ModernButton
@@ -611,6 +615,26 @@ export default function HomeScreen() {
       <QuickActivityModal
         visible={showQuickActivityModal}
         onClose={() => setShowQuickActivityModal(false)}
+      />
+
+      <AddTaskModal
+        visible={showAddTaskModal}
+        onClose={() => setShowAddTaskModal(false)}
+        onSave={(taskData) => {
+          // Handle task saving logic here
+          console.log('New task created:', taskData);
+          // You can add this to your task store/API call
+        }}
+      />
+
+      <PlanningModal
+        visible={showPlanningModal}
+        onClose={() => setShowPlanningModal(false)}
+        onSave={(planningData) => {
+          // Handle planning data saving logic here
+          console.log('Day plan created:', planningData);
+          // You can integrate this with your daily planning system
+        }}
       />
     </ModernView>
   );

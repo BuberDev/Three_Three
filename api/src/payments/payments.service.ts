@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, forwardRef } from '@nestjs/common';
 import Stripe from 'stripe';
 import { SubscriptionsService } from '../subscriptions/subscriptions.service';
 import { UsersService } from '../users/users.service';
@@ -11,6 +11,7 @@ export class PaymentsService {
     constructor(
         private readonly stripeService: StripeService,
         private readonly usersService: UsersService,
+        @Inject(forwardRef(() => SubscriptionsService))
         private readonly subscriptionsService: SubscriptionsService,
     ) { }
 

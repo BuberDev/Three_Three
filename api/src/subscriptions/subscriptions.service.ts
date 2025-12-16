@@ -1,7 +1,9 @@
 import {
     ConflictException,
+    Inject,
     Injectable,
-    NotFoundException
+    NotFoundException,
+    forwardRef
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -36,6 +38,7 @@ export class SubscriptionsService {
         @InjectRepository(SubscriptionTransaction)
         private readonly transactionRepository: Repository<SubscriptionTransaction>,
         private readonly usersService: UsersService,
+        @Inject(forwardRef(() => StripeService))
         private readonly stripeService: StripeService,
     ) { }
 
