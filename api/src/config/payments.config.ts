@@ -8,9 +8,6 @@ export const stripeConfig = registerAs('stripe', () => ({
     currency: 'pln',
     country: 'PL',
     pricing: {
-        basic: {
-            monthly: process.env.STRIPE_BASIC_MONTHLY_PRICE_ID,
-        },
         premium: {
             monthly: process.env.STRIPE_PREMIUM_MONTHLY_PRICE_ID,
             yearly: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID,

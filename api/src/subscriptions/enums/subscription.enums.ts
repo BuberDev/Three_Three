@@ -13,12 +13,7 @@ export enum SubscriptionPlan {
 }
 
 export enum SubscriptionFeature {
-    // Core features
-    BASIC_VOICE_NOTES = 'basic_voice_notes',
-    BASIC_SLEEP_TRACKING = 'basic_sleep_tracking',
-    BASIC_TASKS = 'basic_tasks',
-
-    // Premium features
+    // Premium features only
     UNLIMITED_VOICE_NOTES = 'unlimited_voice_notes',
     ADVANCED_SLEEP_ANALYSIS = 'advanced_sleep_analysis',
     AI_INSIGHTS = 'ai_insights',

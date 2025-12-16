@@ -1,3 +1,4 @@
+import { FREE_USER_LIMITS, hasReachedLimit, LimitType } from '@/lib/constants/subscription-limits';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -76,6 +77,8 @@ interface AppStore {
     cancelSubscription: (reason?: string) => Promise<boolean>;
     hasFeatureAccess: (feature: keyof SubscriptionFeature) => boolean;
     checkUsageLimit: (limitType: string) => boolean;
+    canUseFeature: (feature: string) => { allowed: boolean; reason?: string };
+    getRemainingUsage: (limitType: LimitType) => number | null;
 
     // Voice notes actions
     addVoiceNote: (voiceNote: VoiceNote) => void;
@@ -209,8 +212,29 @@ export const useAppStore = create<AppStore>()(
                 try {
                     const apiService = ApiService.getInstance();
                     const response = await apiService.makeRequest('/subscriptions/current');
-                    if (response.success) {
-                        set({ subscriptionStatus: response.data as SubscriptionStatus | null });
+                    if (response.success && response.data) {
+                        const summary = response.data as any; // SubscriptionSummary from backend
+
+                        // Map SubscriptionSummary to SubscriptionStatus for frontend
+                        const status: SubscriptionStatus = {
+                            hasActiveSubscription: !!summary.subscription,
+                            isOnTrial: summary.subscription?.isTrialActive || false,
+                            isPremiumUser: summary.subscription?.plan === 'PREMIUM' || false,
+                            plan: summary.subscription?.plan || null,
+                            status: summary.subscription?.status || null,
+                            trialEndDate: summary.subscription?.trialEndDate ? new Date(summary.subscription.trialEndDate) : undefined,
+                            currentPeriodEnd: summary.subscription?.currentPeriodEnd ? new Date(summary.subscription.currentPeriodEnd) : undefined,
+                            daysRemaining: summary.daysRemaining || 0,
+                            usage: summary.usage || {
+                                voiceNotesUsed: 0,
+                                sleepSessionsUsed: 0,
+                                exportsThisMonth: 0
+                            }
+                        };
+
+                        set({ subscriptionStatus: status });
+                    } else {
+                        set({ subscriptionStatus: null });
                     }
                 } catch (error) {
                     console.error('Failed to load subscription status:', error);
@@ -302,24 +326,106 @@ export const useAppStore = create<AppStore>()(
                 const subscription = state.subscriptionStatus;
 
                 if (!subscription) {
-                    // Check if it's a free feature
-                    const freeFeatures = ['BASIC_VOICE_NOTES', 'BASIC_SLEEP_TRACKING', 'BASIC_TASKS'];
-                    return freeFeatures.includes(String(feature));
+                    return false; // No subscription = no premium features
                 }
 
-                return subscription.isPremiumUser;
+                // Check if user has premium access (either paid or trial)
+                return subscription.isPremiumUser || subscription.isOnTrial;
             },
 
             checkUsageLimit: (limitType: string) => {
                 const state = get();
                 const subscription = state.subscriptionStatus;
 
-                if (!subscription || !subscription.isPremiumUser) {
-                    return true; // Free users have limits
+                // Check if user has premium access (paid or trial)
+                const isPremium = subscription?.isPremiumUser || subscription?.isOnTrial || false;
+
+                if (isPremium) {
+                    return false; // Premium users have no limits
                 }
 
-                // Premium users typically have unlimited access
-                return false;
+                // For free users, check specific usage based on limitType
+                const usage = subscription?.usage || { voiceNotesUsed: 0, sleepSessionsUsed: 0, exportsThisMonth: 0 };
+
+                switch (limitType) {
+                    case 'voiceNotes':
+                        return hasReachedLimit('voiceNotesPerMonth', usage.voiceNotesUsed, false);
+                    case 'sleepSessions':
+                        return hasReachedLimit('sleepSessionsPerMonth', usage.sleepSessionsUsed, false);
+                    case 'exports':
+                        return hasReachedLimit('exportsPerMonth', usage.exportsThisMonth, false);
+                    default:
+                        return true; // Unknown limit type = restricted for free users
+                }
+            },
+
+            canUseFeature: (feature: string) => {
+                const state = get();
+                const subscription = state.subscriptionStatus;
+                const isPremium = subscription?.isPremiumUser || subscription?.isOnTrial || false;
+
+                // Define which features require premium
+                const premiumFeatures = [
+                    'ai_insights',
+                    'correlation_analysis',
+                    'unlimited_voice_notes',
+                    'advanced_sleep_analysis',
+                    'voice_transcription',
+                    'priority_support',
+                    'custom_reports'
+                ];
+
+                if (premiumFeatures.includes(feature)) {
+                    return isPremium
+                        ? { allowed: true }
+                        : { allowed: false, reason: 'Funkcja dostępna tylko w planie Premium' };
+                }
+
+                // For usage-based features, check limits
+                const usage = subscription?.usage || { voiceNotesUsed: 0, sleepSessionsUsed: 0, exportsThisMonth: 0 };
+
+                switch (feature) {
+                    case 'voice_note_recording':
+                        if (!isPremium && hasReachedLimit('voiceNotesPerMonth', usage.voiceNotesUsed, false)) {
+                            return { allowed: false, reason: `Limit ${FREE_USER_LIMITS.voiceNotesPerMonth} notatek głosowych miesięcznie osiągnięty` };
+                        }
+                        break;
+                    case 'sleep_tracking':
+                        if (!isPremium && hasReachedLimit('sleepSessionsPerMonth', usage.sleepSessionsUsed, false)) {
+                            return { allowed: false, reason: `Limit ${FREE_USER_LIMITS.sleepSessionsPerMonth} sesji snu miesięcznie osiągnięty` };
+                        }
+                        break;
+                    case 'data_export':
+                        if (!isPremium && hasReachedLimit('exportsPerMonth', usage.exportsThisMonth, false)) {
+                            return { allowed: false, reason: `Limit ${FREE_USER_LIMITS.exportsPerMonth} eksportu miesięcznie osiągnięty` };
+                        }
+                        break;
+                }
+
+                return { allowed: true };
+            },
+
+            getRemainingUsage: (limitType: LimitType) => {
+                const state = get();
+                const subscription = state.subscriptionStatus;
+                const isPremium = subscription?.isPremiumUser || subscription?.isOnTrial || false;
+
+                if (isPremium) {
+                    return null; // Unlimited for premium users
+                }
+
+                const usage = subscription?.usage || { voiceNotesUsed: 0, sleepSessionsUsed: 0, exportsThisMonth: 0 };
+
+                switch (limitType) {
+                    case 'voiceNotesPerMonth':
+                        return Math.max(0, FREE_USER_LIMITS.voiceNotesPerMonth - usage.voiceNotesUsed);
+                    case 'sleepSessionsPerMonth':
+                        return Math.max(0, FREE_USER_LIMITS.sleepSessionsPerMonth - usage.sleepSessionsUsed);
+                    case 'exportsPerMonth':
+                        return Math.max(0, FREE_USER_LIMITS.exportsPerMonth - usage.exportsThisMonth);
+                    default:
+                        return 0;
+                }
             },
 
             // Voice notes actions

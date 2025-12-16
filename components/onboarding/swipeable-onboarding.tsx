@@ -273,6 +273,18 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     isAuthenticated: true
                 });
 
+                // Wait a moment for state to update before proceeding
+                await new Promise(resolve => setTimeout(resolve, 100));
+
+                // Double-check authentication state was properly set
+                const { isAuthenticated, user } = useAppStore.getState();
+                if (!isAuthenticated || !user) {
+                    console.error('⚠️ Authentication state not properly updated, retrying...');
+                    throw new Error('Authentication state update failed');
+                }
+
+                console.log('✅ Authentication state confirmed:', { isAuthenticated, userEmail: user.email });
+
                 // Success - break retry loop
                 break;
 
@@ -300,11 +312,32 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         try {
             console.log('📋 Final onboarding screen reached');
 
-            // SECURITY: Ensure user is properly authenticated before completing onboarding
-            const { isAuthenticated, user } = useAppStore.getState();
+            // Wait for authentication state to be properly updated (with retries)
+            let authCheckRetries = 0;
+            const maxAuthRetries = 5;
+            let isAuthenticated = false;
+            let user = null;
+
+            while (authCheckRetries < maxAuthRetries) {
+                const state = useAppStore.getState();
+                isAuthenticated = state.isAuthenticated;
+                user = state.user;
+
+                if (isAuthenticated && user) {
+                    console.log('✅ Authentication confirmed on retry', authCheckRetries + 1);
+                    break;
+                }
+
+                authCheckRetries++;
+                console.log(`🔄 Auth check retry ${authCheckRetries}/${maxAuthRetries} - waiting for state update...`);
+
+                if (authCheckRetries < maxAuthRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms between retries
+                }
+            }
 
             if (!isAuthenticated || !user) {
-                console.error('❌ Cannot complete onboarding: User not authenticated');
+                console.error('❌ Cannot complete onboarding: User not authenticated after retries');
                 console.log('📋 Redirecting to authentication screen...');
                 // Go back to auth screen (page 1)
                 pagerRef.current?.setPage(1);

@@ -40,9 +40,6 @@ export interface SubscriptionStatus {
 }
 
 export type SubscriptionFeature =
-    | 'basic_voice_notes'
-    | 'basic_sleep_tracking'
-    | 'basic_tasks'
     | 'unlimited_voice_notes'
     | 'advanced_sleep_analysis'
     | 'ai_insights'

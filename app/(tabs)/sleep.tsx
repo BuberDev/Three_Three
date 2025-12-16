@@ -1,8 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Switch,
@@ -19,6 +21,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSleepRecording } from '@/hooks/use-sleep-recording';
+import { sleepApiService, SleepRecord, SleepStats } from '@/lib/services/sleep-api';
 import { useAppStore } from '@/stores/app-store';
 
 export default function SleepScreen() {
@@ -35,23 +38,58 @@ export default function SleepScreen() {
         getCurrentSleepSession,
     } = useSleepRecording();
 
-    const { user } = useAppStore();
+    const { user, setError } = useAppStore();
 
-    // Mock last sleep analysis for now
-    const getLastSleepAnalysis = () => {
-        // In production, this would fetch the latest sleep analysis from the backend
-        const currentSession = getCurrentSleepSession();
-        if (!currentSession) return null;
+    // Real API state management
+    const [latestSleepRecord, setLatestSleepRecord] = useState<SleepRecord | null>(null);
+    const [sleepStats, setSleepStats] = useState<SleepStats | null>(null);
+    const [sleepRecords, setSleepRecords] = useState<SleepRecord[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [refreshing, setRefreshing] = useState(false);
+    const [error, setLocalError] = useState<string | null>(null);
 
-        return {
-            snoringEvents: [],
-            sleepTalkingEvents: [],
-            sleepQuality: 0.85,
-            totalSleepDuration: 480, // 8 hours in minutes
-        };
-    };
+    // Fetch latest sleep data from API
+    const fetchSleepData = useCallback(async (showRefreshing = false) => {
+        try {
+            if (showRefreshing) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+            setLocalError(null);
 
-    const lastSleepAnalysis = getLastSleepAnalysis();
+            // Fetch data in parallel
+            const [latest, stats, recentRecords] = await Promise.all([
+                sleepApiService.getLatestSleepRecord(),
+                sleepApiService.getSleepStats(30),
+                sleepApiService.getSleepRecords({ limit: 7 })
+            ]);
+
+            setLatestSleepRecord(latest);
+            setSleepStats(stats);
+            setSleepRecords(recentRecords);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Failed to load sleep data';
+            setLocalError(errorMessage);
+            setError(errorMessage);
+            console.error('Error fetching sleep data:', err);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
+        }
+    }, [setError]);
+
+    // Load data on component mount
+    useEffect(() => {
+        if (user) {
+            fetchSleepData();
+        }
+    }, [user, fetchSleepData]);
+
+    // Pull to refresh
+    const onRefresh = useCallback(() => {
+        fetchSleepData(true);
+    }, [fetchSleepData]);
 
     const handleToggleSleepRecording = async () => {
         if (isRecordingEnabled) {
@@ -64,7 +102,41 @@ export default function SleepScreen() {
                         text: 'Zatrzymaj',
                         style: 'destructive',
                         onPress: async () => {
-                            await stopSleepRecording();
+                            try {
+                                const analysis = await stopSleepRecording();
+                                if (analysis) {
+                                    // Save sleep session to backend
+                                    const sleepRecord = await sleepApiService.createSleepRecord({
+                                        sleepDate: new Date().toISOString().split('T')[0],
+                                        recordingStartTime: sleepConfig.startTime.toISOString(),
+                                        recordingEndTime: new Date().toISOString(),
+                                        sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
+                                        sleepQuality: analysis.sleepQuality,
+                                        sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100),
+                                        snoringDetected: analysis.snoringEvents.length > 0,
+                                        snoringIntensity: analysis.snoringEvents.length > 10 ? 'HEAVY' :
+                                            analysis.snoringEvents.length > 5 ? 'MODERATE' :
+                                                analysis.snoringEvents.length > 0 ? 'LIGHT' : 'NONE',
+                                        sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
+                                        sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
+                                        analysisMetadata: {
+                                            sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100)
+                                        }
+                                    });
+
+                                    // Refresh data to show the new record
+                                    await fetchSleepData();
+
+                                    Alert.alert(
+                                        '🌅 Analiza snu zakończona!',
+                                        `Jakość snu: ${analysis.sleepQuality}/10\nCzas snu: ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin\nChrapanie: ${analysis.snoringEvents.length} epizodów`,
+                                        [{ text: 'Zobacz więcej', onPress: () => fetchSleepData() }, { text: 'OK' }]
+                                    );
+                                }
+                            } catch (error) {
+                                console.error('Error stopping sleep recording:', error);
+                                setError('Błąd podczas zatrzymywania nagrywania snu');
+                            }
                         },
                     },
                 ]
@@ -118,6 +190,59 @@ export default function SleepScreen() {
         }
     };
 
+    // Utility functions for formatting sleep data
+    const formatSleepDuration = (hours: number) => {
+        const h = Math.floor(hours);
+        const m = Math.round((hours - h) * 60);
+        return `${h}h ${m}m`;
+    };
+
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('pl-PL', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+        });
+    };
+
+    const getSnoringIntensityText = (intensity: string) => {
+        switch (intensity) {
+            case 'NONE': return 'Brak';
+            case 'LIGHT': return 'Słabe';
+            case 'MODERATE': return 'Umiarkowane';
+            case 'HEAVY': return 'Silne';
+            default: return 'Nieznane';
+        }
+    };
+
+    const getSnoringIntensityColor = (intensity: string) => {
+        switch (intensity) {
+            case 'NONE': return colors.success;
+            case 'LIGHT': return colors.warning;
+            case 'MODERATE': return colors.error;
+            case 'HEAVY': return colors.error;
+            default: return colors.text;
+        }
+    };
+
+    const getQualityColor = (quality: number) => {
+        if (quality >= 8) return colors.success;
+        if (quality >= 6) return colors.warning;
+        return colors.error;
+    };
+
+    // Loading state
+    if (loading) {
+        return (
+            <ModernView style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <ThemedText variant="bodyLarge" style={{ marginTop: DesignSystem.spacing.md }}>
+                    Ładowanie danych o śnie...
+                </ThemedText>
+            </ModernView>
+        );
+    }
+
     return (
         <ModernView style={{ flex: 1 }}>
             <StatusBar style="auto" />
@@ -130,6 +255,14 @@ export default function SleepScreen() {
                     paddingBottom: DesignSystem.spacing['4xl'],
                 }}
                 showsVerticalScrollIndicator={false}
+                refreshControl={
+                    <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={onRefresh}
+                        tintColor={colors.primary}
+                        colors={[colors.primary]}
+                    />
+                }
             >
                 {/* Header with Gradient */}
                 <LinearGradient
@@ -321,8 +454,8 @@ export default function SleepScreen() {
                     </View>
                 </ModernCard>
 
-                {/* Last Night Analysis */}
-                {lastSleepAnalysis && (
+                {/* Latest Sleep Record Analysis */}
+                {latestSleepRecord && (
                     <ModernCard
                         title="Ostatnia analiza"
                         elevation={2}
@@ -331,42 +464,42 @@ export default function SleepScreen() {
                         <View style={styles.analysisContainer}>
                             <View style={styles.analysisItem}>
                                 <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                                    <IconSymbol name="moon.zzz" size={20} color={colors.primary} />
+                                    <IconSymbol name="moon.zzz" size={20} color={getSnoringIntensityColor(latestSleepRecord.snoringIntensity)} />
                                 </View>
                                 <View>
                                     <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
                                         Chrapanie
                                     </Text>
-                                    <Text style={[styles.analysisValue, { color: colors.text }]}>
-                                        {lastSleepAnalysis.snoringEvents.length} epizodów
+                                    <Text style={[styles.analysisValue, { color: getSnoringIntensityColor(latestSleepRecord.snoringIntensity) }]}>
+                                        {getSnoringIntensityText(latestSleepRecord.snoringIntensity)}
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.analysisItem}>
                                 <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                                    <IconSymbol name="cloud" size={20} color={colors.primary} />
+                                    <IconSymbol name="cloud" size={20} color={latestSleepRecord.sleepTalkingDetected ? colors.warning : colors.success} />
                                 </View>
                                 <View>
                                     <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
                                         Mówienie przez sen
                                     </Text>
-                                    <Text style={[styles.analysisValue, { color: colors.text }]}>
-                                        {lastSleepAnalysis.sleepTalkingEvents.length} razy
+                                    <Text style={[styles.analysisValue, { color: latestSleepRecord.sleepTalkingDetected ? colors.warning : colors.text }]}>
+                                        {latestSleepRecord.sleepTalkingFrequency} razy
                                     </Text>
                                 </View>
                             </View>
 
                             <View style={styles.analysisItem}>
                                 <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                                    <IconSymbol name="star" size={20} color={colors.primary} />
+                                    <IconSymbol name="star" size={20} color={getQualityColor(latestSleepRecord.sleepQuality)} />
                                 </View>
                                 <View>
                                     <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
                                         Jakość snu
                                     </Text>
-                                    <Text style={[styles.analysisValue, { color: colors.text }]}>
-                                        {Math.round(lastSleepAnalysis.sleepQuality * 100)}%
+                                    <Text style={[styles.analysisValue, { color: getQualityColor(latestSleepRecord.sleepQuality) }]}>
+                                        {latestSleepRecord.sleepQuality}/10
                                     </Text>
                                 </View>
                             </View>
@@ -380,10 +513,162 @@ export default function SleepScreen() {
                                         Czas snu
                                     </Text>
                                     <Text style={[styles.analysisValue, { color: colors.text }]}>
-                                        {Math.round(lastSleepAnalysis.totalSleepDuration / 60)} min
+                                        {formatSleepDuration(latestSleepRecord.sleepDurationHours)}
                                     </Text>
                                 </View>
                             </View>
+
+                            <View style={styles.analysisItem}>
+                                <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                                    <IconSymbol name="chart.bar" size={20} color={colors.primary} />
+                                </View>
+                                <View>
+                                    <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
+                                        Efektywność
+                                    </Text>
+                                    <Text style={[styles.analysisValue, { color: colors.text }]}>
+                                        {latestSleepRecord.sleepEfficiency}%
+                                    </Text>
+                                </View>
+                            </View>
+
+                            <View style={styles.analysisItem}>
+                                <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
+                                    <IconSymbol name="calendar" size={20} color={colors.textSecondary} />
+                                </View>
+                                <View>
+                                    <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
+                                        Data
+                                    </Text>
+                                    <Text style={[styles.analysisValue, { color: colors.text }]}>
+                                        {formatDate(latestSleepRecord.sleepDate)}
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </ModernCard>
+                )}
+
+                {/* Sleep Statistics */}
+                {sleepStats && sleepStats.totalRecords > 0 && (
+                    <ModernCard
+                        title="Statystyki (ostatnie 30 dni)"
+                        elevation={2}
+                        style={{ marginBottom: DesignSystem.spacing.xl }}
+                    >
+                        <View style={styles.statsContainer}>
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: colors.primary }]}>
+                                        {formatSleepDuration(sleepStats.averageDuration)}
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Średni czas snu
+                                    </Text>
+                                </View>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: getQualityColor(sleepStats.averageQuality) }]}>
+                                        {sleepStats.averageQuality.toFixed(1)}/10
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Średnia jakość
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: colors.warning }]}>
+                                        {sleepStats.snoringNights}
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Nocy z chrapaniem
+                                    </Text>
+                                </View>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: colors.error }]}>
+                                        {sleepStats.sleepTalkingNights}
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Nocy z mówieniem
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={styles.statsRow}>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: colors.success }]}>
+                                        {sleepStats.averageEfficiency.toFixed(0)}%
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Średnia efektywność
+                                    </Text>
+                                </View>
+                                <View style={styles.statItem}>
+                                    <Text style={[styles.statValue, { color: colors.text }]}>
+                                        {sleepStats.totalRecords}
+                                    </Text>
+                                    <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                                        Nagranych nocy
+                                    </Text>
+                                </View>
+                            </View>
+                        </View>
+                    </ModernCard>
+                )}
+
+                {/* Recent Sleep Records */}
+                {sleepRecords.length > 0 && (
+                    <ModernCard
+                        title="Historia snu"
+                        elevation={2}
+                        style={{ marginBottom: DesignSystem.spacing.xl }}
+                    >
+                        {sleepRecords.slice(0, 5).map((record) => (
+                            <View key={record.id} style={styles.historyItem}>
+                                <View style={styles.historyDate}>
+                                    <Text style={[styles.historyDateText, { color: colors.text }]}>
+                                        {formatDate(record.sleepDate)}
+                                    </Text>
+                                </View>
+                                <View style={styles.historyDetails}>
+                                    <Text style={[styles.historyDuration, { color: colors.primary }]}>
+                                        {formatSleepDuration(record.sleepDurationHours)}
+                                    </Text>
+                                    <Text style={[styles.historyQuality, { color: getQualityColor(record.sleepQuality) }]}>
+                                        {record.sleepQuality}/10
+                                    </Text>
+                                    <View style={styles.historyIndicators}>
+                                        {record.snoringDetected && (
+                                            <View style={[styles.indicator, { backgroundColor: getSnoringIntensityColor(record.snoringIntensity) }]}>
+                                                <IconSymbol name="moon.zzz" size={12} color="#ffffff" />
+                                            </View>
+                                        )}
+                                        {record.sleepTalkingDetected && (
+                                            <View style={[styles.indicator, { backgroundColor: colors.warning }]}>
+                                                <IconSymbol name="cloud" size={12} color="#ffffff" />
+                                            </View>
+                                        )}
+                                    </View>
+                                </View>
+                            </View>
+                        ))}
+                    </ModernCard>
+                )}
+
+                {/* No Data Message */}
+                {!latestSleepRecord && !loading && (
+                    <ModernCard
+                        title="Rozpocznij monitoring"
+                        elevation={1}
+                        style={{ marginBottom: DesignSystem.spacing.xl }}
+                    >
+                        <View style={{ alignItems: 'center', padding: DesignSystem.spacing.xl }}>
+                            <IconSymbol name="moon" size={48} color={colors.textSecondary} style={{ marginBottom: DesignSystem.spacing.md }} />
+                            <Text style={[{ fontSize: 16, fontWeight: '500' }, { color: colors.text, textAlign: 'center', marginBottom: DesignSystem.spacing.sm }]}>
+                                Nie masz jeszcze żadnych nagrań snu
+                            </Text>
+                            <Text style={[{ color: colors.textSecondary, textAlign: 'center', lineHeight: 20 }]}>
+                                Włącz monitoring snu, aby rozpocząć analizę jakości swojego odpoczynku i wykrywanie chrapania.
+                            </Text>
                         </View>
                     </ModernCard>
                 )}
@@ -416,85 +701,85 @@ export default function SleepScreen() {
 
 const styles = StyleSheet.create({
     headerGradient: {
-        marginBottom: DesignSystem.spacing['3xl'],
-        borderRadius: DesignSystem.borderRadius['2xl'],
         padding: DesignSystem.spacing.xl,
+        borderRadius: DesignSystem.borderRadius.lg,
+        marginBottom: DesignSystem.spacing.xl,
+        minHeight: 120,
+        justifyContent: 'center',
         alignItems: 'center',
+        position: 'relative',
     },
     moonContainer: {
-        backgroundColor: 'rgba(255, 255, 255, 0.15)',
-        borderRadius: DesignSystem.borderRadius.full,
-        padding: DesignSystem.spacing.lg,
-        marginBottom: DesignSystem.spacing.lg,
+        marginBottom: DesignSystem.spacing.md,
     },
     headerTitle: {
+        fontWeight: 'bold',
         textAlign: 'center',
-        marginBottom: DesignSystem.spacing.sm,
-        fontWeight: '700',
+        marginBottom: DesignSystem.spacing.xs,
     },
     headerSubtitle: {
         textAlign: 'center',
-        lineHeight: 24,
+        opacity: 0.9,
     },
     controlSection: {
-        gap: DesignSystem.spacing.lg,
+        padding: DesignSystem.spacing.lg,
     },
     controlHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        marginBottom: DesignSystem.spacing.md,
     },
     controlTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '600',
+        flex: 1,
     },
     activeStatus: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: DesignSystem.spacing.sm,
+        marginBottom: DesignSystem.spacing.md,
+        padding: DesignSystem.spacing.sm,
+        borderRadius: DesignSystem.borderRadius.sm,
+        backgroundColor: '#f0f9ff',
     },
     pulsingDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#00ff00',
-        // Add animation later
+        backgroundColor: '#3b82f6',
+        marginRight: DesignSystem.spacing.sm,
     },
     statusText: {
         fontSize: 14,
         fontWeight: '500',
     },
     controlDescription: {
-        fontSize: 15,
-        lineHeight: 22,
+        fontSize: 14,
+        lineHeight: 20,
+        marginBottom: DesignSystem.spacing.lg,
     },
     featureList: {
-        gap: DesignSystem.spacing.sm,
+        gap: DesignSystem.spacing.md,
     },
     featureItem: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: DesignSystem.spacing.md,
+        gap: DesignSystem.spacing.sm,
     },
     featureIconContainer: {
         width: 32,
         height: 32,
         borderRadius: 16,
-        alignItems: 'center',
         justifyContent: 'center',
-        marginRight: DesignSystem.spacing.md,
+        alignItems: 'center',
     },
     featureText: {
-        fontSize: 15,
-        fontWeight: '500',
+        fontSize: 14,
+        flex: 1,
     },
     settingItem: {
         marginBottom: DesignSystem.spacing.xl,
-    },
-    settingRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
     },
     settingHeader: {
         flexDirection: 'row',
@@ -507,8 +792,13 @@ const styles = StyleSheet.create({
         fontWeight: '600',
     },
     settingSubtitle: {
-        fontSize: 13,
+        fontSize: 12,
         marginTop: 2,
+    },
+    settingRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
     },
     timeContainer: {
         flexDirection: 'row',
@@ -517,7 +807,7 @@ const styles = StyleSheet.create({
     timeButton: {
         flex: 1,
         borderWidth: 1,
-        borderRadius: DesignSystem.borderRadius.lg,
+        borderRadius: DesignSystem.borderRadius.sm,
         padding: DesignSystem.spacing.md,
         alignItems: 'center',
     },
@@ -526,24 +816,24 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     timeValue: {
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: '600',
     },
     sensitivityContainer: {
         flexDirection: 'row',
         gap: DesignSystem.spacing.sm,
-        marginBottom: DesignSystem.spacing.sm,
+        marginBottom: DesignSystem.spacing.md,
     },
     sensitivityButton: {
         flex: 1,
         borderWidth: 1,
-        borderRadius: DesignSystem.borderRadius.md,
+        borderRadius: DesignSystem.borderRadius.sm,
         padding: DesignSystem.spacing.md,
         alignItems: 'center',
         gap: DesignSystem.spacing.xs,
     },
     sensitivityLabel: {
-        fontSize: 13,
+        fontSize: 12,
         fontWeight: '500',
     },
     sensitivityDescription: {
@@ -562,31 +852,97 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        alignItems: 'center',
         justifyContent: 'center',
-        marginRight: DesignSystem.spacing.md,
+        alignItems: 'center',
     },
     analysisLabel: {
-        fontSize: 13,
+        fontSize: 12,
+        marginBottom: 2,
     },
     analysisValue: {
         fontSize: 16,
         fontWeight: '600',
+    },
+    statsContainer: {
+        gap: DesignSystem.spacing.lg,
+    },
+    statsRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: DesignSystem.spacing.md,
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+        padding: DesignSystem.spacing.md,
+        borderRadius: DesignSystem.borderRadius.sm,
+        backgroundColor: '#f8fafc',
+    },
+    statValue: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    statLabel: {
+        fontSize: 12,
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+    historyItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: DesignSystem.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    historyDate: {
+        width: 80,
+    },
+    historyDateText: {
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    historyDetails: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    historyDuration: {
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    historyQuality: {
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    historyIndicators: {
+        flexDirection: 'row',
+        gap: DesignSystem.spacing.xs,
+    },
+    indicator: {
+        width: 20,
+        height: 20,
+        borderRadius: 10,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     tipsContainer: {
         gap: DesignSystem.spacing.md,
     },
     tipItem: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         gap: DesignSystem.spacing.sm,
     },
     tipBullet: {
         fontSize: 16,
         lineHeight: 20,
+        marginTop: 2,
     },
     tipText: {
-        flex: 1,
         fontSize: 14,
         lineHeight: 20,
+        flex: 1,
     },
 });

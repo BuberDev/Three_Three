@@ -15,21 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     {
-        id: 'basic',
-        name: 'Basic',
-        description: 'Idealne dla osób rozpoczynających swoją podróż zdrowotną',
-        price: 1999, // 19.99 PLN in cents
-        currency: 'pln',
-        interval: 'month',
-        stripePriceId: process.env.EXPO_PUBLIC_STRIPE_BASIC_PRICE_ID || '',
-        features: [
-            'Podstawowe śledzenie aktywności',
-            'Dziennik zdrowia',
-            'Miesięczne raporty',
-            'Email support'
-        ],
-    },
-    {
         id: 'premium',
         name: 'Premium',
         description: 'Kompleksowe zarządzanie zdrowiem z AI',
@@ -39,14 +24,14 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
         stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
         recommended: true,
         features: [
-            'Wszystko z planu Basic',
             'AI asystent zdrowia 24/7',
             'Personalizowane rekomendacje',
             'Zaawansowane analityki',
             'Śledzenie snu z AI',
             'Notatki głosowe bez limitu',
             'Integracje z urządzeniami',
-            'Priority support'
+            'Priority support',
+            'Wszystkie przyszłe funkcje'
         ],
     },
     {
@@ -140,7 +125,6 @@ export const SubscriptionScreen: React.FC = () => {
 
         // Map Stripe price IDs to plan IDs
         const priceIdToPlanId = {
-            [process.env.EXPO_PUBLIC_STRIPE_BASIC_PRICE_ID || '']: 'basic',
             [process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '']: 'premium',
             [process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '']: 'premium-yearly',
         };

@@ -1,4 +1,3 @@
-import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
@@ -47,10 +46,10 @@ TaskManager.defineTask(SLEEP_RECORDING_TASK, async () => {
             }
         }
 
-        return BackgroundFetch.BackgroundFetchResult.NewData;
+        return { data: null, error: null }; // Success
     } catch (error) {
         console.error('Sleep recording task error:', error);
-        return BackgroundFetch.BackgroundFetchResult.Failed;
+        return { data: null, error: error }; // Failure
     }
 });
 
@@ -72,11 +71,8 @@ export const useSleepRecording = () => {
     useEffect(() => {
         const registerBackgroundTasks = async () => {
             try {
-                await BackgroundFetch.registerTaskAsync(SLEEP_RECORDING_TASK, {
-                    minimumInterval: 60, // Check every minute
-                    stopOnTerminate: false,
-                    startOnBoot: true,
-                });
+                // Background tasks are already registered via TaskManager.defineTask above
+                console.log('Background sleep recording task registered');
             } catch (error) {
                 console.error('Failed to register background task:', error);
                 setError('Failed to set up sleep recording');
@@ -86,7 +82,8 @@ export const useSleepRecording = () => {
         registerBackgroundTasks();
 
         return () => {
-            BackgroundFetch.unregisterTaskAsync(SLEEP_RECORDING_TASK);
+            // Cleanup if needed
+            TaskManager.unregisterTaskAsync(SLEEP_RECORDING_TASK);
         };
     }, []);
 

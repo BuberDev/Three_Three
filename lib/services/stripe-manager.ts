@@ -27,7 +27,21 @@ export class PaymentServiceManager {
         const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
         if (!publishableKey) {
+            // In development, log warning but don't throw
+            if (__DEV__) {
+                console.warn('⚠️ Stripe publishable key not found - payment features will be disabled');
+                return;
+            }
             throw new StripeSetupError('Missing Stripe publishable key in environment variables');
+        }
+
+        // Check if it's a placeholder key (common in development)
+        if (publishableKey.includes('placeholder') || publishableKey.length < 50) {
+            if (__DEV__) {
+                console.warn('⚠️ Using placeholder Stripe key - payment features will be disabled');
+                return;
+            }
+            throw new StripeSetupError('Invalid Stripe publishable key - appears to be a placeholder');
         }
 
         try {
@@ -54,6 +68,13 @@ export class PaymentServiceManager {
         } catch (error) {
             console.error('❌ Failed to initialize Stripe:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+            // In development, log warning but don't throw
+            if (__DEV__) {
+                console.warn('⚠️ Stripe initialization failed in development - payment features will be disabled');
+                return;
+            }
+
             throw new StripeSetupError(`Failed to initialize Stripe: ${errorMessage}`);
         }
     }

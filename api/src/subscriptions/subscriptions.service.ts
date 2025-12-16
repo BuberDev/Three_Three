@@ -404,11 +404,8 @@ export class SubscriptionsService {
     }
 
     private isFreeFeature(feature: SubscriptionFeature): boolean {
-        const freeFeatures = [
-            SubscriptionFeature.BASIC_VOICE_NOTES,
-            SubscriptionFeature.BASIC_SLEEP_TRACKING,
-            SubscriptionFeature.BASIC_TASKS
-        ];
-        return freeFeatures.includes(feature);
+        // All features are now premium-only
+        // Free users get basic functionality without these advanced features
+        return false;
     }
 }
