@@ -48,7 +48,7 @@ export class EnterpriseAIService {
 
         const sessionData = await response.json();
         console.log('🔍 Enterprise AI createSession response:', sessionData);
-        return sessionData;
+        return sessionData.data || sessionData;
     }
 
     /**
