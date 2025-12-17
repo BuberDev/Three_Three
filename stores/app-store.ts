@@ -88,6 +88,7 @@ interface AppStore {
     uploadVoiceNote: (audioUri: string) => Promise<boolean>;
     uploadVoiceNoteWithContext: (audioUri: string, context?: string) => Promise<boolean>;
     uploadSleepRecording: (sleepData: any) => Promise<boolean>;
+    getSleepInsights: (sleepTrackingId: string) => Promise<any>;
 
     // 🏢 ENTERPRISE Voice Recording Functions
     uploadDailyReportVoice: (audioUri: string, reportType: 'morning' | 'evening' | 'summary') => Promise<boolean>;
@@ -890,6 +891,43 @@ export const useAppStore = create<AppStore>()(
                     console.error('Upload sleep recording error:', error);
                     setError(error instanceof Error ? error.message : 'Upload failed');
                     return false;
+                } finally {
+                    setLoading(false);
+                }
+            },
+
+            getSleepInsights: async (sleepTrackingId: string) => {
+                const { user, setError, setLoading } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return null;
+                }
+
+                try {
+                    setLoading(true);
+                    console.log('Fetching AI sleep insights for:', sleepTrackingId);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await fetch(`${apiService.baseUrl}/sleep-tracking/${sleepTrackingId}/insights`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${get().accessToken}`,
+                            'Content-Type': 'application/json',
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch sleep insights: ${response.statusText}`);
+                    }
+
+                    const insights = await response.json();
+                    console.log('✨ Sleep insights received:', insights);
+
+                    return insights;
+                } catch (error) {
+                    console.error('Get sleep insights error:', error);
+                    setError(error instanceof Error ? error.message : 'Failed to get sleep insights');
+                    return null;
                 } finally {
                     setLoading(false);
                 }

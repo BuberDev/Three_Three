@@ -1,21 +1,47 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, FindManyOptions, Repository } from 'typeorm';
 import { CreateSleepTrackingDto } from './dto/create-sleep-tracking.dto';
 import { UpdateSleepTrackingDto } from './dto/update-sleep-tracking.dto';
+import { SleepEvent } from './entities/sleep-event.entity';
 import { SleepTracking, SnoringIntensity } from './entities/sleep-tracking.entity';
+import { SleepAnalysisService } from './services/sleep-analysis.service';
+import { SleepCorrelationService } from './services/sleep-correlation.service';
 
 @Injectable()
 export class SleepTrackingService {
+    private readonly logger = new Logger(SleepTrackingService.name);
+
     constructor(
         @InjectRepository(SleepTracking)
         private readonly sleepTrackingRepository: Repository<SleepTracking>,
+        @InjectRepository(SleepEvent)
+        private readonly sleepEventRepository: Repository<SleepEvent>,
+        private readonly sleepAnalysisService: SleepAnalysisService,
+        private readonly sleepCorrelationService: SleepCorrelationService,
     ) { }
 
     async create(
         userId: string,
         createSleepTrackingDto: CreateSleepTrackingDto,
     ): Promise<SleepTracking> {
+        // Check if a record already exists for this user and date
+        const existingRecord = await this.sleepTrackingRepository.findOne({
+            where: {
+                userId,
+                sleepDate: createSleepTrackingDto.sleepDate,
+            },
+        });
+
+        if (existingRecord) {
+            // Update existing record
+            await this.sleepTrackingRepository.update(existingRecord.id, createSleepTrackingDto);
+            return await this.sleepTrackingRepository.findOne({
+                where: { id: existingRecord.id },
+            });
+        }
+
+        // Create new record
         const sleepRecord = this.sleepTrackingRepository.create({
             ...createSleepTrackingDto,
             userId,
@@ -126,33 +152,127 @@ export class SleepTrackingService {
         };
     }
 
+    /**
+     * Process nocturnal audio with real AI analysis (replaces old mock method)
+     */
     async processNocurnalAudio(
         userId: string,
         audioFilePath: string,
-        bedtime: Date,
-        wakeTime: Date,
+        bedtime: string,
+        wakeTime: string,
     ): Promise<SleepTracking> {
-        // This would integrate with audio processing service
-        // For now, creating a basic sleep record
-        const sleepDurationHours = Math.round((wakeTime.getTime() - bedtime.getTime()) / (1000 * 60 * 60) * 10) / 10; // hours
+        this.logger.log(`Starting AI analysis for nocturnal audio: ${audioFilePath}`);
 
-        const sleepRecord = await this.create(userId, {
+        try {
+            // 1. Calculate basic sleep metrics
+            const sleepDurationHours = Math.round(
+                (new Date(wakeTime).getTime() - new Date(bedtime).getTime()) / (1000 * 60 * 60) * 10
+            ) / 10;
+
+            // 2. Perform real audio analysis
+            const analysisResult = await this.sleepAnalysisService.analyzeSleepAudio(
+                'temp-id', // Will be replaced when sleep record is created
+                audioFilePath,
+                sleepDurationHours * 60 * 60 * 1000, // Convert hours to milliseconds
+            );
+
+            // 3. Create sleep record with analysis results
+            const sleepRecord = await this.create(userId, {
+                sleepDate: new Date().toISOString().split('T')[0],
+                recordingStartTime: bedtime,
+                recordingEndTime: wakeTime,
+                sleepDurationHours,
+                audioFiles: [{
+                    url: audioFilePath,
+                    duration: sleepDurationHours * 60,
+                    segment: 1,
+                    size: 0
+                }],
+                snoringDetected: analysisResult.snoringDetected,
+                snoringIntensity: analysisResult.snoringIntensity,
+                sleepTalkingDetected: analysisResult.sleepTalkingDetected,
+                sleepTalkingFrequency: analysisResult.sleepTalkingFrequency,
+                sleepQualityScore: analysisResult.sleepQualityScore,
+                awakeningsCount: analysisResult.awakeningsCount,
+                sleepEfficiency: analysisResult.sleepEfficiency,
+                analysisMetadata: analysisResult.analysisMetadata,
+            });
+
+            // 4. Save sleep events detected in analysis
+            if (analysisResult.events && analysisResult.events.length > 0) {
+                const sleepEvents = analysisResult.events.map(event =>
+                    this.sleepEventRepository.create({
+                        ...event,
+                        sleepTrackingId: sleepRecord.id,
+                    })
+                );
+                await this.sleepEventRepository.save(sleepEvents);
+            }
+
+            this.logger.log(`Sleep analysis completed. Quality: ${analysisResult.sleepQualityScore}/10`);
+            return sleepRecord;
+
+        } catch (error) {
+            this.logger.error(`Sleep audio analysis failed: ${error.message}`, error.stack);
+            // Fallback to basic record without AI analysis
+            return this.createBasicSleepRecord(userId, audioFilePath, bedtime, wakeTime);
+        }
+    }
+
+    /**
+     * Get comprehensive sleep insights with AI correlations
+     */
+    async getSleepInsights(userId: string, sleepTrackingId: string) {
+        try {
+            this.logger.log(`Generating sleep insights for tracking: ${sleepTrackingId}`);
+
+            const insights = await this.sleepCorrelationService.generateSleepInsights(
+                userId,
+                sleepTrackingId,
+            );
+
+            return insights;
+        } catch (error) {
+            this.logger.error(`Sleep insights generation failed: ${error.message}`, error.stack);
+            throw error;
+        }
+    }
+
+    /**
+     * Fallback method for basic sleep record creation
+     */
+    private async createBasicSleepRecord(
+        userId: string,
+        audioFilePath: string,
+        bedtime: string,
+        wakeTime: string,
+    ): Promise<SleepTracking> {
+        const sleepDurationHours = Math.round(
+            (new Date(wakeTime).getTime() - new Date(bedtime).getTime()) / (1000 * 60 * 60) * 10
+        ) / 10;
+
+        return this.create(userId, {
             sleepDate: new Date().toISOString().split('T')[0],
             recordingStartTime: bedtime,
             recordingEndTime: wakeTime,
             sleepDurationHours,
-            audioFiles: [{ url: audioFilePath, duration: sleepDurationHours * 60, segment: 1, size: 0 }],
-            snoringDetected: true,
-            snoringIntensity: SnoringIntensity.LIGHT, // would be detected from audio
+            audioFiles: [{
+                url: audioFilePath,
+                duration: sleepDurationHours * 60,
+                segment: 1,
+                size: 0
+            }],
+            snoringDetected: false,
+            snoringIntensity: SnoringIntensity.NONE,
             sleepTalkingDetected: false,
             sleepTalkingFrequency: 0,
-            sleepQualityScore: 7,
+            sleepQualityScore: Math.max(1, Math.min(10, sleepDurationHours * 1.2)), // Basic duration-based score
             awakeningsCount: 0,
+            sleepEfficiency: Math.min(100, (sleepDurationHours / 8) * 100),
             analysisMetadata: {
-                sleepEfficiency: Math.min(100, (sleepDurationHours / 8) * 100), // assuming 8h target
+                fallbackMode: true,
+                reason: 'AI analysis failed, using basic calculation',
             },
         });
-
-        return sleepRecord;
     }
 }

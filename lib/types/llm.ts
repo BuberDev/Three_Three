@@ -28,20 +28,20 @@ export const AVAILABLE_MODELS: LLMModel[] = [
         description: 'Najlepszy model do rozumowania i analizy'
     },
     {
-        id: 'openai/gpt-4o-2024-11-20',
-        name: 'GPT-4o',
-        provider: 'OpenAI',
+        id: 'microsoft/phi-3-medium-128k-instruct:free',
+        name: 'Phi-3 Medium (Darmowy)',
+        provider: 'Microsoft via OpenRouter',
         contextLength: 128000,
-        pricing: { input: 2.5, output: 10.0 },
-        description: 'Zaawansowany model multimodalny'
+        pricing: { input: 0, output: 0 },
+        description: 'Darmowy model Microsoft o wysokiej jakości'
     },
     {
-        id: 'openai/gpt-4o-mini-2024-07-18',
-        name: 'GPT-4o Mini',
-        provider: 'OpenAI',
-        contextLength: 128000,
-        pricing: { input: 0.15, output: 0.6 },
-        description: 'Szybki i ekonomiczny model'
+        id: 'meta-llama/llama-3.2-3b-instruct:free',
+        name: 'Llama 3.2 3B (Darmowy)',
+        provider: 'Meta via OpenRouter',
+        contextLength: 32000,
+        pricing: { input: 0, output: 0 },
+        description: 'Darmowy model Meta Llama'
     },
     {
         id: 'google/gemini-pro-1.5',

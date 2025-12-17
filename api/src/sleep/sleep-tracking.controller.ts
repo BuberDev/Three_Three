@@ -197,4 +197,68 @@ export class SleepTrackingController {
     ): Promise<void> {
         return this.sleepTrackingService.remove(id, user.id);
     }
+
+    @Get(':id/insights')
+    @ApiOperation({ summary: 'Get AI-powered sleep insights and correlations' })
+    @ApiParam({ name: 'id', type: 'string', format: 'uuid', description: 'Sleep tracking record ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Sleep insights generated successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                sleepTrackingId: { type: 'string' },
+                date: { type: 'string' },
+                correlations: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            type: { type: 'string', enum: ['diet', 'mood', 'activity', 'stress', 'environment'] },
+                            correlation: { type: 'string' },
+                            confidence: { type: 'number' },
+                            evidence: { type: 'array', items: { type: 'string' } },
+                            recommendation: { type: 'string' },
+                        },
+                    },
+                },
+                overallInsight: { type: 'string' },
+                actionableAdvice: { type: 'array', items: { type: 'string' } },
+                trendAnalysis: { type: 'string' },
+            },
+        },
+    })
+    @ApiResponse({
+        status: 404,
+        description: 'Sleep record not found',
+    })
+    async getSleepInsights(
+        @CurrentUser() user: User,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.sleepTrackingService.getSleepInsights(user.id, id);
+    }
+
+    @Post('process-audio')
+    @ApiOperation({ summary: 'Process nocturnal audio recording with AI analysis' })
+    @ApiResponse({
+        status: 201,
+        description: 'Audio processed and sleep record created successfully',
+        type: SleepTracking,
+    })
+    async processAudio(
+        @CurrentUser() user: User,
+        @Body() processAudioDto: {
+            audioFilePath: string;
+            bedtime: string;
+            wakeTime: string;
+        },
+    ): Promise<SleepTracking> {
+        return this.sleepTrackingService.processNocurnalAudio(
+            user.id,
+            processAudioDto.audioFilePath,
+            processAudioDto.bedtime,
+            processAudioDto.wakeTime,
+        );
+    }
 }

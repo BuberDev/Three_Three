@@ -16,11 +16,11 @@ export default registerAs('app', () => ({
         s3BucketName: process.env.AWS_S3_BUCKET_NAME || 'three-three-voice-notes',
     },
 
-    // OpenAI Configuration
-    openai: {
-        apiKey: process.env.OPENAI_API_KEY,
-        model: process.env.OPENAI_MODEL || 'gpt-4',
-        whisperModel: process.env.WHISPER_MODEL || 'whisper-1',
+    // OpenRouter Configuration
+    openRouter: {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        model: process.env.OPENROUTER_MODEL || 'microsoft/phi-3-medium-128k-instruct:free',
+        baseUrl: 'https://openrouter.ai/api/v1',
     },
 
     // Kafka Configuration

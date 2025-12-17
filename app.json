@@ -10,13 +10,28 @@
       "router": {},
       "eas": {
         "projectId": "d055f204-0805-4fa9-8fa2-832464c185cf"
+      },
+      "googleClientId": {
+        "ios": "523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3.apps.googleusercontent.com",
+        "android": "523125599576-cuemvi6uso0qpmkg9tea1nhu9p228tr.apps.googleusercontent.com",
+        "web": "523125599576-cuejvvi6uso0opmkg9tea1nhu9p228tr.apps.googleusercontent.com"
       }
     },
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.buber.threethree"
+      "bundleIdentifier": "com.buber.threethree",
+      "infoPlist": {
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": [
+              "threethree",
+              "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
+            ]
+          }
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,7 +65,14 @@
       ],
       "expo-sqlite",
       "expo-audio",
-      "expo-asset"
+      "expo-asset",
+      [
+        "@react-native-google-signin/google-signin",{
+        "iosUrlScheme": "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
+      }
+      ]
+      
+
     ],
     "experiments": {
       "typedRoutes": true,

@@ -10,12 +10,12 @@ export class CreateSleepTrackingDto {
     @ApiPropertyOptional({ description: 'Recording start time' })
     @IsOptional()
     @IsDateString()
-    recordingStartTime?: Date;
+    recordingStartTime?: string;
 
     @ApiPropertyOptional({ description: 'Recording end time' })
     @IsOptional()
     @IsDateString()
-    recordingEndTime?: Date;
+    recordingEndTime?: string;
 
     @ApiPropertyOptional({ description: 'Audio files metadata' })
     @IsOptional()
@@ -68,6 +68,11 @@ export class CreateSleepTrackingDto {
     @Min(0)
     awakeningsCount?: number;
 
+    @ApiPropertyOptional({ description: 'Sleep efficiency percentage' })
+    @IsOptional()
+    @IsNumber()
+    sleepEfficiency?: number;
+
     @ApiPropertyOptional({ description: 'Analysis metadata' })
     @IsOptional()
     analysisMetadata?: {
@@ -82,5 +87,7 @@ export class CreateSleepTrackingDto {
         longestAwakePeriod?: number;
         averageHeartRate?: number;
         oxygenSaturation?: number;
+        fallbackMode?: boolean;
+        reason?: string;
     };
 }

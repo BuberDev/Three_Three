@@ -8,11 +8,11 @@ export interface SleepRecord {
     recordingStartTime: string;
     recordingEndTime: string;
     sleepDurationHours: number;
-    sleepQuality: number;
+    sleepQuality: number; // This will be mapped from sleepQualityScore
     sleepEfficiency: number;
     restfulnessScore: number;
     snoringDetected: boolean;
-    snoringIntensity: 'NONE' | 'LIGHT' | 'MODERATE' | 'HEAVY';
+    snoringIntensity: 'NONE' | 'LIGHT' | 'MODERATE' | 'HEAVY'; // UI uses uppercase for display
     sleepTalkingDetected: boolean;
     sleepTalkingFrequency: number;
     awakeningsCount: number;
@@ -47,14 +47,12 @@ export interface SleepStats {
 
 export interface CreateSleepRecordDto {
     sleepDate: string;
-    recordingStartTime: string;
-    recordingEndTime: string;
-    sleepDurationHours: number;
-    sleepQuality?: number;
-    sleepEfficiency?: number;
-    restfulnessScore?: number;
+    recordingStartTime?: string;
+    recordingEndTime?: string;
+    sleepDurationHours?: number;
+    sleepQualityScore?: number;
     snoringDetected?: boolean;
-    snoringIntensity?: 'NONE' | 'LIGHT' | 'MODERATE' | 'HEAVY';
+    snoringIntensity?: 'none' | 'light' | 'moderate' | 'heavy';
     sleepTalkingDetected?: boolean;
     sleepTalkingFrequency?: number;
     awakeningsCount?: number;
@@ -64,7 +62,19 @@ export interface CreateSleepRecordDto {
         segment: number;
         size: number;
     }>;
-    analysisMetadata?: any;
+    analysisMetadata?: {
+        deepSleepPercentage?: number;
+        lightSleepPercentage?: number;
+        remSleepPercentage?: number;
+        noiseLevel?: number;
+        roomTemperature?: number;
+        environmentalFactors?: string[];
+        sleepEfficiency?: number;
+        timeToFallAsleep?: number;
+        longestAwakePeriod?: number;
+        averageHeartRate?: number;
+        oxygenSaturation?: number;
+    };
 }
 
 class SleepApiService {

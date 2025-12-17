@@ -6,6 +6,7 @@
 import * as AuthSession from 'expo-auth-session';
 import Constants from 'expo-constants';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 
 // Complete the auth session for web browser
 WebBrowser.maybeCompleteAuthSession();
@@ -35,15 +36,15 @@ export class GoogleAuthService {
     private discovery: AuthSession.DiscoveryDocument | null = null;
 
     private constructor() {
-        // Initialize discovery
-        this.initializeDiscovery();
-
         // Get client ID from app config
         const extra = Constants.expoConfig?.extra;
         const platform = Constants.platform;
+        const appOwnership = Constants.appOwnership;
 
-        let clientId: string;
-        if (platform?.ios) {
+        let clientId: string | undefined;
+        if (appOwnership === 'expo') {
+            clientId = extra?.googleClientId?.web;  // Używaj Web Client ID dla Expo Go
+        } else if (platform?.ios) {
             clientId = extra?.googleClientId?.ios;
         } else if (platform?.android) {
             clientId = extra?.googleClientId?.android;
@@ -51,7 +52,15 @@ export class GoogleAuthService {
             clientId = extra?.googleClientId?.web;
         }
 
-        if (!clientId) {
+        // Check for placeholder values and provide helpful error message
+        if (!clientId || clientId.includes('your-') || clientId.includes('.apps.googleusercontent.com') === false) {
+            console.error('❌ Google OAuth not configured properly');
+            console.error('📋 To set up Google OAuth:');
+            console.error('1. Go to Google Cloud Console (https://console.cloud.google.com/)');
+            console.error('2. Create OAuth 2.0 credentials for your app');
+            console.error('3. Replace placeholder values in app.json with real client IDs');
+            console.error('4. See GOOGLE_OAUTH_SETUP.md for detailed instructions');
+
             throw new Error('Google Client ID not configured. Please set up OAuth credentials in app.json');
         }
 
@@ -63,7 +72,13 @@ export class GoogleAuthService {
 
     private async initializeDiscovery(): Promise<void> {
         try {
-            this.discovery = await AuthSession.useAutoDiscovery('https://accounts.google.com');
+            // Use the static discovery document instead of the hook
+            this.discovery = {
+                authorizationEndpoint: 'https://accounts.google.com/o/oauth2/v2/auth',
+                tokenEndpoint: 'https://www.googleapis.com/oauth2/v4/token',
+                revocationEndpoint: 'https://oauth2.googleapis.com/revoke',
+                userInfoEndpoint: 'https://www.googleapis.com/oauth2/v2/userinfo',
+            };
         } catch (error) {
             console.error('Failed to initialize Google discovery:', error);
             throw new Error('Failed to initialize Google OAuth discovery');
@@ -75,6 +90,33 @@ export class GoogleAuthService {
             GoogleAuthService.instance = new GoogleAuthService();
         }
         return GoogleAuthService.instance;
+    }
+
+    /**
+     * Validate if Google OAuth is properly configured
+     */
+    public validateConfiguration(): boolean {
+        try {
+            const extra = Constants.expoConfig?.extra;
+            const platform = Constants.platform;
+
+            let clientId: string;
+            if (platform?.ios) {
+                clientId = extra?.googleClientId?.ios;
+            } else if (platform?.android) {
+                clientId = extra?.googleClientId?.android;
+            } else {
+                clientId = extra?.googleClientId?.web;
+            }
+
+            // Check if clientId exists and is not a placeholder
+            return !!(clientId &&
+                !clientId.includes('your-') &&
+                clientId.includes('.apps.googleusercontent.com'));
+        } catch (error) {
+            console.error('Error validating Google OAuth configuration:', error);
+            return false;
+        }
     }
 
     /**
@@ -93,10 +135,36 @@ export class GoogleAuthService {
 
             const scheme = Array.isArray(Constants.expoConfig?.scheme)
                 ? Constants.expoConfig.scheme[0]
-                : Constants.expoConfig?.scheme || 'three-three';
+                : Constants.expoConfig?.scheme || 'threethree';
 
-            const redirectUri = AuthSession.makeRedirectUri({
+            const appOwnership = Constants.appOwnership;
+            const isExpoGo = appOwnership === 'expo';
+
+            const isNativeRuntime = Platform.OS === 'ios' || Platform.OS === 'android';
+            let nativeRedirect: string | undefined;
+            if (!isExpoGo && isNativeRuntime && this.config.clientId?.includes('.apps.googleusercontent.com')) {
+                const clientPrefix = this.config.clientId.split('.apps.googleusercontent.com')[0];
+                nativeRedirect = `com.googleusercontent.apps.${clientPrefix}:/oauthredirect`;
+            }
+
+            const shouldUseProxy = isExpoGo;
+
+            // ZAWSZE użyj proxy w Expo Go
+            const redirectUri = isExpoGo
+                ? `https://auth.expo.io/@buber/three_three`  // Bezpośrednio proxy URL
+                : AuthSession.makeRedirectUri({
+                    scheme,
+                    useProxy: false,
+                    native: nativeRedirect,
+                });
+
+            console.log('🔍 OAuth Debug Info:', {
+                clientId: this.config.clientId,
+                redirectUri,
                 scheme,
+                appOwnership,
+                isExpoGo,
+                nativeRedirect,
             });
 
             const request = new AuthSession.AuthRequest({
@@ -231,13 +299,6 @@ export class GoogleAuthService {
             console.error('Sign out failed:', error);
             // Don't throw - sign out should be successful even if revoke fails
         }
-    }
-
-    /**
-     * Validate if Google authentication is properly configured
-     */
-    public validateConfiguration(): boolean {
-        return !!(this.config.clientId && this.discovery);
     }
 }
 

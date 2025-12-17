@@ -103,26 +103,30 @@ export default function SleepScreen() {
                         style: 'destructive',
                         onPress: async () => {
                             try {
+                                // First disable in config
+                                updateSleepConfig({ enabled: false });
+
                                 const analysis = await stopSleepRecording();
                                 if (analysis) {
                                     // Save sleep session to backend
-                                    const sleepRecord = await sleepApiService.createSleepRecord({
+                                    const sleepRecordData = {
                                         sleepDate: new Date().toISOString().split('T')[0],
                                         recordingStartTime: sleepConfig.startTime.toISOString(),
                                         recordingEndTime: new Date().toISOString(),
                                         sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
-                                        sleepQuality: analysis.sleepQuality,
-                                        sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100),
+                                        sleepQualityScore: analysis.sleepQuality,
                                         snoringDetected: analysis.snoringEvents.length > 0,
-                                        snoringIntensity: analysis.snoringEvents.length > 10 ? 'HEAVY' :
-                                            analysis.snoringEvents.length > 5 ? 'MODERATE' :
-                                                analysis.snoringEvents.length > 0 ? 'LIGHT' : 'NONE',
+                                        snoringIntensity: analysis.snoringEvents.length > 10 ? 'heavy' :
+                                            analysis.snoringEvents.length > 5 ? 'moderate' :
+                                                analysis.snoringEvents.length > 0 ? 'light' : 'none',
                                         sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
                                         sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
                                         analysisMetadata: {
                                             sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100)
                                         }
-                                    });
+                                    };
+
+                                    const sleepRecord = await sleepApiService.createSleepRecord(sleepRecordData);
 
                                     // Refresh data to show the new record
                                     await fetchSleepData();
@@ -150,13 +154,39 @@ export default function SleepScreen() {
                     {
                         text: 'Rozpocznij',
                         onPress: async () => {
-                            const success = await startSleepRecording();
-                            if (success) {
-                                Alert.alert(
-                                    '✅ Monitoring rozpoczęty!',
-                                    'Możesz teraz położyć telefon obok łóżka. Nagrywanie będzie działać w tle.',
-                                    [{ text: 'OK' }]
-                                );
+                            try {
+                                console.log('User clicked Rozpocznij button');
+
+                                // First enable in config
+                                updateSleepConfig({ enabled: true });
+
+                                // Small delay to ensure state is updated
+                                await new Promise(resolve => setTimeout(resolve, 100));
+
+                                console.log('Starting sleep recording with current config:', sleepConfig);
+
+                                const success = await startSleepRecording(true); // Force start
+                                console.log('Sleep recording start result:', success);
+
+                                if (success) {
+                                    Alert.alert(
+                                        '✅ Monitoring rozpoczęty!',
+                                        'Możesz teraz położyć telefon obok łóżka. Nagrywanie będzie działać w tle.',
+                                        [{ text: 'OK' }]
+                                    );
+                                } else {
+                                    // Reset config if failed
+                                    updateSleepConfig({ enabled: false });
+                                    Alert.alert(
+                                        'Błąd',
+                                        'Nie udało się rozpocząć monitorowania snu. Sprawdź uprawnienia do mikrofonu.',
+                                        [{ text: 'OK' }]
+                                    );
+                                }
+                            } catch (error) {
+                                console.error('Error starting sleep recording:', error);
+                                updateSleepConfig({ enabled: false });
+                                setError('Błąd podczas rozpoczynania nagrywania snu');
                             }
                         },
                     },

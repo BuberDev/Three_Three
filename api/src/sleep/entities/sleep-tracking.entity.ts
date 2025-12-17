@@ -7,6 +7,7 @@ import {
 } from 'typeorm';
 import { BaseEntity } from '../../common/entities/base.entity';
 import { User } from '../../users/entities/user.entity';
+// import { SleepEvent } from './sleep-event.entity'; // Temporarily disabled for debugging
 
 export enum SnoringIntensity {
     NONE = 'none',
@@ -47,8 +48,8 @@ export class SleepTracking extends BaseEntity {
 
     @Column({
         name: 'snoring_intensity',
-        type: 'enum',
-        enum: SnoringIntensity,
+        type: 'varchar',
+        length: 20,
         default: SnoringIntensity.NONE,
     })
     snoringIntensity: SnoringIntensity;
@@ -59,11 +60,14 @@ export class SleepTracking extends BaseEntity {
     @Column({ name: 'sleep_talking_frequency', default: 0 })
     sleepTalkingFrequency: number;
 
-    @Column({ name: 'sleep_quality_score', nullable: true })
-    sleepQualityScore?: number; // 1-10
+    @Column({ name: 'sleep_quality_score', type: 'decimal', precision: 3, scale: 1, nullable: true })
+    sleepQualityScore?: number; // 1-10 (allows decimals like 8.2)
 
     @Column({ name: 'awakenings_count', default: 0 })
     awakeningsCount: number;
+
+    @Column({ name: 'sleep_efficiency', type: 'integer', nullable: true })
+    sleepEfficiency?: number; // 0-100 percentage
 
     @Column({ name: 'analysis_completed', default: false })
     analysisCompleted: boolean;
@@ -89,7 +93,12 @@ export class SleepTracking extends BaseEntity {
     })
     @JoinColumn({ name: 'user_id' })
     user: User;
-
+    // Sleep events relation - temporarily disabled for debugging
+    // @OneToMany(() => SleepEvent, (sleepEvent) => sleepEvent.sleepTracking, {
+    //     cascade: true,
+    //     eager: false,
+    // })
+    // events: SleepEvent[];
     // Computed properties
     get totalRecordingTime(): number | null {
         if (!this.recordingStartTime || !this.recordingEndTime) return null;
@@ -109,11 +118,6 @@ export class SleepTracking extends BaseEntity {
         if (this.sleepQualityScore <= 5) return 'fair';
         if (this.sleepQualityScore <= 7) return 'good';
         return 'excellent';
-    }
-
-    get sleepEfficiency(): number | null {
-        if (!this.sleepDurationHours || !this.totalRecordingTime) return null;
-        return (this.sleepDurationHours / this.totalRecordingTime) * 100;
     }
 
     // Analysis helper methods
