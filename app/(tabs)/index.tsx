@@ -16,7 +16,6 @@ import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { TimeOfDay } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
 import { router } from 'expo-router';
 
@@ -114,14 +113,6 @@ export default function HomeScreen() {
     return dailyMetrics?.averageEnergyLevel || 4;
   };
 
-  const getCurrentTimeOfDay = (): TimeOfDay => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 8) return TimeOfDay.EARLY_MORNING;
-    if (hour >= 8 && hour < 12) return TimeOfDay.MORNING;
-    if (hour >= 12 && hour < 17) return TimeOfDay.AFTERNOON;
-    if (hour >= 17 && hour < 21) return TimeOfDay.EVENING;
-    return TimeOfDay.NIGHT;
-  };
 
   const getStreakInfo = () => {
     return progressMetrics?.streak || { current: 7, longest: 12, type: 'daily_logging' };
@@ -313,7 +304,6 @@ export default function HomeScreen() {
         <View style={{
           flexDirection: 'row',
           gap: DesignSystem.spacing.sm,
-          paddingHorizontal: DesignSystem.spacing.lg,
           marginBottom: DesignSystem.spacing.md,
         }}>
           <CompactStats
@@ -357,7 +347,6 @@ export default function HomeScreen() {
           elevation={2}
           padding="md"
           style={{
-            marginHorizontal: DesignSystem.spacing.lg,
             marginBottom: DesignSystem.spacing.md
           }}
         >
@@ -412,7 +401,6 @@ export default function HomeScreen() {
           elevation={1}
           padding="md"
           style={{
-            marginHorizontal: DesignSystem.spacing.lg,
             marginBottom: DesignSystem.spacing.md
           }}
         >
@@ -429,7 +417,6 @@ export default function HomeScreen() {
           elevation={1}
           padding="md"
           style={{
-            marginHorizontal: DesignSystem.spacing.lg,
             marginBottom: DesignSystem.spacing.lg
           }}
         >
@@ -548,7 +535,6 @@ export default function HomeScreen() {
           elevation={1}
           padding="md"
           style={{
-            marginHorizontal: DesignSystem.spacing.lg,
             marginBottom: DesignSystem.spacing.lg
           }}
         >
