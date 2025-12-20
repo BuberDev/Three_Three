@@ -30,6 +30,12 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
         startTrial
     } = useAppStore();
 
+    // Format price from cents to main currency units (e.g., 3999 -> 39.99)
+    const formatPrice = (priceInCents: number, currency: string): string => {
+        const priceInMainUnits = priceInCents / 100;
+        return priceInMainUnits.toFixed(2);
+    };
+
     useEffect(() => {
         loadAvailablePlans();
         loadSubscriptionStatus();
@@ -94,7 +100,27 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
     };
 
     const canSelectTrial = () => {
-        return !subscriptionStatus || (!subscriptionStatus.hasActiveSubscription && !subscriptionStatus.isOnTrial);
+        console.log('🔍 Checking trial eligibility:', {
+            hasSubscriptionStatus: !!subscriptionStatus,
+            isOnTrial: subscriptionStatus?.isOnTrial,
+            hasActiveSubscription: subscriptionStatus?.hasActiveSubscription,
+            isPremiumUser: subscriptionStatus?.isPremiumUser,
+            hasUsedTrial: subscriptionStatus?.hasUsedTrial,
+            plan: subscriptionStatus?.plan,
+            status: subscriptionStatus?.status
+        });
+
+        // User can select trial only if:
+        // 1. No subscription status yet (new user), OR
+        // 2. Has subscription status but never used trial before
+        const canSelect = !subscriptionStatus ||
+            (!subscriptionStatus.hasUsedTrial &&
+                !subscriptionStatus.isOnTrial &&
+                !subscriptionStatus.hasActiveSubscription &&
+                !subscriptionStatus.isPremiumUser);
+
+        console.log('🎯 Trial eligibility result:', canSelect);
+        return canSelect;
     };
 
     return (
@@ -158,62 +184,69 @@ export const SubscriptionScreen: React.FC<SubscriptionScreenProps> = ({ onClose 
                 )}
 
                 {/* Available Plans */}
-                {availablePlans.map((plan) => (
-                    <View
-                        key={plan.id}
-                        style={[
-                            styles.planCard,
-                            isCurrentPlan(plan.id) && styles.currentPlanCard
-                        ]}
-                    >
-                        <View style={styles.planHeader}>
-                            <Text style={styles.planName}>{plan.name}</Text>
-                            {plan.metadata?.popularBadge && (
-                                <View style={styles.popularBadge}>
-                                    <Text style={styles.popularBadgeText}>POPULARNE</Text>
+                {availablePlans && availablePlans.length > 0 ? (
+                    availablePlans.map((plan) => (
+                        <View
+                            key={plan.id}
+                            style={[
+                                styles.planCard,
+                                isCurrentPlan(plan.id) && styles.currentPlanCard
+                            ]}
+                        >
+                            <View style={styles.planHeader}>
+                                <Text style={styles.planName}>{plan.name}</Text>
+                                {plan.metadata?.popularBadge && (
+                                    <View style={styles.popularBadge}>
+                                        <Text style={styles.popularBadgeText}>POPULARNE</Text>
+                                    </View>
+                                )}
+                            </View>
+
+                            <Text style={styles.planPrice}>
+                                {formatPrice(plan.price, plan.currency)} {plan.currency.toUpperCase()}
+                                <Text style={styles.priceUnit}> / {plan.interval === 'month' ? 'miesiąc' : 'rok'}</Text>
+                            </Text>
+
+                            {plan.description && (
+                                <Text style={styles.planDescription}>{plan.description}</Text>
+                            )}
+
+                            <View style={styles.featuresContainer}>
+                                {getPlanFeatures(plan).map((feature, index) => (
+                                    <View key={index} style={styles.featureRow}>
+                                        <Text style={styles.featureCheck}>✓</Text>
+                                        <Text style={styles.featureText}>{feature}</Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            {isCurrentPlan(plan.id) ? (
+                                <View style={styles.currentPlanButton}>
+                                    <Text style={styles.currentPlanText}>Aktualny Plan</Text>
                                 </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={[styles.selectButton, styles.premiumButton]}
+                                    onPress={() => handlePlanSelection(plan.id)}
+                                    disabled={isLoading}
+                                >
+                                    {isLoading ? (
+                                        <ActivityIndicator color="#FFFFFF" size="small" />
+                                    ) : (
+                                        <Text style={styles.selectButtonText}>
+                                            Wybierz Plan
+                                        </Text>
+                                    )}
+                                </TouchableOpacity>
                             )}
                         </View>
-
-                        <Text style={styles.planPrice}>
-                            {plan.price} {plan.currency.toUpperCase()}
-                            <Text style={styles.priceUnit}> / {plan.interval === 'month' ? 'miesiąc' : 'rok'}</Text>
-                        </Text>
-
-                        {plan.description && (
-                            <Text style={styles.planDescription}>{plan.description}</Text>
-                        )}
-
-                        <View style={styles.featuresContainer}>
-                            {getPlanFeatures(plan).map((feature, index) => (
-                                <View key={index} style={styles.featureRow}>
-                                    <Text style={styles.featureCheck}>✓</Text>
-                                    <Text style={styles.featureText}>{feature}</Text>
-                                </View>
-                            ))}
-                        </View>
-
-                        {isCurrentPlan(plan.id) ? (
-                            <View style={styles.currentPlanButton}>
-                                <Text style={styles.currentPlanText}>Aktualny Plan</Text>
-                            </View>
-                        ) : (
-                            <TouchableOpacity
-                                style={[styles.selectButton, styles.premiumButton]}
-                                onPress={() => handlePlanSelection(plan.id)}
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <ActivityIndicator color="#FFFFFF" size="small" />
-                                ) : (
-                                    <Text style={styles.selectButtonText}>
-                                        Wybierz Plan
-                                    </Text>
-                                )}
-                            </TouchableOpacity>
-                        )}
+                    ))
+                ) : (
+                    <View style={styles.loadingContainer}>
+                        <ActivityIndicator size="large" color={Colors.primary} />
+                        <Text style={styles.loadingText}>Ładowanie planów...</Text>
                     </View>
-                ))}
+                )}
 
                 <View style={styles.footer}>
                     <Text style={styles.footerText}>
@@ -400,5 +433,16 @@ const styles = StyleSheet.create({
         color: Colors.light.tabIconDefault,
         textAlign: 'center',
         lineHeight: 18,
+    },
+    loadingContainer: {
+        padding: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    loadingText: {
+        marginTop: 16,
+        fontSize: 16,
+        color: Colors.textSecondary,
+        textAlign: 'center',
     },
 });

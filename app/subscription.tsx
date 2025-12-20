@@ -332,3 +332,6 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
 });
+
+// Default export required by Expo Router
+export default SubscriptionScreen;

@@ -29,8 +29,15 @@
               "threethree",
               "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
             ]
+          },
+          {
+            "CFBundleURLSchemes": [
+              "threethree",
+              "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
+            ]
           }
-        ]
+        ],
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -43,7 +50,11 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.buber.threethree",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "output": "static",
@@ -67,12 +78,11 @@
       "expo-audio",
       "expo-asset",
       [
-        "@react-native-google-signin/google-signin",{
-        "iosUrlScheme": "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
-      }
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.523125599576-h5dflih7l07v33bdsjgdsv5r7k7156i3"
+        }
       ]
-      
-
     ],
     "experiments": {
       "typedRoutes": true,

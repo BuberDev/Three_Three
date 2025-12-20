@@ -310,36 +310,67 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
 
     const handleFinalComplete = async () => {
         try {
-            console.log('📋 Final onboarding screen reached');
-
-            // Wait for authentication state to be properly updated (with retries)
-            let authCheckRetries = 0;
-            const maxAuthRetries = 5;
-            let isAuthenticated = false;
-            let user = null;
-
-            while (authCheckRetries < maxAuthRetries) {
-                const state = useAppStore.getState();
-                isAuthenticated = state.isAuthenticated;
-                user = state.user;
-
-                if (isAuthenticated && user) {
-                    console.log('✅ Authentication confirmed on retry', authCheckRetries + 1);
-                    break;
-                }
-
-                authCheckRetries++;
-                console.log(`🔄 Auth check retry ${authCheckRetries}/${maxAuthRetries} - waiting for state update...`);
-
-                if (authCheckRetries < maxAuthRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 200)); // Wait 200ms between retries
-                }
+            // GUARD: Only proceed if we're actually on the completion screen (page 4)
+            if (currentPage !== 4) {
+                console.log(`⚠️ handleFinalComplete called on page ${currentPage}, but should only run on page 4. Ignoring.`);
+                return;
             }
 
-            if (!isAuthenticated || !user) {
-                console.error('❌ Cannot complete onboarding: User not authenticated after retries');
+            console.log('📋 Final onboarding screen reached');
+
+            // Implement circuit breaker pattern for authentication
+            const authCircuitBreaker = {
+                failureCount: 0,
+                threshold: 3,
+                timeout: 5000, // 5 seconds
+                lastFailureTime: 0,
+                state: 'CLOSED' as 'CLOSED' | 'OPEN' | 'HALF_OPEN'
+            };
+
+            const checkAuthenticationWithCircuitBreaker = async (): Promise<boolean> => {
+                const now = Date.now();
+
+                // Check if circuit is open (failed too many times)
+                if (authCircuitBreaker.state === 'OPEN') {
+                    if (now - authCircuitBreaker.lastFailureTime < authCircuitBreaker.timeout) {
+                        console.log('🔒 Authentication circuit breaker is OPEN, skipping check');
+                        return false;
+                    } else {
+                        authCircuitBreaker.state = 'HALF_OPEN';
+                    }
+                }
+
+                try {
+                    const state = useAppStore.getState();
+                    const { isAuthenticated, user } = state;
+
+                    if (isAuthenticated && user) {
+                        // Reset circuit breaker on success
+                        authCircuitBreaker.failureCount = 0;
+                        authCircuitBreaker.state = 'CLOSED';
+                        return true;
+                    }
+
+                    throw new Error('User not authenticated');
+                } catch (error) {
+                    authCircuitBreaker.failureCount++;
+                    authCircuitBreaker.lastFailureTime = now;
+
+                    if (authCircuitBreaker.failureCount >= authCircuitBreaker.threshold) {
+                        authCircuitBreaker.state = 'OPEN';
+                        console.error('🔒 Authentication circuit breaker opened due to repeated failures');
+                    }
+
+                    return false;
+                }
+            };
+
+            // Try authentication check with circuit breaker
+            const isAuthValid = await checkAuthenticationWithCircuitBreaker();
+
+            if (!isAuthValid) {
+                console.error('❌ Cannot complete onboarding: Authentication failed or circuit breaker open');
                 console.log('📋 Redirecting to authentication screen...');
-                // Go back to auth screen (page 1)
                 pagerRef.current?.setPage(1);
                 return;
             }

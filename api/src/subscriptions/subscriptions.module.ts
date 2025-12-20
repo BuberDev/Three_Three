@@ -6,6 +6,7 @@ import { SubscriptionPlanConfig } from './entities/subscription-plan-config.enti
 import { SubscriptionTransaction } from './entities/subscription-transaction.entity';
 import { Subscription } from './entities/subscription.entity';
 import { SubscriptionGuard } from './guards/subscription.guard';
+import { SubscriptionSchedulerService } from './services/subscription-scheduler.service';
 import { SubscriptionsController } from './subscriptions.controller';
 import { SubscriptionsService } from './subscriptions.service';
 
@@ -20,7 +21,7 @@ import { SubscriptionsService } from './subscriptions.service';
         forwardRef(() => PaymentsModule),
     ],
     controllers: [SubscriptionsController],
-    providers: [SubscriptionsService, SubscriptionGuard],
+    providers: [SubscriptionsService, SubscriptionGuard, SubscriptionSchedulerService],
     exports: [SubscriptionsService, SubscriptionGuard],
 })
 export class SubscriptionsModule { }

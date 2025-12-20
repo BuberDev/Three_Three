@@ -27,28 +27,41 @@ export interface StripePaymentIntentData {
 @Injectable()
 export class StripeService {
     private readonly logger = new Logger(StripeService.name);
-    private readonly stripe: Stripe;
+    private readonly stripe: Stripe | null;
+    private readonly isEnabled: boolean;
 
     constructor(private readonly configService: ConfigService) {
         const secretKey = this.configService.get<string>('stripe.secretKey');
 
-        if (!secretKey) {
-            throw new Error('Stripe secret key is required');
+        // Check if Stripe is properly configured (not placeholder)
+        if (!secretKey || secretKey.includes('placeholder')) {
+            this.logger.warn('Stripe is not configured or using placeholder key - payment features disabled');
+            this.stripe = null;
+            this.isEnabled = false;
+        } else {
+            this.stripe = new Stripe(secretKey, {
+                typescript: true,
+            });
+            this.isEnabled = true;
+            this.logger.log('Stripe service initialized successfully');
         }
+    }
 
-        this.stripe = new Stripe(secretKey, {
-            typescript: true,
-        });
+    private ensureStripeEnabled(): void {
+        if (!this.isEnabled || !this.stripe) {
+            throw new Error('Stripe service is not enabled - check your configuration');
+        }
     }
 
     /**
      * Create Stripe customer
      */
     async createCustomer(customerData: StripeCustomerData): Promise<Stripe.Customer> {
+        this.ensureStripeEnabled();
         try {
             this.logger.log(`Creating Stripe customer for email: ${customerData.email}`);
 
-            const customer = await this.stripe.customers.create({
+            const customer = await this.stripe!.customers.create({
                 email: customerData.email,
                 name: customerData.name,
                 metadata: customerData.metadata || {},
@@ -66,9 +79,10 @@ export class StripeService {
      * Get or create Stripe customer
      */
     async getOrCreateCustomer(customerData: StripeCustomerData): Promise<Stripe.Customer> {
+        this.ensureStripeEnabled();
         try {
             // First, try to find existing customer by email
-            const existingCustomers = await this.stripe.customers.list({
+            const existingCustomers = await this.stripe!.customers.list({
                 email: customerData.email,
                 limit: 1,
             });

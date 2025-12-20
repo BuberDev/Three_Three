@@ -7,6 +7,7 @@ import { AISettingsModal } from '@/components/ai/ai-settings-modal';
 import { AnalyticsView } from '@/components/ai/analytics-view';
 import { ChatSessionManager } from '@/components/ai/chat-session-manager';
 import { EnterpriseChatInterface } from '@/components/ai/enterprise-chat-interface';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
@@ -65,125 +66,130 @@ export default function AIScreen() {
     ];
 
     return (
-        <View style={styles.container}>
-            <StatusBar style="light" backgroundColor={Colors.light.tint} />
+        <SubscriptionGate
+            feature="ai_chat"
+            screenTitle="AI Asystent"
+        >
+            <View style={styles.container}>
+                <StatusBar style="light" backgroundColor={Colors.light.tint} />
 
-            {/* Navigation Header */}
-            <View style={[
-                currentView === 'chat' && aiChat.currentSession ? styles.compactHeader : styles.navigationHeader,
-                { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 5 : 10) }
-            ]}>
-                {!(currentView === 'chat' && aiChat.currentSession) && (
-                    <View style={styles.navContent}>
-                        <IconSymbol name="brain" size={32} color={Colors.light.tint} />
-                        <ThemedText variant="headlineMedium" style={styles.navTitle}>
-                            AI Assistant
-                        </ThemedText>
+                {/* Navigation Header */}
+                <View style={[
+                    currentView === 'chat' && aiChat.currentSession ? styles.compactHeader : styles.navigationHeader,
+                    { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 5 : 10) }
+                ]}>
+                    {!(currentView === 'chat' && aiChat.currentSession) && (
+                        <View style={styles.navContent}>
+                            <IconSymbol name="brain" size={32} color={Colors.light.tint} />
+                            <ThemedText variant="headlineMedium" style={styles.navTitle}>
+                                AI Assistant
+                            </ThemedText>
+                        </View>
+                    )}
+
+                    <View style={styles.headerMain}>
+                        <View style={currentView === 'chat' && aiChat.currentSession ? styles.compactTabs : styles.navTabs}>
+                            <TouchableOpacity
+                                style={[styles.navTab, currentView === 'chat' && styles.activeNavTab]}
+                                onPress={() => setCurrentView('chat')}
+                            >
+                                <IconSymbol
+                                    name="message.circle.fill"
+                                    size={currentView === 'chat' && aiChat.currentSession ? 14 : 20}
+                                    color={currentView === 'chat' ? '#fff' : Colors.light.tint}
+                                />
+                                {!(currentView === 'chat' && aiChat.currentSession) && (
+                                    <ThemedText style={[
+                                        styles.navTabText,
+                                        currentView === 'chat' && styles.activeNavTabText
+                                    ]}>
+                                        Chat
+                                    </ThemedText>
+                                )}
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                style={[styles.navTab, currentView === 'analytics' && styles.activeNavTab]}
+                                onPress={() => setCurrentView('analytics')}
+                            >
+                                <IconSymbol
+                                    name="chart.bar.fill"
+                                    size={currentView === 'analytics' && aiChat.currentSession ? 14 : 20}
+                                    color={currentView === 'analytics' ? '#fff' : Colors.light.tint}
+                                />
+                                {!(currentView === 'chat' && aiChat.currentSession) && (
+                                    <ThemedText style={[
+                                        styles.navTabText,
+                                        currentView === 'analytics' && styles.activeNavTabText
+                                    ]}>
+                                        Analiza
+                                    </ThemedText>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        <TouchableOpacity
+                            style={[
+                                styles.settingsButton,
+                                { borderColor: Colors.light.tint + '30' },
+                                currentView === 'chat' && aiChat.currentSession && styles.compactSettingsButton
+                            ]}
+                            onPress={() => setShowSettings(true)}
+                        >
+                            <IconSymbol
+                                name="gear"
+                                size={currentView === 'chat' && aiChat.currentSession ? 14 : 18}
+                                color={Colors.light.tint}
+                            />
+                        </TouchableOpacity>
                     </View>
+                </View>
+
+                {/* Content */}
+                {currentView === 'chat' ? (
+                    <View style={styles.chatContainer}>
+                        {aiChat.currentSession ? (
+                            <EnterpriseChatInterface
+                                session={aiChat.currentSession}
+                                messages={aiChat.messages}
+                                isLoading={aiChat.isLoading}
+                                error={aiChat.error}
+                                onSendMessage={aiChat.sendMessage}
+                                onBackToSessions={() => aiChat.selectSession(null)}
+                                onNewSession={() => aiChat.createSession('Nowa sesja', 'general')}
+                            />
+                        ) : (
+                            <ChatSessionManager
+                                sessions={aiChat.sessions}
+                                onCreateSession={aiChat.createSession}
+                                onSelectSession={aiChat.selectSession}
+                                onDeleteSession={aiChat.deleteSession}
+                            />
+                        )}
+                    </View>
+                ) : (
+                    <AnalyticsView
+                        completionRate={completionRate}
+                        tasks={tasks}
+                        voiceNotes={voiceNotes}
+                        weeklyProgress={weeklyProgress}
+                        mockInsights={mockInsights}
+                        insets={insets}
+                    />
                 )}
 
-                <View style={styles.headerMain}>
-                    <View style={currentView === 'chat' && aiChat.currentSession ? styles.compactTabs : styles.navTabs}>
-                        <TouchableOpacity
-                            style={[styles.navTab, currentView === 'chat' && styles.activeNavTab]}
-                            onPress={() => setCurrentView('chat')}
-                        >
-                            <IconSymbol
-                                name="message.circle.fill"
-                                size={currentView === 'chat' && aiChat.currentSession ? 14 : 20}
-                                color={currentView === 'chat' ? '#fff' : Colors.light.tint}
-                            />
-                            {!(currentView === 'chat' && aiChat.currentSession) && (
-                                <ThemedText style={[
-                                    styles.navTabText,
-                                    currentView === 'chat' && styles.activeNavTabText
-                                ]}>
-                                    Chat
-                                </ThemedText>
-                            )}
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[styles.navTab, currentView === 'analytics' && styles.activeNavTab]}
-                            onPress={() => setCurrentView('analytics')}
-                        >
-                            <IconSymbol
-                                name="chart.bar.fill"
-                                size={currentView === 'analytics' && aiChat.currentSession ? 14 : 20}
-                                color={currentView === 'analytics' ? '#fff' : Colors.light.tint}
-                            />
-                            {!(currentView === 'chat' && aiChat.currentSession) && (
-                                <ThemedText style={[
-                                    styles.navTabText,
-                                    currentView === 'analytics' && styles.activeNavTabText
-                                ]}>
-                                    Analiza
-                                </ThemedText>
-                            )}
-                        </TouchableOpacity>
-                    </View>
-
-                    <TouchableOpacity
-                        style={[
-                            styles.settingsButton,
-                            { borderColor: Colors.light.tint + '30' },
-                            currentView === 'chat' && aiChat.currentSession && styles.compactSettingsButton
-                        ]}
-                        onPress={() => setShowSettings(true)}
-                    >
-                        <IconSymbol
-                            name="gear"
-                            size={currentView === 'chat' && aiChat.currentSession ? 14 : 18}
-                            color={Colors.light.tint}
-                        />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* Content */}
-            {currentView === 'chat' ? (
-                <View style={styles.chatContainer}>
-                    {aiChat.currentSession ? (
-                        <EnterpriseChatInterface
-                            session={aiChat.currentSession}
-                            messages={aiChat.messages}
-                            isLoading={aiChat.isLoading}
-                            error={aiChat.error}
-                            onSendMessage={aiChat.sendMessage}
-                            onBackToSessions={() => aiChat.selectSession(null)}
-                            onNewSession={() => aiChat.createSession('Nowa sesja', 'general')}
-                        />
-                    ) : (
-                        <ChatSessionManager
-                            sessions={aiChat.sessions}
-                            onCreateSession={aiChat.createSession}
-                            onSelectSession={aiChat.selectSession}
-                            onDeleteSession={aiChat.deleteSession}
-                        />
-                    )}
-                </View>
-            ) : (
-                <AnalyticsView
-                    completionRate={completionRate}
-                    tasks={tasks}
-                    voiceNotes={voiceNotes}
-                    weeklyProgress={weeklyProgress}
-                    mockInsights={mockInsights}
-                    insets={insets}
+                {/* AI Settings Modal */}
+                <AISettingsModal
+                    visible={showSettings}
+                    onClose={() => setShowSettings(false)}
+                    selectedModel={aiChat.selectedModel}
+                    onModelSelect={aiChat.setSelectedModel}
+                    availableModels={aiChat.availableModels}
+                    systemInstruction={aiChat.systemInstruction}
+                    onSystemInstructionChange={aiChat.setSystemInstruction}
                 />
-            )}
-
-            {/* AI Settings Modal */}
-            <AISettingsModal
-                visible={showSettings}
-                onClose={() => setShowSettings(false)}
-                selectedModel={aiChat.selectedModel}
-                onModelSelect={aiChat.setSelectedModel}
-                availableModels={aiChat.availableModels}
-                systemInstruction={aiChat.systemInstruction}
-                onSystemInstructionChange={aiChat.setSystemInstruction}
-            />
-        </View>
+            </View>
+        </SubscriptionGate>
     );
 }
 

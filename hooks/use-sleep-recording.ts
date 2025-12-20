@@ -34,15 +34,29 @@ TaskManager.defineTask(SLEEP_RECORDING_TASK, async () => {
     try {
         const audioService = AudioService.getInstance();
         const isNightTime = isCurrentlyNightTime();
+        const isCurrentlyRecording = audioService.isRecording();
 
         if (isNightTime) {
-            // Continue or start recording
-            await audioService.startNocturnalRecording();
+            // Continue or start recording during night time
+            if (!isCurrentlyRecording) {
+                await audioService.startNocturnalRecording();
+            }
         } else {
-            // Stop recording and process
-            const recording = await audioService.stopNocturnalRecording();
-            if (recording) {
-                await processSleepRecording(recording);
+            // During day time, only stop if it's an automatic recording
+            // Don't stop manually started recordings for testing purposes
+            if (isCurrentlyRecording) {
+                // Get current sleep analysis to check if recording has been long enough
+                const currentSession = audioService.getCurrentSleepAnalysis();
+                if (currentSession && currentSession.duration > 0) {
+                    // Only auto-stop if recording has been running for more than 30 seconds
+                    // This prevents immediate stopping of manually started test recordings
+                    if (currentSession.duration > 30000) {
+                        const recording = await audioService.stopNocturnalRecording();
+                        if (recording) {
+                            await processSleepRecording(recording);
+                        }
+                    }
+                }
             }
         }
 

@@ -136,4 +136,80 @@ export class SubscriptionsController {
             cancelSubscriptionDto,
         );
     }
+
+    @Post('admin/process-expired-trials')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Manually process expired trials (admin only)',
+        description: 'Processes all expired trials and returns statistics. Should be protected with admin authentication in production.'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Expired trials processed successfully',
+        schema: {
+            type: 'object',
+            properties: {
+                processedCount: { type: 'number', example: 5 },
+                errors: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        properties: {
+                            id: { type: 'string', example: 'uuid' },
+                            error: { type: 'string', example: 'Error message' }
+                        }
+                    }
+                },
+                duration: { type: 'string', example: '150ms' },
+                timestamp: { type: 'string', example: '2024-01-01T10:00:00Z' }
+            }
+        }
+    })
+    async processExpiredTrials() {
+        const startTime = Date.now();
+        const result = await this.subscriptionsService.processTrialExpiration();
+        const duration = Date.now() - startTime;
+
+        return {
+            ...result,
+            duration: `${duration}ms`,
+            timestamp: new Date().toISOString()
+        };
+    }
+
+    @Get('admin/scheduler-status')
+    @ApiOperation({
+        summary: 'Get subscription scheduler status (admin only)',
+        description: 'Returns the status of subscription-related scheduled jobs'
+    })
+    @ApiResponse({
+        status: 200,
+        description: 'Scheduler status retrieved successfully'
+    })
+    async getSchedulerStatus() {
+        // This would require injecting the scheduler service
+        // For now, return a basic status
+        return {
+            enabled: true,
+            jobs: [],
+            timestamp: new Date().toISOString()
+        };
+    }
+    @Post('test/process-expired-trials')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'TEST: Process expired trials without auth',
+        description: 'REMOVE IN PRODUCTION! Test endpoint to process expired trials'
+    })
+    async testProcessExpiredTrials() {
+        const startTime = Date.now();
+        const result = await this.subscriptionsService.processTrialExpiration();
+        const duration = Date.now() - startTime;
+
+        return {
+            ...result,
+            duration: `${duration}ms`,
+            timestamp: new Date().toISOString()
+        };
+    }
 }

@@ -1,12 +1,14 @@
 import {
+    BadRequestException,
     ConflictException,
     Inject,
     Injectable,
+    Logger,
     NotFoundException,
     forwardRef
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { StripeService } from '../payments/stripe.service';
 import { UsersService } from '../users/users.service';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
@@ -30,6 +32,8 @@ export interface SubscriptionSummary {
 
 @Injectable()
 export class SubscriptionsService {
+    private readonly logger = new Logger(SubscriptionsService.name);
+
     constructor(
         @InjectRepository(Subscription)
         private readonly subscriptionRepository: Repository<Subscription>,
@@ -52,11 +56,11 @@ export class SubscriptionsService {
             throw new ConflictException('User already has an active subscription');
         }
 
-        // Check if user has already used trial
+        // Check if user has already used trial (any status including expired)
         const previousTrial = await this.subscriptionRepository.findOne({
             where: {
                 userId,
-                status: SubscriptionStatus.TRIAL
+                plan: SubscriptionPlan.FREE_TRIAL
             }
         });
 
@@ -103,23 +107,32 @@ export class SubscriptionsService {
         // Check for existing subscription
         const existingSubscription = await this.findActiveSubscriptionByUserId(userId);
 
-        // Get or create Stripe customer
+        // For development mode when Stripe is not configured, return mock subscription error
         let stripeCustomerId = user.metadata?.stripeCustomerId;
-        if (!stripeCustomerId) {
-            const stripeCustomer = await this.stripeService.getOrCreateCustomer({
-                email: user.email,
-                name: user.fullName,
-                metadata: { userId: user.id }
-            });
-            stripeCustomerId = stripeCustomer.id;
+        try {
+            if (!stripeCustomerId) {
+                const stripeCustomer = await this.stripeService.getOrCreateCustomer({
+                    email: user.email,
+                    name: user.fullName,
+                    metadata: { userId: user.id }
+                });
+                stripeCustomerId = stripeCustomer.id;
 
-            // Update user with Stripe customer ID
-            await this.usersService.update(userId, {
-                metadata: {
-                    ...user.metadata,
-                    stripeCustomerId
-                }
-            });
+                // Update user with Stripe customer ID
+                await this.usersService.update(userId, {
+                    metadata: {
+                        ...user.metadata,
+                        stripeCustomerId
+                    }
+                });
+            }
+        } catch (error) {
+            if (error.message.includes('Stripe service is not enabled')) {
+                throw new BadRequestException(
+                    'Payment functionality is currently disabled in development mode. Please contact support for assistance.'
+                );
+            }
+            throw error;
         }
 
         let subscription: Subscription;
@@ -283,31 +296,55 @@ export class SubscriptionsService {
      * Get subscription summary for user
      */
     async getSubscriptionSummary(userId: string): Promise<SubscriptionSummary | null> {
-        const subscription = await this.findActiveSubscriptionByUserId(userId);
-        if (!subscription) {
-            return null;
+        // First check for active subscription
+        const activeSubscription = await this.findActiveSubscriptionByUserId(userId);
+
+        if (activeSubscription) {
+            const planConfig = await this.getPlanConfig(activeSubscription.plan);
+
+            // Calculate usage (simplified - should be actual usage from other services)
+            const usage = {
+                voiceNotesUsed: 0, // TODO: Get from voice notes service
+                sleepSessionsUsed: 0, // TODO: Get from sleep tracking service
+                exportsThisMonth: 0, // TODO: Get from analytics service
+            };
+
+            const daysRemaining = activeSubscription.status === SubscriptionStatus.TRIAL
+                ? activeSubscription.daysUntilTrialEnd
+                : activeSubscription.daysUntilRenewal;
+
+            return {
+                subscription: activeSubscription,
+                planConfig,
+                usage,
+                daysRemaining,
+                nextBillingDate: activeSubscription.currentPeriodEnd
+            };
         }
 
-        const planConfig = await this.getPlanConfig(subscription.plan);
+        // If no active subscription, check if user has ever had a trial (to prevent multiple trials)
+        const hasUsedTrial = await this.subscriptionRepository.findOne({
+            where: { userId, plan: SubscriptionPlan.FREE_TRIAL },
+            order: { createdAt: 'DESC' }
+        });
 
-        // Calculate usage (simplified - should be actual usage from other services)
-        const usage = {
-            voiceNotesUsed: 0, // TODO: Get from voice notes service
-            sleepSessionsUsed: 0, // TODO: Get from sleep tracking service
-            exportsThisMonth: 0, // TODO: Get from analytics service
-        };
+        if (hasUsedTrial) {
+            // User has used trial before, return summary indicating trial was used
+            return {
+                subscription: hasUsedTrial, // Return the expired trial info
+                planConfig: null,
+                usage: {
+                    voiceNotesUsed: 0,
+                    sleepSessionsUsed: 0,
+                    exportsThisMonth: 0,
+                },
+                daysRemaining: 0,
+                nextBillingDate: null
+            };
+        }
 
-        const daysRemaining = subscription.isTrialActive
-            ? subscription.daysUntilTrialEnd
-            : subscription.daysUntilRenewal;
-
-        return {
-            subscription,
-            planConfig,
-            usage,
-            daysRemaining,
-            nextBillingDate: subscription.currentPeriodEnd
-        };
+        // No subscription history at all
+        return null;
     }
 
     /**
@@ -349,18 +386,50 @@ export class SubscriptionsService {
     /**
      * Process trial expiration
      */
-    async processTrialExpiration(): Promise<void> {
+    async processTrialExpiration(): Promise<{
+        processedCount: number;
+        errors: Array<{ id: string; error: string }>;
+    }> {
+        const now = new Date();
         const expiredTrials = await this.subscriptionRepository.find({
             where: {
                 status: SubscriptionStatus.TRIAL,
-                trialEndDate: new Date()
+                trialEndDate: LessThan(now)
             }
         });
 
+        const errors: Array<{ id: string; error: string }> = [];
+        let processedCount = 0;
+
+        this.logger.log(`Found ${expiredTrials.length} expired trials to process`);
+
         for (const subscription of expiredTrials) {
-            subscription.expire();
-            await this.subscriptionRepository.save(subscription);
+            try {
+                this.logger.log(`Expiring trial for user ${subscription.userId}`);
+                subscription.expire();
+                await this.subscriptionRepository.save(subscription);
+                processedCount++;
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                this.logger.error(`Failed to expire trial for subscription ${subscription.id}`, { error: errorMessage });
+                errors.push({ id: subscription.id, error: errorMessage });
+            }
         }
+
+        this.logger.log(`Processed ${processedCount} expired trials with ${errors.length} errors`);
+        return { processedCount, errors };
+    }
+
+    /**
+     * Process trial ending notifications
+     */
+    async processTrialEndingNotifications(): Promise<{
+        processedCount: number;
+        errors: Array<{ id: string; error: string }>;
+    }> {
+        // TODO: Implement notification logic when notification service is ready
+        this.logger.log('Trial ending notifications not yet implemented');
+        return { processedCount: 0, errors: [] };
     }
 
     /**

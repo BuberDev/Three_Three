@@ -10,10 +10,11 @@ import {
 } from 'react-native';
 import { Colors } from '../../constants/theme';
 import { useVoiceRecording } from '../../hooks/use-voice-recording';
+import { AudioRecording } from '../../lib/types';
 
 interface VoiceRecorderProps {
     onComplete?: () => void;
-    onCompleteWithAudio?: (audioUri: string) => Promise<boolean>; // New Enterprise callback
+    onCompleteWithAudio?: (audioRecording: AudioRecording) => Promise<boolean>; // Enterprise callback with duration
     size?: 'small' | 'medium' | 'large';
     disabled?: boolean;
 }
@@ -70,9 +71,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             const result = await recordOnly();
             console.log('🎯 RecordOnly result:', result, 'type:', typeof result);
 
-            if (result && result !== 'recording-started') {
+            if (result && result !== 'recording-started' && typeof result === 'object') {
                 console.log('🎙️ Recording completed, calling onCompleteWithAudio with:', result);
-                // Recording completed (was recording and now stopped), call custom upload
+                // Recording completed, call custom upload with AudioRecording object
                 const success = await onCompleteWithAudio(result);
                 console.log('✅ Upload result:', success);
                 if (success && onComplete) {

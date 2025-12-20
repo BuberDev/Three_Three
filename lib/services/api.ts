@@ -197,7 +197,7 @@ export class ApiService {
 
             // Get file extension to determine proper MIME type
             const fileExtension = audioUri.split('.').pop()?.toLowerCase();
-            let mimeType = 'audio/m4a'; // Default for expo-av recordings
+            let mimeType = 'audio/m4a'; // Default for expo-audio recordings
 
             switch (fileExtension) {
                 case 'm4a':

@@ -63,18 +63,22 @@ export const useVoiceRecording = () => {
             const uri = await audioService.stopRecording();
             if (!uri) return null;
 
-            // Create AudioRecording object with current duration
+            // Get actual duration from AudioService after stopping
+            const duration = audioService.getRecordingDuration();
+
+            // Create AudioRecording object with actual duration
             const recording: AudioRecording = {
                 uri,
-                duration: currentRecording.duration
+                duration
             };
+            console.log('📝 Recording completed:', { uri, duration });
             return recording;
         } catch (error) {
             console.error('Failed to stop recording:', error);
             setError(error instanceof Error ? error.message : 'Failed to stop recording');
             return null;
         }
-    }, [audioService, setError, currentRecording.duration]);
+    }, [audioService, setError]);
 
     const playRecording = useCallback(async (uri: string): Promise<void> => {
         try {
@@ -104,7 +108,7 @@ export const useVoiceRecording = () => {
 
     const processAndUpload = useCallback(async (audioRecording: AudioRecording): Promise<boolean> => {
         try {
-            const success = await uploadVoiceNote(audioRecording.uri);
+            const success = await uploadVoiceNote(audioRecording.uri, audioRecording.duration);
             if (success) {
                 // Delete the local recording after successful upload
                 await deleteRecording(audioRecording.uri);
@@ -132,15 +136,14 @@ export const useVoiceRecording = () => {
     }, [currentRecording.isRecording, startRecording, stopRecording, processAndUpload]);
 
     // NEW: Record only without auto-upload for custom handling
-    const recordOnly = useCallback(async (): Promise<string | null> => {
+    const recordOnly = useCallback(async (): Promise<AudioRecording | string | null> => {
         console.log('🎯 recordOnly called, isRecording:', currentRecording.isRecording);
         if (currentRecording.isRecording) {
-            // Stop recording and return URI
+            // Stop recording and return AudioRecording object
             console.log('🛑 Stopping recording...');
             const recording = await stopRecording();
-            const uri = recording?.uri || null;
-            console.log('📝 Recording stopped, URI:', uri);
-            return uri;
+            console.log('📝 Recording stopped:', recording);
+            return recording;
         } else {
             // Start recording
             console.log('▶️ Starting recording...');

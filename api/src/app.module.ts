@@ -11,6 +11,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { applePayConfig, googlePayConfig, stripeConfig } from './config/payments.config';
 import redisConfig from './config/redis.config';
+import subscriptionConfig from './config/subscription.config';
 
 // Common
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -59,7 +60,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         // Configuration
         ConfigModule.forRoot({
             isGlobal: true,
-            load: [appConfig, databaseConfig, redisConfig, stripeConfig, applePayConfig, googlePayConfig],
+            load: [appConfig, databaseConfig, redisConfig, stripeConfig, applePayConfig, googlePayConfig, subscriptionConfig],
             envFilePath: ['.env.local', '.env'],
         }),
 

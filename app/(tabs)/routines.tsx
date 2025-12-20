@@ -12,6 +12,7 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { Task } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 
 type FilterType = 'all' | 'today' | 'completed' | 'pending';
 
@@ -81,6 +82,7 @@ function AddRoutineModal({ visible, onClose, onSave }: AddRoutineModalProps) {
     if (!visible) return null;
 
     return (
+        
         <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
@@ -470,6 +472,10 @@ export default function RoutinesScreen() {
     );
 
     return (
+          <SubscriptionGate
+              feature="routines_screen"
+              screenTitle="Ekran główny"
+            >
         <View style={styles.container}>
             <StatusBar style="auto" />
 
@@ -658,6 +664,7 @@ export default function RoutinesScreen() {
                 onClose={() => setShowSidebar(false)}
             />
         </View>
+        </SubscriptionGate>
     );
 }
 

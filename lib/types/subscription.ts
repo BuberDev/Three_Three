@@ -32,6 +32,7 @@ export interface SubscriptionStatus {
     trialEndDate?: Date;
     currentPeriodEnd?: Date;
     daysRemaining: number;
+    hasUsedTrial?: boolean; // Whether user has ever used free trial
     usage: {
         voiceNotesUsed: number;
         sleepSessionsUsed: number;

@@ -85,7 +85,7 @@ interface AppStore {
     loadVoiceNotes: () => Promise<void>;
     updateRecordingState: (state: RecordingState) => void;
     setProcessingVoiceNote: (processing: boolean) => void;
-    uploadVoiceNote: (audioUri: string) => Promise<boolean>;
+    uploadVoiceNote: (audioUri: string, duration?: number) => Promise<boolean>;
     uploadVoiceNoteWithContext: (audioUri: string, context?: string) => Promise<boolean>;
     uploadSleepRecording: (sleepData: any) => Promise<boolean>;
     getSleepInsights: (sleepTrackingId: string) => Promise<any>;
@@ -121,6 +121,7 @@ interface AppStore {
     clearError: () => void;
     setOnboardingComplete: () => void;
     logout: () => Promise<void>;
+    refreshAuthToken: () => Promise<boolean>;
     refreshUser: () => Promise<void>;
 }
 
@@ -211,29 +212,72 @@ export const useAppStore = create<AppStore>()(
             // Subscription actions
             loadSubscriptionStatus: async () => {
                 try {
+                    console.log('🔍 Loading subscription status...');
+                    const { accessToken, refreshToken } = get();
+
+                    // If no tokens, user is not authenticated - set null status
+                    if (!accessToken) {
+                        console.log('🚫 No access token, setting null subscription status');
+                        set({ subscriptionStatus: null });
+                        return;
+                    }
+
                     const apiService = ApiService.getInstance();
                     const response = await apiService.makeRequest('/subscriptions/current');
+
+                    console.log('📊 Subscription status API response:', {
+                        success: response.success,
+                        hasData: !!response.data,
+                        error: response.error
+                    });
+
                     if (response.success && response.data) {
                         const summary = response.data as any; // SubscriptionSummary from backend
+                        console.log('📋 Raw subscription summary:', summary);
+
+                        // Handle nested API response (data.data structure)
+                        const actualSummary = summary.data?.data || summary.data || summary;
+                        console.log('🔍 Actual subscription summary:', actualSummary);
+                        console.log('🔍 Subscription object details:', {
+                            hasSubscription: !!actualSummary.subscription,
+                            subscriptionPlan: actualSummary.subscription?.plan,
+                            subscriptionStatus: actualSummary.subscription?.status,
+                            subscriptionTrialEndDate: actualSummary.subscription?.trialEndDate,
+                            fullSubscription: actualSummary.subscription
+                        });
 
                         // Map SubscriptionSummary to SubscriptionStatus for frontend
                         const status: SubscriptionStatus = {
-                            hasActiveSubscription: !!summary.subscription,
-                            isOnTrial: summary.subscription?.isTrialActive || false,
-                            isPremiumUser: summary.subscription?.plan === 'PREMIUM' || false,
-                            plan: summary.subscription?.plan || null,
-                            status: summary.subscription?.status || null,
-                            trialEndDate: summary.subscription?.trialEndDate ? new Date(summary.subscription.trialEndDate) : undefined,
-                            currentPeriodEnd: summary.subscription?.currentPeriodEnd ? new Date(summary.subscription.currentPeriodEnd) : undefined,
-                            daysRemaining: summary.daysRemaining || 0,
-                            usage: summary.usage || {
+                            hasActiveSubscription: actualSummary.subscription?.status === 'active' || actualSummary.subscription?.status === 'trial',
+                            isOnTrial: actualSummary.subscription?.status === 'trial',
+                            isPremiumUser: actualSummary.subscription?.plan === 'monthly_pro' || actualSummary.subscription?.plan === 'annual_pro' || false,
+                            plan: actualSummary.subscription?.plan || null,
+                            status: actualSummary.subscription?.status || null,
+                            trialEndDate: actualSummary.subscription?.trialEndDate ? new Date(actualSummary.subscription.trialEndDate) : undefined,
+                            currentPeriodEnd: actualSummary.subscription?.currentPeriodEnd ? new Date(actualSummary.subscription.currentPeriodEnd) : undefined,
+                            daysRemaining: actualSummary.daysRemaining || 0,
+                            hasUsedTrial: !!actualSummary.subscription && (actualSummary.subscription.plan === 'free_trial' || actualSummary.subscription.trialEndDate), // User has used trial if they have any subscription with trial data
+                            usage: actualSummary.usage || {
                                 voiceNotesUsed: 0,
                                 sleepSessionsUsed: 0,
                                 exportsThisMonth: 0
                             }
                         };
 
+                        console.log('✅ Mapped subscription status:', status);
                         set({ subscriptionStatus: status });
+                    } else if (response.error?.code === 'HTTP_401' || response.error?.code === 'AUTH_EXPIRED') {
+                        // Token expired - try to refresh or logout
+                        console.log('🔄 Access token expired, attempting refresh...');
+                        const refreshSuccess = await get().refreshAuthToken();
+                        if (refreshSuccess) {
+                            // Retry after successful refresh
+                            return get().loadSubscriptionStatus();
+                        } else {
+                            // Refresh failed - logout user
+                            console.log('❌ Token refresh failed, logging out user');
+                            await get().logout();
+                        }
                     } else {
                         set({ subscriptionStatus: null });
                     }
@@ -245,14 +289,138 @@ export const useAppStore = create<AppStore>()(
 
             loadAvailablePlans: async () => {
                 try {
+                    console.log('🔍 loadAvailablePlans: Starting to load plans...');
+                    const { accessToken } = get();
+
+                    // If no token, provide default plans (user can still see pricing)
+                    if (!accessToken) {
+                        console.log('📋 No auth token, using default subscription plans');
+                        const defaultPlans: SubscriptionPlan[] = [
+                            {
+                                id: 'monthly_pro',
+                                name: 'Premium Miesięczny',
+                                description: 'Miesięczna subskrypcja Premium z pełnym dostępem',
+                                price: 39.99, // 39.99 PLN
+                                currency: 'pln',
+                                interval: 'month',
+                                stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
+                                recommended: true,
+                                features: [
+                                    'Nieograniczony AI asystent zdrowia',
+                                    'Zaawansowane analityki i insights',
+                                    'Monitor snu z analizą AI',
+                                    'Eksport danych w każdym formacie',
+                                    'Priorytetowe wsparcie 24/7'
+                                ]
+                            },
+                            {
+                                id: 'annual_pro',
+                                name: 'Premium Roczny',
+                                description: 'Roczna subskrypcja Premium - oszczędź 20%',
+                                price: 399.99, // 399.99 PLN (savings vs monthly)
+                                currency: 'pln',
+                                interval: 'year',
+                                stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
+                                recommended: false,
+                                features: [
+                                    'Wszystko z planu miesięcznego',
+                                    'Oszczędność 120 PLN rocznie',
+                                    'Pierwszeństwo w nowych funkcjach',
+                                    'Dedykowany success manager'
+                                ]
+                            }
+                        ];
+                        console.log('✅ Setting default plans:', defaultPlans.length, 'plans');
+                        set({ availablePlans: defaultPlans });
+                        return;
+                    }
+
+                    console.log('🌐 Making API request to /subscriptions/plans...');
                     const apiService = ApiService.getInstance();
                     const response = await apiService.makeRequest('/subscriptions/plans');
-                    if (response.success) {
-                        set({ availablePlans: response.data as SubscriptionPlan[] });
+
+                    console.log('📊 API Response:', {
+                        success: response.success,
+                        hasData: !!response.data,
+                        dataType: typeof response.data,
+                        dataKeys: response.data ? Object.keys(response.data) : null,
+                        responseStructure: response
+                    });
+
+                    if (response.success && response.data) {
+                        // Handle nested API response structure (data.data)
+                        const plans = (response.data as any)?.data || response.data;
+                        console.log('📋 Extracted plans:', {
+                            plansType: typeof plans,
+                            isArray: Array.isArray(plans),
+                            plansLength: Array.isArray(plans) ? plans.length : 'N/A',
+                            firstPlan: Array.isArray(plans) && plans.length > 0 ? plans[0] : null
+                        });
+
+                        if (Array.isArray(plans) && plans.length > 0) {
+                            // Convert backend plan configs to frontend format
+                            const formattedPlans: SubscriptionPlan[] = plans.map((planConfig: any) => ({
+                                id: planConfig.plan, // Use backend plan enum value
+                                name: planConfig.name,
+                                description: planConfig.description,
+                                price: Math.round(parseFloat(planConfig.price) * 100), // Convert to cents
+                                currency: planConfig.currency.toLowerCase(),
+                                interval: planConfig.billingPeriod,
+                                stripePriceId: planConfig.stripePriceId || '',
+                                recommended: planConfig.metadata?.popularBadge || false,
+                                features: Array.isArray(planConfig.features) ? planConfig.features : []
+                            }));
+                            console.log('✅ Setting formatted API plans:', formattedPlans.length, 'plans');
+                            set({ availablePlans: formattedPlans });
+                        } else {
+                            console.warn('⚠️ Plans data is not a valid array, using default plans');
+                            // Fallback to default plans
+                            const defaultPlans: SubscriptionPlan[] = [
+                                {
+                                    id: 'monthly_pro',
+                                    name: 'Premium Miesięczny',
+                                    description: 'Miesięczna subskrypcja Premium z pełnym dostępem',
+                                    price: 3999,
+                                    currency: 'pln',
+                                    interval: 'month',
+                                    stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
+                                    recommended: true,
+                                    features: ['AI asystent', 'Zaawansowane analityki', 'Monitor snu', 'Eksport danych', 'Wsparcie 24/7']
+                                },
+                                {
+                                    id: 'annual_pro',
+                                    name: 'Premium Roczny',
+                                    description: 'Roczna subskrypcja Premium - oszczędź 20%',
+                                    price: 39999,
+                                    currency: 'pln',
+                                    interval: 'year',
+                                    stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
+                                    recommended: false,
+                                    features: ['Wszystko z planu miesięcznego', 'Oszczędność 20%', 'Dedykowany support']
+                                }
+                            ];
+                            set({ availablePlans: defaultPlans });
+                        }
+                    } else if (response.error?.code === 'HTTP_401' || response.error?.code === 'AUTH_EXPIRED') {
+                        // Token expired - try to refresh
+                        const refreshSuccess = await get().refreshAuthToken();
+                        if (refreshSuccess) {
+                            return get().loadAvailablePlans();
+                        } else {
+                            // Use default plans as fallback
+                            console.log('🔄 Using default plans after auth failure');
+                            await get().loadAvailablePlans(); // This will use no-token path above
+                        }
+                    } else {
+                        // Backend error - use default plans
+                        await get().loadAvailablePlans();
                     }
                 } catch (error) {
                     console.error('Failed to load available plans:', error);
-                    set({ availablePlans: [] });
+                    // Always provide fallback plans so UI doesn't break
+                    if (!get().availablePlans || get().availablePlans.length === 0) {
+                        await get().loadAvailablePlans(); // This will use no-token path
+                    }
                 }
             },
 
@@ -274,28 +442,29 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
-            createSubscription: async (stripePriceId: string, paymentMethodType?: string) => {
+            createSubscription: async (planId: string, paymentMethodId?: string) => {
                 try {
-                    const { accessToken } = get();
-                    if (!accessToken) return false;
+                    console.log('🔄 Creating subscription for plan:', planId);
+                    const apiService = ApiService.getInstance();
 
-                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/subscriptions`, {
+                    // Send only plan ID - backend handles stripePriceId lookup
+                    const requestBody = {
+                        plan: planId,
+                        ...(paymentMethodId && { paymentMethodId })
+                    };
+
+                    console.log('📤 Subscription request:', requestBody);
+                    const response = await apiService.makeRequest('/subscriptions', {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`,
-                        },
-                        body: JSON.stringify({
-                            stripePriceId,
-                            paymentMethodType
-                        }),
+                        body: JSON.stringify(requestBody)
                     });
 
-                    if (response.ok) {
-                        const subscription = await response.json();
-                        set({ subscription: subscription });
+                    if (response.success) {
+                        console.log('✅ Subscription created successfully');
+                        await get().loadSubscriptionStatus();
                         return true;
                     }
+                    console.error('❌ Subscription creation failed:', response.error);
                     return false;
                 } catch (error) {
                     console.error('Failed to create subscription:', error);
@@ -684,7 +853,7 @@ export const useAppStore = create<AppStore>()(
 
             setProcessingVoiceNote: (isProcessingVoiceNote) => set({ isProcessingVoiceNote }),
 
-            uploadVoiceNote: async (audioUri: string) => {
+            uploadVoiceNote: async (audioUri: string, duration?: number) => {
                 const { user, setError, setProcessingVoiceNote, addVoiceNote, loadVoiceNotes, loadTasks, currentRecording } = get();
                 if (!user) {
                     setError('User not authenticated');
@@ -697,8 +866,12 @@ export const useAppStore = create<AppStore>()(
                     setError(null);
                     console.log('🎙️ Starting voice note upload...');
 
+                    // Use passed duration or fallback to current recording duration
+                    const finalDuration = duration !== undefined ? duration : currentRecording.duration;
+                    console.log('📊 Using duration for upload:', finalDuration);
+
                     // Add a timeout wrapper around the API call - Extended for voice processing
-                    const uploadPromise = ApiService.getInstance().uploadVoiceNote(audioUri, currentRecording.duration);
+                    const uploadPromise = ApiService.getInstance().uploadVoiceNote(audioUri, finalDuration);
                     const timeoutPromise = new Promise<never>((_, reject) => {
                         setTimeout(() => {
                             reject(new Error('Upload timeout after 60 seconds'));
@@ -721,8 +894,8 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         console.log('✅ Voice note uploaded successfully!');
 
-                        // Backend response structure
-                        const voiceNoteData = (response.data as any)?.voiceNote;
+                        // Backend response structure: response.data.data.data contains the voice note
+                        const voiceNoteData = (response.data as any)?.data?.data;
                         console.log('🔍 Voice note object structure:', {
                             id: voiceNoteData?.id,
                             userId: voiceNoteData?.userId,
@@ -1430,8 +1603,16 @@ export const useAppStore = create<AppStore>()(
                     let authenticatedUser = null;
 
                     try {
+                        console.log('🔍 Loading tokens from AsyncStorage...');
                         const accessToken = await AsyncStorage.getItem('@access_token');
                         const refreshToken = await AsyncStorage.getItem('@refresh_token');
+
+                        console.log('📋 Token status:', {
+                            hasAccessToken: !!accessToken,
+                            hasRefreshToken: !!refreshToken,
+                            accessTokenLength: accessToken?.length || 0,
+                            refreshTokenLength: refreshToken?.length || 0
+                        });
 
                         if (accessToken && refreshToken) {
                             loadedTokens = { accessToken, refreshToken };
@@ -1440,44 +1621,71 @@ export const useAppStore = create<AppStore>()(
                             const apiService = ApiService.getInstance();
                             apiService.setAuthToken(accessToken);
 
-                            // Try to fetch user profile to verify token is still valid
+                            // Quick health check before verifying token
+                            console.log('🏥 Checking backend health before token verification...');
+                            let backendHealthy = false;
                             try {
-                                console.log('🔍 Verifying stored token with backend...');
+                                const healthResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/health`, {
+                                    method: 'GET',
+                                    timeout: 5000
+                                });
 
-                                // 🔧 Development mode: Skip token validation and use fallback
-                                if (__DEV__) {
-                                    console.log('🔧 DEV MODE: Skipping token validation, using fallback user');
-                                    authenticatedUser = {
-                                        id: 'a6f7b841-208d-4b2c-aba0-fa1dfdd35bb3',
-                                        email: 'dawid.bubernak@gmail.com',
-                                        authProvider: 'email' as const,
-                                        createdAt: new Date().toISOString(),
-                                        updatedAt: new Date().toISOString()
-                                    };
-                                    console.log('✅ DEV User authenticated:', authenticatedUser.id);
+                                if (healthResponse.ok) {
+                                    console.log('✅ Backend is healthy, proceeding with token verification');
+                                    backendHealthy = true;
                                 } else {
-                                    // Production: Validate token with backend
+                                    throw new Error(`Backend unhealthy: ${healthResponse.status}`);
+                                }
+                            } catch (healthError) {
+                                console.log('❌ Backend health check failed:', healthError.message);
+                                console.log('🔄 Skipping token verification, using fallback from token');
+                                backendHealthy = false;
+                            }
+
+                            if (!backendHealthy) {
+                                // Use token data as fallback
+                                try {
+                                    const tokenPayload = JSON.parse(atob(accessToken.split('.')[1]));
+                                    if (tokenPayload.sub && tokenPayload.email) {
+                                        authenticatedUser = {
+                                            id: tokenPayload.sub,
+                                            email: tokenPayload.email,
+                                            authProvider: tokenPayload.authProvider || 'local'
+                                        };
+                                        console.log('📋 Using token payload due to backend unavailability');
+                                    }
+                                } catch (tokenError) {
+                                    console.log('❌ Could not parse token during fallback');
+                                }
+                            } else {
+                                // Try to fetch user profile to verify token is still valid
+                                try {
+                                    console.log('🔍 Verifying stored token with backend...');
+                                    console.log('🔗 API URL:', process.env.EXPO_PUBLIC_API_URL);
+
+                                    // Validate token with backend
                                     const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
                                         method: 'POST',
                                         headers: {
                                             'Authorization': `Bearer ${accessToken}`,
                                             'Content-Type': 'application/json',
                                         },
+                                        timeout: 10000 // 10 second timeout
                                     });
 
                                     console.log('🔍 Token verification response:', {
                                         status: response.status,
                                         statusText: response.statusText,
                                         ok: response.ok,
-                                        headers: Object.fromEntries(response.headers.entries())
+                                        url: response.url
                                     });
 
                                     if (response.ok) {
                                         const responseData = await response.json();
                                         console.log('🔍 Raw auth response:', responseData);
 
-                                        // Handle different response formats
-                                        authenticatedUser = responseData.user || responseData.data || responseData;
+                                        // Backend returns User object directly, not wrapped in data
+                                        authenticatedUser = responseData;
 
                                         console.log('🔍 Parsed user object:', {
                                             id: authenticatedUser?.id,
@@ -1487,7 +1695,10 @@ export const useAppStore = create<AppStore>()(
                                         });
 
                                         if (authenticatedUser && authenticatedUser.id) {
-                                            console.log('✅ User authenticated from stored token:', authenticatedUser.id);
+                                            console.log('✅ User authenticated from stored token:', authenticatedUser.email);
+                                            // Update API service auth token to ensure it's set
+                                            const apiService = ApiService.getInstance();
+                                            apiService.setAuthToken(accessToken);
                                         } else {
                                             console.log('❌ Authentication response missing user data');
                                             authenticatedUser = null;
@@ -1497,22 +1708,76 @@ export const useAppStore = create<AppStore>()(
                                         }
                                     } else {
                                         const errorData = await response.text().catch(() => 'No error data');
-                                        console.log('❌ Stored token is invalid, clearing...', {
+                                        console.log('❌ Stored token is invalid, attempting refresh...', {
                                             status: response.status,
                                             statusText: response.statusText,
                                             error: errorData
                                         });
-                                        await AsyncStorage.removeItem('@access_token');
-                                        await AsyncStorage.removeItem('@refresh_token');
-                                        loadedTokens = { accessToken: null, refreshToken: null };
+
+                                        // Try to refresh token before clearing
+                                        if (refreshToken && (response.status === 401 || response.status === 403)) {
+                                            console.log('🔄 Attempting token refresh during initialization...');
+                                            const refreshResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/refresh`, {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ refreshToken }),
+                                            });
+
+                                            if (refreshResponse.ok) {
+                                                const refreshData = await refreshResponse.json();
+                                                const newAccessToken = refreshData.accessToken;
+
+                                                if (newAccessToken) {
+                                                    console.log('✅ Token refreshed during initialization');
+                                                    loadedTokens.accessToken = newAccessToken;
+                                                    await AsyncStorage.setItem('@access_token', newAccessToken);
+
+                                                    // Retry auth check with new token
+                                                    const retryResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
+                                                        method: 'POST',
+                                                        headers: { 'Authorization': `Bearer ${newAccessToken}` },
+                                                    });
+
+                                                    if (retryResponse.ok) {
+                                                        const userData = await retryResponse.json();
+                                                        authenticatedUser = userData.user || userData.data || userData;
+                                                        console.log('✅ User authenticated after token refresh');
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // If refresh failed or wasn't attempted, clear tokens
+                                        if (!authenticatedUser) {
+                                            console.log('❌ Final auth failure, clearing tokens');
+                                            await AsyncStorage.removeItem('@access_token');
+                                            await AsyncStorage.removeItem('@refresh_token');
+                                            loadedTokens = { accessToken: null, refreshToken: null };
+                                        }
+                                    }
+                                } catch (tokenVerificationError) {
+                                    console.log('❌ Token verification failed:', tokenVerificationError);
+                                    // Use fallback from token on verification errors
+                                    if (accessToken) {
+                                        try {
+                                            const tokenPayload = JSON.parse(atob(accessToken.split('.')[1]));
+                                            if (tokenPayload.sub && tokenPayload.email) {
+                                                authenticatedUser = {
+                                                    id: tokenPayload.sub,
+                                                    email: tokenPayload.email,
+                                                    authProvider: tokenPayload.authProvider || 'local'
+                                                };
+                                                console.log('📋 Using token payload as fallback after verification failure');
+                                            }
+                                        } catch (tokenError) {
+                                            console.log('❌ Could not parse token, clearing tokens');
+                                            await AsyncStorage.removeItem('@access_token');
+                                            await AsyncStorage.removeItem('@refresh_token');
+                                            loadedTokens = { accessToken: null, refreshToken: null };
+                                        }
                                     }
                                 }
-                            } catch (error) {
-                                console.log('❌ Failed to verify token, clearing...', error);
-                                await AsyncStorage.removeItem('@access_token');
-                                await AsyncStorage.removeItem('@refresh_token');
-                                loadedTokens = { accessToken: null, refreshToken: null };
-                            }
+                            } // End of backendHealthy check
                         }
                     } catch (error) {
                         console.error('Error loading tokens:', error);
@@ -1661,6 +1926,53 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
+            refreshAuthToken: async (): Promise<boolean> => {
+                try {
+                    const { refreshToken: currentRefreshToken } = get();
+
+                    if (!currentRefreshToken) {
+                        console.log('❌ No refresh token available');
+                        return false;
+                    }
+
+                    console.log('🔄 Attempting to refresh access token...');
+
+                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/refresh`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            refreshToken: currentRefreshToken
+                        }),
+                    });
+
+                    if (response.ok) {
+                        const data = await response.json();
+                        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = data;
+
+                        if (newAccessToken) {
+                            console.log('✅ Token refresh successful');
+
+                            // Update tokens in store and storage
+                            await get().setTokens(newAccessToken, newRefreshToken || currentRefreshToken);
+
+                            // Update API service
+                            const apiService = ApiService.getInstance();
+                            apiService.setAuthToken(newAccessToken);
+
+                            return true;
+                        }
+                    } else {
+                        console.log('❌ Token refresh failed:', response.status);
+                    }
+                } catch (error) {
+                    console.error('❌ Token refresh error:', error);
+                }
+
+                return false;
+            },
+
             refreshUser: async () => {
                 const { accessToken } = get();
                 if (!accessToken) return;
@@ -1695,6 +2007,7 @@ export const useAppStore = create<AppStore>()(
             }),
         }
     )
+
 );
 
 

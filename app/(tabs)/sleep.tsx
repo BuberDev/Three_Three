@@ -23,6 +23,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useSleepRecording } from '@/hooks/use-sleep-recording';
 import { sleepApiService, SleepRecord, SleepStats } from '@/lib/services/sleep-api';
 import { useAppStore } from '@/stores/app-store';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 
 export default function SleepScreen() {
     const colorScheme = useColorScheme();
@@ -91,107 +92,127 @@ export default function SleepScreen() {
         fetchSleepData(true);
     }, [fetchSleepData]);
 
+    // Add state to track if we're in the middle of manual start/stop operations
+    const [isManualOperation, setIsManualOperation] = useState(false);
+
     const handleToggleSleepRecording = async () => {
-        if (isRecordingEnabled) {
-            Alert.alert(
-                'Zatrzymać nagrywanie snu?',
-                'Czy na pewno chcesz zatrzymać monitorowanie snu?',
-                [
-                    { text: 'Anuluj', style: 'cancel' },
-                    {
-                        text: 'Zatrzymaj',
-                        style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                // First disable in config
-                                updateSleepConfig({ enabled: false });
+        // Prevent feedback loops during manual operations
+        if (isManualOperation) {
+            return;
+        }
 
-                                const analysis = await stopSleepRecording();
-                                if (analysis) {
-                                    // Save sleep session to backend
-                                    const sleepRecordData = {
-                                        sleepDate: new Date().toISOString().split('T')[0],
-                                        recordingStartTime: sleepConfig.startTime.toISOString(),
-                                        recordingEndTime: new Date().toISOString(),
-                                        sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
-                                        sleepQualityScore: analysis.sleepQuality,
-                                        snoringDetected: analysis.snoringEvents.length > 0,
-                                        snoringIntensity: analysis.snoringEvents.length > 10 ? 'heavy' :
-                                            analysis.snoringEvents.length > 5 ? 'moderate' :
-                                                analysis.snoringEvents.length > 0 ? 'light' : 'none',
-                                        sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
-                                        sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
-                                        analysisMetadata: {
-                                            sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100)
-                                        }
-                                    };
+        setIsManualOperation(true);
 
-                                    const sleepRecord = await sleepApiService.createSleepRecord(sleepRecordData);
-
-                                    // Refresh data to show the new record
-                                    await fetchSleepData();
-
-                                    Alert.alert(
-                                        '🌅 Analiza snu zakończona!',
-                                        `Jakość snu: ${analysis.sleepQuality}/10\nCzas snu: ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin\nChrapanie: ${analysis.snoringEvents.length} epizodów`,
-                                        [{ text: 'Zobacz więcej', onPress: () => fetchSleepData() }, { text: 'OK' }]
-                                    );
-                                }
-                            } catch (error) {
-                                console.error('Error stopping sleep recording:', error);
-                                setError('Błąd podczas zatrzymywania nagrywania snu');
-                            }
-                        },
-                    },
-                ]
-            );
-        } else {
-            Alert.alert(
-                '🌙 Rozpocząć monitoring snu?',
-                'Aplikacja będzie nagrywać dźwięki przez całą noc aby wykryć chrapanie, mówienie przez sen i analizować jakość snu.',
-                [
-                    { text: 'Anuluj', style: 'cancel' },
-                    {
-                        text: 'Rozpocznij',
-                        onPress: async () => {
-                            try {
-                                console.log('User clicked Rozpocznij button');
-
-                                // First enable in config
-                                updateSleepConfig({ enabled: true });
-
-                                // Small delay to ensure state is updated
-                                await new Promise(resolve => setTimeout(resolve, 100));
-
-                                console.log('Starting sleep recording with current config:', sleepConfig);
-
-                                const success = await startSleepRecording(true); // Force start
-                                console.log('Sleep recording start result:', success);
-
-                                if (success) {
-                                    Alert.alert(
-                                        '✅ Monitoring rozpoczęty!',
-                                        'Możesz teraz położyć telefon obok łóżka. Nagrywanie będzie działać w tle.',
-                                        [{ text: 'OK' }]
-                                    );
-                                } else {
-                                    // Reset config if failed
+        try {
+            if (isRecordingEnabled) {
+                Alert.alert(
+                    'Zatrzymać nagrywanie snu?',
+                    'Czy na pewno chcesz zatrzymać monitorowanie snu?',
+                    [
+                        { text: 'Anuluj', style: 'cancel' },
+                        {
+                            text: 'Zatrzymaj',
+                            style: 'destructive',
+                            onPress: async () => {
+                                try {
+                                    // First disable in config
                                     updateSleepConfig({ enabled: false });
-                                    Alert.alert(
-                                        'Błąd',
-                                        'Nie udało się rozpocząć monitorowania snu. Sprawdź uprawnienia do mikrofonu.',
-                                        [{ text: 'OK' }]
-                                    );
+
+                                    const analysis = await stopSleepRecording();
+                                    if (analysis) {
+                                        // Save sleep session to backend
+                                        const sleepRecordData = {
+                                            sleepDate: new Date().toISOString().split('T')[0],
+                                            recordingStartTime: sleepConfig.startTime.toISOString(),
+                                            recordingEndTime: new Date().toISOString(),
+                                            sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
+                                            sleepQualityScore: analysis.sleepQuality,
+                                            snoringDetected: analysis.snoringEvents.length > 0,
+                                            snoringIntensity: analysis.snoringEvents.length > 10 ? 'heavy' :
+                                                analysis.snoringEvents.length > 5 ? 'moderate' :
+                                                    analysis.snoringEvents.length > 0 ? 'light' : 'none',
+                                            sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
+                                            sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
+                                            analysisMetadata: {
+                                                sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100)
+                                            }
+                                        };
+
+                                        const sleepRecord = await sleepApiService.createSleepRecord(sleepRecordData);
+
+                                        // Refresh data to show the new record
+                                        await fetchSleepData();
+
+                                        Alert.alert(
+                                            '🌅 Analiza snu zakończona!',
+                                            `Jakość snu: ${analysis.sleepQuality}/10\nCzas snu: ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin\nChrapanie: ${analysis.snoringEvents.length} epizodów`,
+                                            [{ text: 'Zobacz więcej', onPress: () => fetchSleepData() }, { text: 'OK' }]
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error('Error stopping sleep recording:', error);
+                                    setError('Błąd podczas zatrzymywania nagrywania snu');
                                 }
-                            } catch (error) {
-                                console.error('Error starting sleep recording:', error);
-                                updateSleepConfig({ enabled: false });
-                                setError('Błąd podczas rozpoczynania nagrywania snu');
-                            }
+                            },
                         },
-                    },
-                ]
-            );
+                    ]
+                );
+            } else {
+                Alert.alert(
+                    '🌙 Rozpocząć monitoring snu?',
+                    'Aplikacja będzie nagrywać dźwięki przez całą noc aby wykryć chrapanie, mówienie przez sen i analizować jakość snu.',
+                    [
+                        {
+                            text: 'Anuluj',
+                            style: 'cancel',
+                            onPress: () => setIsManualOperation(false)
+                        },
+                        {
+                            text: 'Rozpocznij',
+                            onPress: async () => {
+                                try {
+                                    console.log('User clicked Rozpocznij button');
+
+                                    // First enable in config
+                                    updateSleepConfig({ enabled: true });
+
+                                    // Small delay to ensure state is updated
+                                    await new Promise(resolve => setTimeout(resolve, 100));
+
+                                    console.log('Starting sleep recording with current config:', sleepConfig);
+
+                                    const success = await startSleepRecording(true); // Force start
+                                    console.log('Sleep recording start result:', success);
+
+                                    if (success) {
+                                        Alert.alert(
+                                            '✅ Monitoring rozpoczęty!',
+                                            'Możesz teraz położyć telefon obok łóżka. Nagrywanie będzie działać w tle.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    } else {
+                                        // Reset config if failed
+                                        updateSleepConfig({ enabled: false });
+                                        Alert.alert(
+                                            'Błąd',
+                                            'Nie udało się rozpocząć monitorowania snu. Sprawdź uprawnienia do mikrofonu.',
+                                            [{ text: 'OK' }]
+                                        );
+                                    }
+                                } catch (error) {
+                                    console.error('Error starting sleep recording:', error);
+                                    updateSleepConfig({ enabled: false });
+                                    setError('Błąd podczas rozpoczynania nagrywania snu');
+                                } finally {
+                                    setIsManualOperation(false);
+                                }
+                            },
+                        },
+                    ]
+                );
+            }
+        } finally {
+            setIsManualOperation(false);
         }
     };
 
@@ -274,6 +295,10 @@ export default function SleepScreen() {
     }
 
     return (
+            <SubscriptionGate
+              feature="sleep_screen"
+              screenTitle="Ekran główny"
+            >
         <ModernView style={{ flex: 1 }}>
             <StatusBar style="auto" />
 
@@ -726,6 +751,7 @@ export default function SleepScreen() {
                 </ModernCard>
             </ScrollView>
         </ModernView>
+        </SubscriptionGate>
     );
 }
 

@@ -18,6 +18,7 @@ import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/stores/app-store';
 import { router } from 'expo-router';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
@@ -146,6 +147,10 @@ export default function HomeScreen() {
   };
 
   return (
+    <SubscriptionGate
+      feature="start_screen"
+      screenTitle="Ekran główny"
+    >
     <ModernView style={{ flex: 1 }}>
       <StatusBar style="auto" />
 
@@ -623,5 +628,6 @@ export default function HomeScreen() {
         }}
       />
     </ModernView>
+    </SubscriptionGate>
   );
 }
