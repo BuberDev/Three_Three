@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "239f4bbb-a3af-44cf-a783-230d541c567e"
+      }
+    },
+    "android": {
+      "package": "com.buber.threethreeapi"
+    }
+  }
+}

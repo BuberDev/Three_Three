@@ -23,6 +23,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.buber.threethree",
       "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Ta aplikacja potrzebuje dostępu do lokalizacji aby powiązać aktywności z miejscami i zapewnić lepszą analitykę.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Ta aplikacja potrzebuje dostępu do lokalizacji aby śledzić aktywności w tle i zapewnić kompleksową analitykę.",
         "CFBundleURLTypes": [
           {
             "CFBundleURLSchemes": [
@@ -50,10 +52,12 @@
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.buber.threethree",
-      "googleServicesFile": "./google-services.json",
+      // "googleServicesFile": "./google-services.json",
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -77,6 +81,8 @@
       "expo-sqlite",
       "expo-audio",
       "expo-asset",
+      "expo-location",
+      "expo-notifications",
       [
         "@react-native-google-signin/google-signin",
         {

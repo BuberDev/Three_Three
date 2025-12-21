@@ -6,11 +6,14 @@ import { DatabaseService } from '../lib/database/database';
 import { ApiService } from '../lib/services/api';
 import { AudioService } from '../lib/services/audio';
 import { EventService } from '../lib/services/event';
+import { HabitsService } from '../lib/services/habits-service';
 import {
     Activity,
     DailyEntry,
     DailyMetrics,
     EventType,
+    Habit,
+    HabitStats,
     ProgressMetrics,
     Recommendation,
     RecordingState,
@@ -44,6 +47,12 @@ interface AppStore {
     tasks: Task[];
     todaysTasks: Task[];
 
+    // Habits state
+    habits: Habit[];
+    habitStats: HabitStats | null;
+    isLoadingHabits: boolean;
+    habitActionStates: Record<string, { isLoading: boolean; lastAction?: 'complete' | 'uncomplete' | 'delete' }>; // Track individual habit actions
+
     // Daily entry state
     todayEntry: DailyEntry | null;
 
@@ -65,6 +74,7 @@ interface AppStore {
     // Actions
     setUser: (user: User | null) => void;
     setUserSettings: (settings: UserSettings) => void;
+    updateUserSettings: (settings: Partial<UserSettings>) => Promise<void>;
     setAuthenticated: (auth: boolean) => void;
     setTokens: (accessToken: string, refreshToken: string) => Promise<void>;
     clearTokens: () => Promise<void>;
@@ -101,6 +111,17 @@ interface AppStore {
     toggleTaskCompletion: (taskId: string) => void;
     deleteTask: (taskId: string) => void;
     loadTasks: () => Promise<void>;
+
+    // Habits actions
+    addHabit: (habit: Omit<Habit, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completionRate' | 'isCompletedToday'>) => Promise<void>;
+    updateHabit: (habitId: string, updates: Partial<Habit>) => Promise<void>;
+    deleteHabit: (habitId: string) => Promise<void>;
+    completeHabit: (habitId: string, notes?: string, rating?: number) => Promise<void>;
+    uncompleteHabit: (habitId: string, date?: string) => Promise<void>;
+    loadHabits: () => Promise<void>;
+    loadHabitStats: () => Promise<void>;
+    getHabitById: (habitId: string) => Habit | undefined;
+    calculateCompletionForPeriod: (habit: Habit, date: Date) => boolean;
 
     // Activity tracking actions
     addActivity: (activity: Activity) => void;
@@ -145,6 +166,13 @@ export const useAppStore = create<AppStore>()(
             isProcessingVoiceNote: false,
             tasks: [],
             todaysTasks: [],
+
+            // Habits initial state
+            habits: [],
+            habitStats: null,
+            isLoadingHabits: false,
+            habitActionStates: {},
+
             todayEntry: null,
             recommendations: [],
 
@@ -162,6 +190,16 @@ export const useAppStore = create<AppStore>()(
             // User actions
             setUser: (user) => set({ user }),
             setUserSettings: (userSettings) => set({ userSettings }),
+            updateUserSettings: async (settingsUpdate) => {
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    const updatedSettings = await apiService.updateUserSettings(settingsUpdate);
+                    set({ userSettings: updatedSettings });
+                } catch (error) {
+                    console.error('❌ Error updating user settings:', error);
+                    throw error;
+                }
+            },
             setAuthenticated: (isAuthenticated) => set({ isAuthenticated }),
 
             setTokens: async (accessToken, refreshToken) => {
@@ -1463,6 +1501,370 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
+            // Habits actions
+            addHabit: async (habitData) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
+
+                try {
+                    set({ isLoadingHabits: true });
+
+                    const habitsService = HabitsService.getInstance();
+                    const newHabit = await habitsService.createHabit(habitData);
+
+                    // Ensure the habit has proper completion state
+                    const habitWithState = {
+                        ...newHabit,
+                        isCompletedToday: false,
+                        isCompletedForPeriod: false,
+                        completionRate: 0
+                    };
+
+                    set((state) => ({
+                        habits: [habitWithState, ...state.habits],
+                        isLoadingHabits: false,
+                    }));
+
+                    // Refresh both habits and stats to ensure consistency
+                    await Promise.all([
+                        get().loadHabits(),
+                        get().loadHabitStats()
+                    ]);
+
+                    // Log habit creation event
+                    const eventService = EventService.getInstance();
+                    eventService.dispatchEvent(EventType.HABIT_CREATED, user.id, {
+                        habitId: newHabit.id,
+                        name: newHabit.name,
+                        category: newHabit.category,
+                        frequency: newHabit.frequency,
+                    });
+                } catch (error) {
+                    console.error('Failed to add habit:', error);
+                    setError('Failed to create habit');
+                    set({ isLoadingHabits: false });
+                    throw error; // Re-throw for UI error handling
+                }
+            },
+
+            updateHabit: async (habitId, updates) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
+
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    const updatedHabit = await habitsService.updateHabit(habitId, updates);
+
+                    set((state) => ({
+                        habits: state.habits.map(habit =>
+                            habit.id === habitId ? updatedHabit : habit
+                        ),
+                    }));
+
+                    // Refresh stats if habit status changed
+                    if (updates.status) {
+                        get().loadHabitStats();
+                    }
+                } catch (error) {
+                    console.error('Failed to update habit:', error);
+                    setError('Failed to update habit');
+                }
+            },
+
+            deleteHabit: async (habitId) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
+
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    await habitsService.deleteHabit(habitId);
+
+                    set((state) => ({
+                        habits: state.habits.filter(habit => habit.id !== habitId),
+                    }));
+
+                    // Refresh stats
+                    get().loadHabitStats();
+                } catch (error) {
+                    console.error('Failed to delete habit:', error);
+                    setError('Failed to delete habit');
+                }
+            },
+
+            completeHabit: async (habitId, notes, rating) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
+
+                // Set loading state for this specific habit
+                set((state) => ({
+                    habitActionStates: {
+                        ...state.habitActionStates,
+                        [habitId]: { isLoading: true, lastAction: 'complete' }
+                    }
+                }));
+
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    const result = await habitsService.completeHabit(habitId, {
+                        notes,
+                        rating
+                    });
+
+                    // Calculate if completed for current period based on frequency
+                    const now = new Date();
+                    const isCompletedForPeriod = get().calculateCompletionForPeriod(result.habit, now);
+
+                    // Update habit with success animation trigger and proper completion state
+                    set((state) => ({
+                        habits: state.habits.map(habit =>
+                            habit.id === habitId ? {
+                                ...result.habit,
+                                isCompletedToday: true,
+                                isCompletedForPeriod,
+                                lastCompletedAt: now,
+                                _justCompleted: true // Temporary flag for animation
+                            } : habit
+                        ),
+                        habitActionStates: {
+                            ...state.habitActionStates,
+                            [habitId]: { isLoading: false, lastAction: 'complete' }
+                        }
+                    }));
+
+                    // Haptic feedback for success
+                    try {
+                        const { HapticFeedback } = await import('expo-haptics');
+                        await HapticFeedback.notificationAsync(HapticFeedback.NotificationFeedbackType.Success);
+                    } catch (e) {
+                        // Platform doesn't support haptics
+                    }
+
+                    // Clear animation flag after animation
+                    setTimeout(() => {
+                        set((state) => ({
+                            habits: state.habits.map(habit =>
+                                habit.id === habitId ? {
+                                    ...habit,
+                                    _justCompleted: undefined
+                                } : habit
+                            )
+                        }));
+                    }, 1000);
+
+                    // Refresh stats
+                    get().loadHabitStats();
+
+                    // Analytics event
+                    const eventService = EventService.getInstance();
+                    eventService.dispatchEvent(EventType.HABIT_COMPLETED, user.id, {
+                        habitId: habitId,
+                        currentStreak: result.habit.currentStreak,
+                        totalCompletions: result.habit.totalCompletions,
+                    });
+                } catch (error) {
+                    console.error('Failed to complete habit:', error);
+
+                    // Clear loading state
+                    set((state) => ({
+                        habitActionStates: {
+                            ...state.habitActionStates,
+                            [habitId]: { isLoading: false, lastAction: 'complete' }
+                        }
+                    }));
+
+                    // Handle error appropriately
+                    if (error.message.includes('already completed on this date')) {
+                        // Haptic warning feedback
+                        try {
+                            const { HapticFeedback } = await import('expo-haptics');
+                            await HapticFeedback.notificationAsync(HapticFeedback.NotificationFeedbackType.Warning);
+                        } catch (e) { }
+                    } else {
+                        setError('Failed to complete habit');
+                    }
+
+                    throw error; // Re-throw for UI handling
+                }
+            },
+
+            uncompleteHabit: async (habitId, date) => {
+                const { user, setError } = get();
+                if (!user) {
+                    setError('User not authenticated');
+                    return;
+                }
+
+                // Set loading state for this specific habit
+                set((state) => ({
+                    habitActionStates: {
+                        ...state.habitActionStates,
+                        [habitId]: { isLoading: true, lastAction: 'uncomplete' }
+                    }
+                }));
+
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    const updatedHabit = await habitsService.uncompleteHabit(habitId, date);
+
+                    // Update habit with new stats and clear completion state
+                    set((state) => ({
+                        habits: state.habits.map(habit =>
+                            habit.id === habitId ? {
+                                ...updatedHabit,
+                                isCompletedToday: false,
+                                isCompletedForPeriod: false
+                            } : habit
+                        ),
+                        habitActionStates: {
+                            ...state.habitActionStates,
+                            [habitId]: { isLoading: false, lastAction: 'uncomplete' }
+                        }
+                    }));
+
+                    // Refresh stats
+                    get().loadHabitStats();
+                } catch (error) {
+                    console.error('Failed to uncomplete habit:', error);
+                    setError('Failed to uncomplete habit');
+
+                    // Clear loading state
+                    set((state) => ({
+                        habitActionStates: {
+                            ...state.habitActionStates,
+                            [habitId]: { isLoading: false, lastAction: 'uncomplete' }
+                        }
+                    }));
+                }
+            },
+
+            loadHabits: async () => {
+                const { user, setError } = get();
+                if (!user) {
+                    set({ habits: [], isLoadingHabits: false });
+                    return;
+                }
+
+                try {
+                    set({ isLoadingHabits: true });
+
+                    const habitsService = HabitsService.getInstance();
+                    const response = await habitsService.getHabits({ status: 'active' });
+
+                    // Process habits to ensure proper completion states
+                    const now = new Date();
+                    const processedHabits = response.habits.map(habit => ({
+                        ...habit,
+                        isCompletedToday: HabitsService.isHabitCompletedToday(habit),
+                        isCompletedForPeriod: get().calculateCompletionForPeriod(habit, now),
+                        completionRate: HabitsService.calculateCompletionRate(habit)
+                    }));
+
+                    set({
+                        habits: processedHabits,
+                        isLoadingHabits: false
+                    });
+                } catch (error) {
+                    console.error('Failed to load habits:', error);
+                    setError('Failed to load habits');
+                    set({ habits: [], isLoadingHabits: false });
+                }
+            },
+
+            loadHabitStats: async () => {
+                const { user } = get();
+                if (!user) return;
+
+                try {
+                    const habitsService = HabitsService.getInstance();
+                    const response = await habitsService.getHabitStats();
+                    // Extract data from API response structure
+                    const stats = response?.data || response;
+                    set({ habitStats: stats });
+                } catch (error) {
+                    console.error('Failed to load habit stats:', error);
+                    // Provide mock data for development
+                    const mockStats: HabitStats = {
+                        totalHabits: 5,
+                        activeHabits: 3,
+                        totalCompletions: 42,
+                        averageCompletionRate: 75.5,
+                        currentActiveStreak: 7,
+                        longestStreak: 21,
+                        completedToday: 2,
+                        pendingToday: 1,
+                        categoryBreakdown: {
+                            health: 2,
+                            fitness: 1,
+                            productivity: 1,
+                            mindfulness: 1,
+                        },
+                        weeklyProgress: [
+                            { date: '2025-12-15', completions: 3, totalHabits: 5 },
+                            { date: '2025-12-16', completions: 4, totalHabits: 5 },
+                            { date: '2025-12-17', completions: 2, totalHabits: 5 },
+                            { date: '2025-12-18', completions: 5, totalHabits: 5 },
+                            { date: '2025-12-19', completions: 3, totalHabits: 5 },
+                            { date: '2025-12-20', completions: 4, totalHabits: 5 },
+                            { date: '2025-12-21', completions: 2, totalHabits: 5 },
+                        ],
+                    };
+                    console.log('Setting mock habit stats:', mockStats);
+                    set({ habitStats: mockStats });
+                    console.log('Mock habit stats set, current state:', get().habitStats);
+                }
+            },
+
+            getHabitById: (habitId) => {
+                const { habits } = get();
+                return habits.find(habit => habit.id === habitId);
+            },
+
+            calculateCompletionForPeriod: (habit, date) => {
+                if (!habit.lastCompletedAt) return false;
+
+                const completedDate = new Date(habit.lastCompletedAt);
+                const currentDate = new Date(date);
+
+                switch (habit.frequency) {
+                    case 'DAILY':
+                        // Same day completion
+                        return completedDate.toDateString() === currentDate.toDateString();
+
+                    case 'WEEKLY':
+                        // Same week completion (Monday as week start)
+                        const getWeekStart = (date: Date) => {
+                            const d = new Date(date);
+                            const day = d.getDay() || 7; // Convert Sunday from 0 to 7
+                            d.setHours(0, 0, 0, 0);
+                            d.setDate(d.getDate() - day + 1); // Monday as start
+                            return d;
+                        };
+                        const completedWeekStart = getWeekStart(completedDate);
+                        const currentWeekStart = getWeekStart(currentDate);
+                        return completedWeekStart.getTime() === currentWeekStart.getTime();
+
+                    case 'MONTHLY':
+                        // Same month and year completion
+                        return completedDate.getMonth() === currentDate.getMonth() &&
+                            completedDate.getFullYear() === currentDate.getFullYear();
+
+                    default:
+                        return false;
+                }
+            },
+
             // Activity tracking actions
             addActivity: (activity) => {
                 const today = new Date();
@@ -1835,6 +2237,8 @@ export const useAppStore = create<AppStore>()(
                         // Load data gracefully - don't throw on network errors
                         const loadPromises = [
                             get().loadTasks(),
+                            get().loadHabits(),
+                            get().loadHabitStats(),
                             get().loadVoiceNotes(),
                             get().loadActivities(),
                             get().loadDailyMetrics(),

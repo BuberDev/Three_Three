@@ -6,15 +6,18 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompactStats } from '@/components/compact-stats';
 import { TaskList } from '@/components/daily/task-list';
+import { AddHabitModal } from '@/components/habits/add-habit-modal';
+import { HabitsView } from '@/components/habits/habits-view';
 import { Sidebar } from '@/components/sidebar';
+import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
-import { Task } from '@/lib/types';
+import { CreateHabitDto, HabitStatus, Task } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
-import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 
 type FilterType = 'all' | 'today' | 'completed' | 'pending';
+type ViewType = 'routines' | 'habits';
 
 interface AddTaskModalProps {
     visible: boolean;
@@ -53,7 +56,9 @@ function AddRoutineModal({ visible, onClose, onSave }: AddRoutineModalProps) {
             priority,
             completed: false,
             category: 'routine',
-            dueDate: new Date().toISOString().split('T')[0]
+            dueDate: new Date().toISOString().split('T')[0],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         onSave(routine);
@@ -82,7 +87,7 @@ function AddRoutineModal({ visible, onClose, onSave }: AddRoutineModalProps) {
     if (!visible) return null;
 
     return (
-        
+
         <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
@@ -249,6 +254,8 @@ function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
             completed: false,
             dueDate: dueDate || undefined,
             category: 'general', // Dodanie kategorii
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
 
         onAdd(task);
@@ -370,11 +377,13 @@ function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
 
 export default function RoutinesScreen() {
     const insets = useSafeAreaInsets();
-    const { tasks, todaysTasks, loadTasks, addTask } = useAppStore();
+    const { tasks, todaysTasks, loadTasks, addTask, addHabit } = useAppStore();
+    const [currentView, setCurrentView] = React.useState<ViewType>('routines');
     const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
     const [showAddModal, setShowAddModal] = React.useState(false);
     const [showAddRoutineModal, setShowAddRoutineModal] = React.useState(false);
     const [showSidebar, setShowSidebar] = React.useState(false);
+    const [showAddHabitModal, setShowAddHabitModal] = React.useState(false);
 
     React.useEffect(() => {
         loadTasks();
@@ -438,6 +447,35 @@ export default function RoutinesScreen() {
         }
     };
 
+    const handleAddHabit = () => {
+        setShowAddHabitModal(true);
+    };
+
+    const handleHabitAdd = async (habitData: CreateHabitDto) => {
+        try {
+            const habitToAdd = {
+                name: habitData.name,
+                description: habitData.description,
+                frequency: habitData.frequency,
+                category: habitData.category,
+                status: 'active' as HabitStatus,
+                currentStreak: 0,
+                longestStreak: 0,
+                totalCompletions: 0,
+                lastCompletedAt: undefined,
+                targetDays: habitData.targetDays,
+                reminderSettings: habitData.reminderSettings,
+                customFields: habitData.customFields,
+            };
+            await addHabit(habitToAdd);
+            setShowAddHabitModal(false);
+            Alert.alert('Sukces', 'Nawyk został dodany');
+        } catch (error) {
+            console.error('Błąd przy dodawaniu nawyku:', error);
+            Alert.alert('Błąd', 'Nie udało się dodać nawyku');
+        }
+    };
+
     const renderFilterTab = (filter: { key: string; label: string; count: number }) => (
         <TouchableOpacity
             key={filter.key}
@@ -472,198 +510,242 @@ export default function RoutinesScreen() {
     );
 
     return (
-          <SubscriptionGate
-              feature="routines_screen"
-              screenTitle="Ekran główny"
-            >
-        <View style={styles.container}>
-            <StatusBar style="auto" />
+        <SubscriptionGate
+            feature="routines_screen"
+            screenTitle="Ekran główny"
+        >
+            <View style={styles.container}>
+                <StatusBar style="auto" />
 
-            {/* Header */}
-            <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
-                <View style={styles.headerContent}>
-                    <View style={styles.headerLeft}>
-                        <Pressable
-                            onPress={() => setShowSidebar(true)}
-                            style={({ pressed }) => [
-                                { padding: 4, borderRadius: 8 },
-                                pressed && { backgroundColor: Colors.light.tint + '20' }
-                            ]}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                {/* Header */}
+                <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+                    <View style={styles.headerContent}>
+                        <View style={styles.headerLeft}>
+                            <Pressable
+                                onPress={() => setShowSidebar(true)}
+                                style={({ pressed }) => [
+                                    { padding: 4, borderRadius: 8 },
+                                    pressed && { backgroundColor: Colors.light.tint + '20' }
+                                ]}
+                                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            >
+                                <IconSymbol name="list.bullet" size={28} color={Colors.light.tint} />
+                            </Pressable>
+                            <ThemedText variant="headlineMedium" style={styles.title}>
+                                Lista & Rutyny
+                            </ThemedText>
+                        </View>
+                        <TouchableOpacity
+                            style={styles.addButton}
+                            onPress={currentView === 'habits' ? handleAddHabit : handleAddTask}
                         >
-                            <IconSymbol name="list.bullet" size={28} color={Colors.light.tint} />
-                        </Pressable>
-                        <ThemedText variant="headlineMedium" style={styles.title}>
-                            Lista & Rutyny
-                        </ThemedText>
+                            <IconSymbol
+                                name={currentView === 'habits' ? "plus.circle.fill" : "paperplane.fill"}
+                                size={20}
+                                color="white"
+                            />
+                        </TouchableOpacity>
                     </View>
-                    <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
-                        <IconSymbol name="paperplane.fill" size={20} color="white" />
-                    </TouchableOpacity>
-                </View>
-                <ThemedText style={styles.subtitle}>
-                    Zarządzaj zadaniami i rutynami
-                </ThemedText>
-            </View>
+                    <ThemedText style={styles.subtitle}>
+                        Zarządzaj zadaniami i rutynami
+                    </ThemedText>
 
-            {/* Filter Stats */}
-            <View style={{
-                flexDirection: 'row',
-                gap: DesignSystem.spacing.sm,
-                paddingHorizontal: 20,
-                marginBottom: 16,
-                height: 110,
-                alignItems: 'flex-start',
-            }}>
-                {filters.map((filter) => (
-                    <CompactStats
-                        key={filter.key}
-                        title={filter.label}
-                        count={filter.count}
-                        icon={
-                            filter.key === 'all' ? 'list.bullet' :
-                                filter.key === 'today' ? 'clock' :
-                                    filter.key === 'pending' ? 'circle' :
-                                        'checkmark.circle'
-                        }
-                        isActive={activeFilter === filter.key}
-                        onPress={() => setActiveFilter(filter.key as FilterType)}
-                        showPreview={true}
-                        previewItems={
-                            filter.key === 'all' ? tasks.slice(0, 2).map(task => ({
-                                id: task.id,
-                                title: task.title,
-                                completed: task.completed
-                            })) :
-                                filter.key === 'today' ? todaysTasks.slice(0, 2).map(task => ({
-                                    id: task.id,
-                                    title: task.title,
-                                    completed: task.completed
-                                })) :
-                                    filter.key === 'pending' ? tasks.filter(t => !t.completed).slice(0, 2).map(task => ({
-                                        id: task.id,
-                                        title: task.title,
-                                        completed: task.completed
-                                    })) :
-                                        tasks.filter(t => t.completed).slice(0, 2).map(task => ({
+                    {/* View Tabs */}
+                    <View style={styles.viewTabs}>
+                        <TouchableOpacity
+                            style={[
+                                styles.viewTab,
+                                currentView === 'routines' && styles.viewTabActive
+                            ]}
+                            onPress={() => setCurrentView('routines')}
+                        >
+                            <ThemedText
+                                style={[
+                                    styles.viewTabText,
+                                    currentView === 'routines' && styles.viewTabTextActive
+                                ]}
+                            >
+                                Rutyny
+                            </ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.viewTab,
+                                currentView === 'habits' && styles.viewTabActive
+                            ]}
+                            onPress={() => setCurrentView('habits')}
+                        >
+                            <ThemedText
+                                style={[
+                                    styles.viewTabText,
+                                    currentView === 'habits' && styles.viewTabTextActive
+                                ]}
+                            >
+                                Nawyki
+                            </ThemedText>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Content based on current view */}
+                {currentView === 'routines' ? (
+                    <>
+                        {/* Filter Stats */}
+                        <View style={{
+                            flexDirection: 'row',
+                            gap: DesignSystem.spacing.sm,
+                            paddingHorizontal: 20,
+                            marginBottom: 16,
+                            height: 110,
+                            alignItems: 'flex-start',
+                        }}>
+                            {filters.map((filter) => (
+                                <CompactStats
+                                    key={filter.key}
+                                    title={filter.label}
+                                    count={filter.count}
+                                    icon={
+                                        filter.key === 'all' ? 'list.bullet' :
+                                            filter.key === 'today' ? 'clock' :
+                                                filter.key === 'pending' ? 'circle' :
+                                                    'checkmark.circle'
+                                    }
+                                    isActive={activeFilter === filter.key}
+                                    onPress={() => setActiveFilter(filter.key as FilterType)}
+                                    showPreview={true}
+                                    previewItems={
+                                        filter.key === 'all' ? tasks.slice(0, 2).map(task => ({
                                             id: task.id,
                                             title: task.title,
                                             completed: task.completed
-                                        }))
-                        }
-                    />
-                ))}
-            </View>
-
-            {/* Filter Tabs - Hidden for now as we use CompactStats above 
-            <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filtersContainer}
-                style={styles.filtersScroll}
-            >
-                {filters.map((filter) => renderFilterTab(filter))}
-            </ScrollView>
-            */}
-
-            {/* Content */}
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                {/* Quick Actions */}
-                <View style={[styles.quickActionsSection, { paddingVertical: 12 }]}>
-                    <View style={styles.quickActionsRow}>
-                        <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddTask}>
-                            <IconSymbol name="paperplane.fill" size={18} color={Colors.light.tint} />
-                            <ThemedText style={styles.quickActionText}>Dodaj zadanie</ThemedText>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddRoutine}>
-                            <IconSymbol name="brain" size={18} color={Colors.light.tint} />
-                            <ThemedText style={styles.quickActionText}>Dodaj rutynę</ThemedText>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-
-                {/* Tasks List */}
-                <View style={[styles.tasksSection, { paddingHorizontal: 20, paddingVertical: 12 }]}>
-                    <View style={styles.tasksSectionHeader}>
-                        <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                            {activeFilter === 'all' && 'Wszystkie zadania'}
-                            {activeFilter === 'today' && 'Zadania na dziś'}
-                            {activeFilter === 'completed' && 'Wykonane zadania'}
-                            {activeFilter === 'pending' && 'Zadania do wykonania'}
-                        </ThemedText>
-                        <ThemedText style={styles.tasksCount}>
-                            {filteredTasks.length} {filteredTasks.length === 1 ? 'zadanie' : 'zadań'}
-                        </ThemedText>
-                    </View>
-
-                    {filteredTasks.length > 0 ? (
-                        <TaskList
-                            tasks={filteredTasks}
-                            showCompleted={activeFilter !== 'pending'}
-                            emptyMessage={`Brak zadań w kategorii "${filters.find(f => f.key === activeFilter)?.label}"`}
-                        />
-                    ) : (
-                        <View style={styles.emptyState}>
-                            <IconSymbol
-                                name={activeFilter === 'completed' ? 'list.bullet' : 'paperplane.fill'}
-                                size={48}
-                                color="#ccc"
-                            />
-                            <ThemedText style={styles.emptyTitle}>
-                                {activeFilter === 'completed' ? 'Brak wykonanych zadań' : 'Brak zadań'}
-                            </ThemedText>
-                            <ThemedText style={styles.emptyDescription}>
-                                {activeFilter === 'completed'
-                                    ? 'Wykonaj pierwsze zadanie, aby zobaczyć je tutaj'
-                                    : 'Nagraj notatkę głosową lub dodaj zadanie ręcznie'
-                                }
-                            </ThemedText>
-                            {activeFilter !== 'completed' && (
-                                <TouchableOpacity style={styles.emptyActionButton} onPress={handleAddTask}>
-                                    <ThemedText style={styles.emptyActionText}>Dodaj pierwsze zadanie</ThemedText>
-                                </TouchableOpacity>
-                            )}
+                                        })) :
+                                            filter.key === 'today' ? todaysTasks.slice(0, 2).map(task => ({
+                                                id: task.id,
+                                                title: task.title,
+                                                completed: task.completed
+                                            })) :
+                                                filter.key === 'pending' ? tasks.filter(t => !t.completed).slice(0, 2).map(task => ({
+                                                    id: task.id,
+                                                    title: task.title,
+                                                    completed: task.completed
+                                                })) :
+                                                    tasks.filter(t => t.completed).slice(0, 2).map(task => ({
+                                                        id: task.id,
+                                                        title: task.title,
+                                                        completed: task.completed
+                                                    }))
+                                    }
+                                />
+                            ))}
                         </View>
-                    )}
-                </View>
 
-                {/* Rutyny Section (placeholder) */}
-                <View style={[styles.routinesSection, { paddingHorizontal: 20, paddingVertical: 12, marginBottom: 20 }]}>
-                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Rutyny
-                    </ThemedText>
-                    <View style={[styles.routinesPlaceholder, { paddingVertical: 16 }]}>
-                        <IconSymbol name="brain" size={24} color="#ccc" />
-                        <ThemedText style={[styles.placeholderText, { marginTop: 8 }]}>
-                            Funkcja rutyn zostanie wkrótce dodana
-                        </ThemedText>
-                        <ThemedText style={[styles.placeholderSubtext, { marginTop: 4 }]}>
-                            Będziesz mógł tworzyć powtarzalne zadania i nawyki
-                        </ThemedText>
-                    </View>
-                </View>
-            </ScrollView>
+                        {/* Content */}
+                        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+                            {/* Quick Actions */}
+                            <View style={[styles.quickActionsSection, { paddingVertical: 12 }]}>
+                                <View style={styles.quickActionsRow}>
+                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddTask}>
+                                        <IconSymbol name="paperplane.fill" size={18} color={Colors.light.tint} />
+                                        <ThemedText style={styles.quickActionText}>Dodaj zadanie</ThemedText>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddRoutine}>
+                                        <IconSymbol name="brain" size={18} color={Colors.light.tint} />
+                                        <ThemedText style={styles.quickActionText}>Dodaj rutynę</ThemedText>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
 
-            {/* Add Task Modal */}
-            <AddTaskModal
-                visible={showAddModal}
-                onClose={() => setShowAddModal(false)}
-                onAdd={handleTaskAdd}
-            />
+                            {/* Tasks List */}
+                            <View style={[styles.tasksSection, { paddingHorizontal: 20, paddingVertical: 12 }]}>
+                                <View style={styles.tasksSectionHeader}>
+                                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
+                                        {activeFilter === 'all' && 'Wszystkie zadania'}
+                                        {activeFilter === 'today' && 'Zadania na dziś'}
+                                        {activeFilter === 'completed' && 'Wykonane zadania'}
+                                        {activeFilter === 'pending' && 'Zadania do wykonania'}
+                                    </ThemedText>
+                                    <ThemedText style={styles.tasksCount}>
+                                        {filteredTasks.length} {filteredTasks.length === 1 ? 'zadanie' : 'zadań'}
+                                    </ThemedText>
+                                </View>
 
-            {/* Add Routine Modal */}
-            <AddRoutineModal
-                visible={showAddRoutineModal}
-                onClose={() => setShowAddRoutineModal(false)}
-                onSave={handleRoutineAdd}
-            />
+                                {filteredTasks.length > 0 ? (
+                                    <TaskList
+                                        tasks={filteredTasks}
+                                        showCompleted={activeFilter !== 'pending'}
+                                        emptyMessage={`Brak zadań w kategorii "${filters.find(f => f.key === activeFilter)?.label}"`}
+                                    />
+                                ) : (
+                                    <View style={styles.emptyState}>
+                                        <IconSymbol
+                                            name={activeFilter === 'completed' ? 'list.bullet' : 'paperplane.fill'}
+                                            size={48}
+                                            color="#ccc"
+                                        />
+                                        <ThemedText style={styles.emptyTitle}>
+                                            {activeFilter === 'completed' ? 'Brak wykonanych zadań' : 'Brak zadań'}
+                                        </ThemedText>
+                                        <ThemedText style={styles.emptyDescription}>
+                                            {activeFilter === 'completed'
+                                                ? 'Wykonaj pierwsze zadanie, aby zobaczyć je tutaj'
+                                                : 'Nagraj notatkę głosową lub dodaj zadanie ręcznie'
+                                            }
+                                        </ThemedText>
+                                        {activeFilter !== 'completed' && (
+                                            <TouchableOpacity style={styles.emptyActionButton} onPress={handleAddTask}>
+                                                <ThemedText style={styles.emptyActionText}>Dodaj pierwsze zadanie</ThemedText>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
 
-            {/* Sidebar */}
-            <Sidebar
-                visible={showSidebar}
-                onClose={() => setShowSidebar(false)}
-            />
-        </View>
+                            {/* Rutyny Section (placeholder) */}
+                            <View style={[styles.routinesSection, { paddingHorizontal: 20, paddingVertical: 12, marginBottom: 20 }]}>
+                                <ThemedText variant="titleMedium" style={styles.sectionTitle}>
+                                    Rutyny
+                                </ThemedText>
+                                <View style={[styles.routinesPlaceholder, { paddingVertical: 16 }]}>
+                                    <IconSymbol name="brain" size={24} color="#ccc" />
+                                    <ThemedText style={[styles.placeholderText, { marginTop: 8 }]}>
+                                        Funkcja rutyn zostanie wkrótce dodana
+                                    </ThemedText>
+                                    <ThemedText style={[styles.placeholderSubtext, { marginTop: 4 }]}>
+                                        Będziesz mógł tworzyć powtarzalne zadania i nawyki
+                                    </ThemedText>
+                                </View>
+                            </View>
+                        </ScrollView>
+                    </>
+                ) : (
+                    <HabitsView onAddHabit={handleAddHabit} />
+                )}
+                <AddTaskModal
+                    visible={showAddModal}
+                    onClose={() => setShowAddModal(false)}
+                    onAdd={handleTaskAdd}
+                />
+
+                {/* Add Habit Modal */}
+                <AddHabitModal
+                    visible={showAddHabitModal}
+                    onClose={() => setShowAddHabitModal(false)}
+                    onAdd={handleHabitAdd}
+                />
+
+                {/* Add Routine Modal */}
+                <AddRoutineModal
+                    visible={showAddRoutineModal}
+                    onClose={() => setShowAddRoutineModal(false)}
+                    onSave={handleRoutineAdd}
+                />
+
+                {/* Sidebar */}
+                <Sidebar
+                    visible={showSidebar}
+                    onClose={() => setShowSidebar(false)}
+                />
+            </View>
         </SubscriptionGate>
     );
 }
@@ -1046,5 +1128,40 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 14,
         fontWeight: '500',
+    },
+    // View tabs styles
+    viewTabs: {
+        flexDirection: 'row',
+        marginTop: 16,
+        backgroundColor: '#f5f5f5',
+        borderRadius: 12,
+        padding: 4,
+    },
+    viewTab: {
+        flex: 1,
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
+        alignItems: 'center',
+    },
+    viewTabActive: {
+        backgroundColor: 'white',
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 1,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+        elevation: 2,
+    },
+    viewTabText: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#666',
+    },
+    viewTabTextActive: {
+        color: Colors.light.tint,
+        fontWeight: '600',
     },
 });

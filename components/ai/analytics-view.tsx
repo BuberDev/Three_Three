@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useAppStore } from '@/stores/app-store';
 
 interface AnalyticsViewProps {
     completionRate: number;
@@ -22,6 +23,28 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({
     mockInsights,
     insets
 }) => {
+    const { userSettings } = useAppStore();
+
+    // Check if analytics are enabled
+    if (!userSettings?.analyticsEnabled) {
+        return (
+            <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[styles.scrollContent, styles.disabledContainer]}
+                showsVerticalScrollIndicator={false}
+            >
+                <View style={styles.disabledView}>
+                    <IconSymbol name="chart.bar.xaxis" size={48} color={Colors.light.icon} style={{ opacity: 0.3 }} />
+                    <ThemedText style={styles.disabledTitle}>Zaawansowana analityka wyłączona</ThemedText>
+                    <ThemedText style={styles.disabledDescription}>
+                        Włącz zaawansowaną analitykę w ustawieniach profilu,{"\n"}
+                        aby zobaczyć szczegółowe wzorce i rekomendacje.
+                    </ThemedText>
+                </View>
+            </ScrollView>
+        );
+    }
+
     return (
         <ScrollView
             style={styles.scrollView}
@@ -164,6 +187,29 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingBottom: 100,
+    },
+    disabledContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        minHeight: 400,
+    },
+    disabledView: {
+        alignItems: 'center',
+        paddingHorizontal: 40,
+    },
+    disabledTitle: {
+        fontSize: 20,
+        fontWeight: '600',
+        color: Colors.light.text,
+        marginTop: 20,
+        marginBottom: 12,
+        textAlign: 'center',
+    },
+    disabledDescription: {
+        fontSize: 16,
+        color: Colors.light.tabIconDefault,
+        textAlign: 'center',
+        lineHeight: 22,
     },
     header: {
         paddingHorizontal: 20,

@@ -7,11 +7,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+// import { locationService } from '@/lib/services/location-service';
+import { notificationService } from '@/lib/services/notification-service';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileScreen() {
     const insets = useSafeAreaInsets();
-    const { user, userSettings, setUserSettings, logout, subscription, subscriptionStatus } = useAppStore();
+    const { user, userSettings, setUserSettings, updateUserSettings, logout, subscription, subscriptionStatus } = useAppStore();
 
     // Get subscription details for enterprise display
     const getSubscriptionDisplayInfo = () => {
@@ -46,11 +48,17 @@ export default function ProfileScreen() {
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(
         userSettings?.notificationsEnabled ?? true
     );
-    const [dataProcessingConsent, setDataProcessingConsent] = React.useState(
-        userSettings?.dataProcessingConsent ?? false
+    const [pushNotifications, setPushNotifications] = React.useState(
+        userSettings?.pushNotifications ?? false
     );
-    const [aiAnalysisEnabled, setAiAnalysisEnabled] = React.useState(
-        userSettings?.aiAnalysisEnabled ?? true
+    const [analyticsEnabled, setAnalyticsEnabled] = React.useState(
+        userSettings?.analyticsEnabled ?? true
+    );
+    const [locationTrackingEnabled, setLocationTrackingEnabled] = React.useState(
+        userSettings?.locationTrackingEnabled ?? false
+    );
+    const [betaFeaturesEnabled, setBetaFeaturesEnabled] = React.useState(
+        userSettings?.betaFeaturesEnabled ?? false
     );
 
     const handleLogout = () => {
@@ -74,14 +82,93 @@ export default function ProfileScreen() {
         );
     };
 
-    const handleSettingChange = (setting: string, value: boolean) => {
+    const handleSettingChange = async (setting: string, value: boolean) => {
         if (!userSettings) return;
 
-        const newSettings = {
-            ...userSettings,
-            [setting]: value,
-        };
-        setUserSettings(newSettings);
+        try {
+            // Update locally first for immediate UI feedback
+            const newSettings = {
+                ...userSettings,
+                [setting]: value,
+            };
+            setUserSettings(newSettings);
+
+            // Save to API
+            await updateUserSettings({ [setting]: value });
+
+            // Apply real functionality based on setting
+            switch (setting) {
+                case 'notificationsEnabled':
+                    // Kontroluje WSZYSTKIE powiadomienia w aplikacji
+                    if (value) {
+                        await notificationService.initialize();
+                        console.log('📧 Notifications enabled and service initialized');
+                    } else {
+                        await notificationService.cancelAllNotifications();
+                        console.log('📧 Notifications disabled, all cancelled');
+                    }
+                    break;
+
+                case 'pushNotifications':
+                    // Kontroluje push notifications
+                    if (value) {
+                        const granted = await notificationService.requestPushPermissions();
+                        if (granted) {
+                            const token = await notificationService.getPushToken();
+                            console.log('📱 Push notifications enabled, token:', token);
+                        } else {
+                            console.log('📱 Push notification permissions denied');
+                        }
+                    } else {
+                        console.log('📱 Push notifications disabled');
+                    }
+                    break;
+
+                case 'analyticsEnabled':
+                    // Kontroluje zaawansowaną analitykę - AnalyticsView już sprawdza to ustawienie
+                    console.log(`📊 Advanced analytics ${value ? 'enabled' : 'disabled'}`);
+                    break;
+
+                case 'locationTrackingEnabled':
+                    // Kontroluje dostęp do GPS
+                    if (value) {
+                        // TODO: Uncomment when development build includes expo-location
+                        // const started = await locationService.startLocationTracking();
+                        console.log('📍 Location tracking enabled (temporarily disabled - need new dev build)');
+                        // if (started) {
+                        //     console.log('📍 Location tracking enabled and started');
+                        // } else {
+                        //     console.log('📍 Failed to start location tracking');
+                        // }
+                    } else {
+                        // await locationService.stopLocationTracking();
+                        console.log('📍 Location tracking disabled (temporarily disabled - need new dev build)');
+                    }
+                    break;
+
+                case 'betaFeaturesEnabled':
+                    // Kontroluje widoczność funkcji beta - AI Lab w ai.tsx już sprawdza to ustawienie
+                    console.log(`🧪 Beta features ${value ? 'enabled' : 'disabled'}`);
+                    if (value) {
+                        await notificationService.notifyAI('Funkcje beta zostały włączone! Odkryj nowe możliwości.');
+                    }
+                    break;
+            }
+
+        } catch (error) {
+            console.error('❌ Failed to update setting:', error);
+            // Revert local change on error
+            const revertedSettings = {
+                ...userSettings,
+                [setting]: !value,
+            };
+            setUserSettings(revertedSettings);
+
+            Alert.alert(
+                'Błąd',
+                'Nie udało się zapisać ustawienia. Sprawdź połączenie internetowe i spróbuj ponownie.'
+            );
+        }
     };
 
     const profileMenuItems = [
@@ -220,11 +307,11 @@ export default function ProfileScreen() {
                     <View style={styles.settingsContainer}>
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="paperplane.fill" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="bell.fill" size={20} color={Colors.light.tint} />
                                 <View style={styles.settingText}>
                                     <ThemedText style={styles.settingTitle}>Powiadomienia</ThemedText>
                                     <ThemedText style={styles.settingDescription}>
-                                        Otrzymuj przypomnienia o zadaniach
+                                        Wyłącz gdy potrzebujesz skupienia lub odpoczynku
                                     </ThemedText>
                                 </View>
                             </View>
@@ -241,56 +328,99 @@ export default function ProfileScreen() {
 
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="brain" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="app.badge" size={20} color={Colors.light.tint} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Analiza AI</ThemedText>
+                                    <ThemedText style={styles.settingTitle}>Powiadomienia push</ThemedText>
                                     <ThemedText style={styles.settingDescription}>
-                                        Umożliw AI analizowanie Twoich wzorców
+                                        Alternatywa: otrzymuj tylko powiadomienia email
                                     </ThemedText>
                                 </View>
                             </View>
                             <Switch
-                                value={aiAnalysisEnabled}
+                                value={pushNotifications}
                                 onValueChange={(value) => {
-                                    setAiAnalysisEnabled(value);
-                                    handleSettingChange('aiAnalysisEnabled', value);
+                                    setPushNotifications(value);
+                                    handleSettingChange('pushNotifications', value);
                                 }}
                                 trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={aiAnalysisEnabled ? '#f5dd4b' : '#f4f3f4'}
+                                thumbColor={pushNotifications ? '#f5dd4b' : '#f4f3f4'}
                             />
                         </View>
                     </View>
                 </View>
 
-                {/* Data Privacy Section */}
+                {/* Privacy & Analytics Section */}
                 <View style={styles.section}>
                     <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Prywatność i dane
+                        Prywatność i Analityka
                     </ThemedText>
 
                     <View style={styles.settingsContainer}>
                         <View style={styles.settingItem}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="house.fill" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="chart.bar.xaxis" size={20} color={Colors.light.tint} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Zgoda na przetwarzanie</ThemedText>
+                                    <ThemedText style={styles.settingTitle}>Zaawansowana analityka</ThemedText>
                                     <ThemedText style={styles.settingDescription}>
-                                        Wyrażam zgodę na przetwarzanie danych osobowych
+                                        Wyłącz jeśli nie chcesz analizy wzorceów zachowań
                                     </ThemedText>
                                 </View>
                             </View>
                             <Switch
-                                value={dataProcessingConsent}
+                                value={analyticsEnabled}
                                 onValueChange={(value) => {
-                                    setDataProcessingConsent(value);
-                                    handleSettingChange('dataProcessingConsent', value);
+                                    setAnalyticsEnabled(value);
+                                    handleSettingChange('analyticsEnabled', value);
                                 }}
                                 trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={dataProcessingConsent ? '#f5dd4b' : '#f4f3f4'}
+                                thumbColor={analyticsEnabled ? '#f5dd4b' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <IconSymbol name="location" size={20} color={Colors.light.tint} />
+                                <View style={styles.settingText}>
+                                    <ThemedText style={styles.settingTitle}>Lokalizacja</ThemedText>
+                                    <ThemedText style={styles.settingDescription}>
+                                        Wyłącz dla prywatności i oszczędzania baterii
+                                    </ThemedText>
+                                </View>
+                            </View>
+                            <Switch
+                                value={locationTrackingEnabled}
+                                onValueChange={(value) => {
+                                    setLocationTrackingEnabled(value);
+                                    handleSettingChange('locationTrackingEnabled', value);
+                                }}
+                                trackColor={{ false: '#767577', true: Colors.light.tint }}
+                                thumbColor={locationTrackingEnabled ? '#f5dd4b' : '#f4f3f4'}
+                            />
+                        </View>
+
+                        <View style={styles.settingItem}>
+                            <View style={styles.settingLeft}>
+                                <IconSymbol name="flask" size={20} color={Colors.light.tint} />
+                                <View style={styles.settingText}>
+                                    <ThemedText style={styles.settingTitle}>Funkcje beta</ThemedText>
+                                    <ThemedText style={styles.settingDescription}>
+                                        Wyłącz jeśli wolisz stabilność niż nowości
+                                    </ThemedText>
+                                </View>
+                            </View>
+                            <Switch
+                                value={betaFeaturesEnabled}
+                                onValueChange={(value) => {
+                                    setBetaFeaturesEnabled(value);
+                                    handleSettingChange('betaFeaturesEnabled', value);
+                                }}
+                                trackColor={{ false: '#767577', true: Colors.light.tint }}
+                                thumbColor={betaFeaturesEnabled ? '#f5dd4b' : '#f4f3f4'}
                             />
                         </View>
                     </View>
                 </View>
+
 
                 {/* Profile Menu */}
                 <View style={styles.section}>

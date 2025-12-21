@@ -23,6 +23,12 @@ export enum EventType {
     TASK_DELETED = 'task_deleted',
     TASK_OVERDUE = 'task_overdue',
 
+    // Habit events
+    HABIT_CREATED = 'habit_created',
+    HABIT_COMPLETED = 'habit_completed',
+    HABIT_UPDATED = 'habit_updated',
+    HABIT_DELETED = 'habit_deleted',
+
     // Daily summary events
     DAILY_SUMMARY_GENERATED = 'daily_summary_generated',
     DAILY_INSIGHTS_UPDATED = 'daily_insights_updated',
@@ -87,10 +93,44 @@ export interface UserSettings {
     consentVoiceProcessing: boolean;
     consentPersonalization: boolean;
     primaryGoals: string[];
-    // Nowe ustawienia dla profilu
+
+    // Basic notification settings
     notificationsEnabled?: boolean;
+    emailNotifications?: boolean;
+    pushNotifications?: boolean;
+
+    // Privacy & Security Settings
     dataProcessingConsent?: boolean;
+    analyticsEnabled?: boolean;
+    shareUsageData?: boolean;
+    allowPersonalization?: boolean;
+
+    // Feature Settings
     aiAnalysisEnabled?: boolean;
+    voiceProcessingEnabled?: boolean;
+    sleepTrackingEnabled?: boolean;
+    taskRemindersEnabled?: boolean;
+    locationTrackingEnabled?: boolean;
+
+    // Data & Export Settings
+    dataRetentionDays?: number;
+    autoExportEnabled?: boolean;
+    privacyLevel?: string; // 'strict', 'standard', 'relaxed'
+
+    // Performance & Analytics
+    performanceMetricsEnabled?: boolean;
+    correlationAnalysisEnabled?: boolean;
+    betaFeaturesEnabled?: boolean;
+
+    // Security Settings
+    biometricAuthEnabled?: boolean;
+    sessionTimeoutEnabled?: boolean;
+    sessionTimeoutMinutes?: number;
+
+    // Language & Localization
+    timezone?: string;
+    language?: string;
+
     createdAt: string;
     updatedAt: string;
 }
@@ -311,4 +351,109 @@ export interface ProgressMetrics {
 // Export additional type modules
 export * from './payment';
 export * from './subscription';
+
+// Habit types
+export enum HabitFrequency {
+    DAILY = 'daily',
+    WEEKLY = 'weekly',
+    MONTHLY = 'monthly',
+}
+
+export enum HabitCategory {
+    HEALTH = 'health',
+    PRODUCTIVITY = 'productivity',
+    LEARNING = 'learning',
+    PERSONAL = 'personal',
+    FITNESS = 'fitness',
+    MINDFULNESS = 'mindfulness',
+    SOCIAL = 'social',
+    FINANCIAL = 'financial',
+}
+
+export enum HabitStatus {
+    ACTIVE = 'active',
+    PAUSED = 'paused',
+    COMPLETED = 'completed',
+    ARCHIVED = 'archived',
+}
+
+export interface ReminderSettings {
+    enabled: boolean;
+    time?: string; // HH:MM format
+    days?: number[]; // 0-6, Sunday = 0
+}
+
+export interface Habit {
+    id: string;
+    userId: string;
+    name: string;
+    description?: string;
+    frequency: HabitFrequency;
+    category: HabitCategory;
+    status: HabitStatus;
+    currentStreak: number;
+    longestStreak: number;
+    totalCompletions: number;
+    lastCompletedAt?: Date;
+    targetDays?: number;
+    reminderSettings?: ReminderSettings;
+    customFields?: Record<string, any>;
+    createdAt: Date;
+    updatedAt: Date;
+    // Computed properties
+    completionRate: number;
+    isCompletedToday: boolean;
+    isCompletedForPeriod?: boolean; // Completed for current period (day/week/month)
+    _justCompleted?: boolean; // Temporary animation flag
+}
+
+export interface HabitCompletion {
+    id: string;
+    habitId: string;
+    userId: string;
+    completedAt: Date;
+    notes?: string;
+    rating?: number; // 1-5
+    metadata?: Record<string, any>;
+    createdAt: Date;
+    updatedAt: Date;
+}
+
+export interface HabitStats {
+    totalHabits: number;
+    activeHabits: number;
+    totalCompletions: number;
+    averageCompletionRate: number;
+    currentActiveStreak: number;
+    longestStreak: number;
+    completedToday: number;
+    pendingToday: number;
+    categoryBreakdown: Record<string, number>;
+    weeklyProgress: Array<{
+        date: string;
+        completions: number;
+        totalHabits: number;
+    }>;
+}
+
+export interface CreateHabitDto {
+    name: string;
+    description?: string;
+    frequency: HabitFrequency;
+    category: HabitCategory;
+    targetDays?: number;
+    reminderSettings?: ReminderSettings;
+    customFields?: Record<string, any>;
+}
+
+export interface UpdateHabitDto extends Partial<CreateHabitDto> {
+    status?: HabitStatus;
+}
+
+export interface CompleteHabitDto {
+    completedAt?: string;
+    notes?: string;
+    rating?: number;
+    metadata?: Record<string, any>;
+}
 

@@ -28,6 +28,7 @@ import { AiModule } from './ai/ai.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ChatModule } from './chat/chat.module';
 import { EventsModule } from './events/events.module';
+import { HabitsModule } from './habits/habits.module';
 import { JournalModule } from './journal/journal.module';
 import { PaymentsModule } from './payments/payments.module';
 import { SleepModule } from './sleep/sleep.module';
@@ -45,6 +46,8 @@ import { PerformanceMetric } from './analytics/entities/performance-metric.entit
 import { ChatMessage } from './chat/entities/chat-message.entity';
 import { ChatSession } from './chat/entities/chat-session.entity';
 import { Event } from './events/entities/event.entity';
+import { HabitCompletion } from './habits/entities/habit-completion.entity';
+import { Habit } from './habits/entities/habit.entity';
 import { JournalEntry } from './journal/entities/journal-entry.entity';
 import { SleepTracking } from './sleep/entities/sleep-tracking.entity';
 import { SubscriptionPlanConfig } from './subscriptions/entities/subscription-plan-config.entity';
@@ -91,7 +94,9 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                     ChatMessage,
                     Subscription,
                     SubscriptionPlanConfig,
-                    SubscriptionTransaction
+                    SubscriptionTransaction,
+                    Habit,
+                    HabitCompletion,
                 ],
                 migrations: ['dist/migrations/*.js'],
                 synchronize: configService.get('app.nodeEnv') === 'development',
@@ -149,6 +154,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         PaymentsModule,
         VoiceNotesModule,
         TasksModule,
+        HabitsModule,
         EventsModule,
         ActivitiesModule,
         SleepModule,

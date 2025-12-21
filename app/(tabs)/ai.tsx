@@ -21,7 +21,8 @@ export default function AIScreen() {
     const {
         tasks,
         todaysTasks,
-        voiceNotes
+        voiceNotes,
+        userSettings
     } = useAppStore();
 
     const aiChat = useEnterpriseAIChat();
@@ -126,6 +127,28 @@ export default function AIScreen() {
                                     </ThemedText>
                                 )}
                             </TouchableOpacity>
+
+                            {/* Beta Tab - tylko dla użytkowników z betaFeaturesEnabled */}
+                            {userSettings?.betaFeaturesEnabled && (
+                                <TouchableOpacity
+                                    style={[styles.navTab, styles.betaTab]}
+                                    onPress={() => setCurrentView('chat')}
+                                >
+                                    <IconSymbol
+                                        name="flask.fill"
+                                        size={currentView === 'chat' && aiChat.currentSession ? 14 : 20}
+                                        color="#ff6b35"
+                                    />
+                                    <View style={styles.betaBadge}>
+                                        <ThemedText style={styles.betaBadgeText}>BETA</ThemedText>
+                                    </View>
+                                    {!(currentView === 'chat' && aiChat.currentSession) && (
+                                        <ThemedText style={[styles.navTabText, styles.betaTabText]}>
+                                            AI Lab
+                                        </ThemedText>
+                                    )}
+                                </TouchableOpacity>
+                            )}
                         </View>
 
                         <TouchableOpacity
@@ -209,6 +232,27 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+    },
+    betaTab: {
+        position: 'relative',
+        borderColor: '#ff6b35',
+    },
+    betaBadge: {
+        position: 'absolute',
+        top: -5,
+        right: -10,
+        backgroundColor: '#ff6b35',
+        borderRadius: 8,
+        paddingHorizontal: 4,
+        paddingVertical: 1,
+    },
+    betaBadgeText: {
+        fontSize: 8,
+        fontWeight: '700',
+        color: 'white',
+    },
+    betaTabText: {
+        color: '#ff6b35',
     },
     navContent: {
         flexDirection: 'row',

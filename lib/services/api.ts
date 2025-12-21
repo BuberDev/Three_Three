@@ -108,16 +108,19 @@ export class ApiService {
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
 
+                // Extract the actual error message - server returns { error: { message: "..." } }
+                const actualMessage = errorData.error?.message || errorData.message;
+
                 let error: AppError;
                 switch (response.status) {
                     case 401:
-                        error = new AuthError(errorData.message || 'Unauthorized');
+                        error = new AuthError(actualMessage || 'Unauthorized');
                         break;
                     case 400:
-                        error = new ValidationError(errorData.message || 'Bad request', errorData.field);
+                        error = new ValidationError(actualMessage || 'Bad request', errorData.error?.field || errorData.field);
                         break;
                     default:
-                        error = new ServerError(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+                        error = new ServerError(actualMessage || `HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 errorHandler.handleError(error);

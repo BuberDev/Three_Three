@@ -22,6 +22,12 @@ export enum EventType {
     GOAL_ACHIEVED = 'goal_achieved',
     INSIGHT_GENERATED = 'insight_generated',
     PERSONALIZATION_UPDATED = 'personalization_updated',
+    HABIT_CREATED = 'habit_created',
+    HABIT_UPDATED = 'habit_updated',
+    HABIT_DELETED = 'habit_deleted',
+    HABIT_COMPLETED = 'habit_completed',
+    HABIT_UNCOMPLETED = 'habit_uncompleted',
+    HABIT_STREAK_MILESTONE = 'habit_streak_milestone',
 }
 
 export enum EventStatus {

@@ -164,6 +164,9 @@ export class EventsService {
                 case EventType.DAILY_ENTRY_CREATED:
                     await this.handleDailyEntryCreated(event);
                     break;
+                case EventType.HABIT_COMPLETED:
+                    await this.handleHabitCompleted(event);
+                    break;
                 default:
                     this.logger.warn(`Unhandled event type: ${event.type}`);
             }
@@ -221,6 +224,27 @@ export class EventsService {
         const { dailyEntryId, userId } = event.payload;
 
         this.logger.log(`Daily entry created: ${dailyEntryId} by user: ${userId}`);
+    }
+
+    private async handleHabitCompleted(event: Event): Promise<void> {
+        // Handle habit completion events
+        // E.g., check for streak milestones, trigger achievements, send congratulations
+        const { habitId, userId, currentStreak, totalCompletions } = event.payload;
+
+        this.logger.log(
+            `Habit completed: ${habitId} by user: ${userId} (streak: ${currentStreak}, total: ${totalCompletions})`
+        );
+
+        // Check for streak milestones (e.g., 7, 30, 100 days)
+        const milestones = [7, 14, 30, 60, 100, 200, 365];
+        if (milestones.includes(currentStreak)) {
+            await this.emit(EventType.HABIT_STREAK_MILESTONE, {
+                habitId,
+                userId,
+                milestone: currentStreak,
+                totalCompletions,
+            });
+        }
     }
 
     async getEventStats(userId?: string): Promise<{
