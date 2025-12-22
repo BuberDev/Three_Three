@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
     Alert,
+    KeyboardAvoidingView,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -219,65 +221,72 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                         <Text style={styles.emailButtonText}>Kontynuuj z Email</Text>
                     </TouchableOpacity>
 
+                    {/* Login/Register Toggle - moved outside form for better visibility */}
                     {showEmailForm && (
-                        <View style={styles.emailForm}>
-                            <TextInput
-                                style={styles.emailInput}
-                                placeholder="Wprowadź swój email"
-                                placeholderTextColor={Colors.light.icon}
-                                value={email}
-                                onChangeText={setEmail}
-                                keyboardType="email-address"
-                                autoCapitalize="none"
-                                autoComplete="email"
-                                autoFocus
-                            />
-                            <TextInput
-                                style={styles.emailInput}
-                                placeholder="Wprowadź hasło"
-                                placeholderTextColor={Colors.light.icon}
-                                value={password}
-                                onChangeText={setPassword}
-                                secureTextEntry
-                                autoCapitalize="none"
-                                autoComplete="password"
-                            />
-                            <View style={styles.emailFormButtons}>
-                                <TouchableOpacity
-                                    style={[styles.formButton, styles.cancelButton]}
-                                    onPress={() => {
-                                        setShowEmailForm(false);
-                                        setEmail('');
-                                        setPassword('');
-                                    }}
-                                >
-                                    <Text style={styles.cancelButtonText}>Anuluj</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                    style={[styles.formButton, styles.submitButton]}
-                                    onPress={handleEmailSubmit}
-                                    disabled={!email.trim() || !password.trim() || isLoading}
-                                >
-                                    <Text style={[styles.submitButtonText, (!email.trim() || !password.trim()) && styles.disabledText]}>
-                                        {isLoading ? 'Przetwarzanie...' : isLoginMode ? 'Zaloguj się' : 'Kontynuuj'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
+                        <TouchableOpacity
+                            style={styles.toggleButton}
+                            onPress={() => setIsLoginMode(!isLoginMode)}
+                            disabled={isLoading}
+                        >
+                            <Text style={styles.toggleText}>
+                                {isLoginMode
+                                    ? 'Nie masz konta? Utwórz nowe'
+                                    : 'Masz już konto? Zaloguj się'
+                                }
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
-                            {/* Login/Register Toggle */}
-                            <TouchableOpacity
-                                style={styles.toggleButton}
-                                onPress={() => setIsLoginMode(!isLoginMode)}
-                                disabled={isLoading}
-                            >
-                                <Text style={styles.toggleText}>
-                                    {isLoginMode
-                                        ? 'Nie masz konta? Utwórz nowe'
-                                        : 'Masz już konto? Zaloguj się'
-                                    }
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
+                    {showEmailForm && (
+                        <KeyboardAvoidingView
+                            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                            style={styles.keyboardAvoidingView}
+                        >
+                            <View style={styles.emailForm}>
+                                <TextInput
+                                    style={styles.emailInput}
+                                    placeholder="Wprowadź swój email"
+                                    placeholderTextColor={Colors.light.icon}
+                                    value={email}
+                                    onChangeText={setEmail}
+                                    keyboardType="email-address"
+                                    autoCapitalize="none"
+                                    autoComplete="email"
+                                    autoFocus
+                                />
+                                <TextInput
+                                    style={styles.emailInput}
+                                    placeholder="Wprowadź hasło"
+                                    placeholderTextColor={Colors.light.icon}
+                                    value={password}
+                                    onChangeText={setPassword}
+                                    secureTextEntry
+                                    autoCapitalize="none"
+                                    autoComplete="password"
+                                />
+                                <View style={styles.emailFormButtons}>
+                                    <TouchableOpacity
+                                        style={[styles.formButton, styles.cancelButton]}
+                                        onPress={() => {
+                                            setShowEmailForm(false);
+                                            setEmail('');
+                                            setPassword('');
+                                        }}
+                                    >
+                                        <Text style={styles.cancelButtonText}>Anuluj</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.formButton, styles.submitButton]}
+                                        onPress={handleEmailSubmit}
+                                        disabled={!email.trim() || !password.trim() || isLoading}
+                                    >
+                                        <Text style={[styles.submitButtonText, (!email.trim() || !password.trim()) && styles.disabledText]}>
+                                            {isLoading ? 'Przetwarzanie...' : isLoginMode ? 'Zaloguj się' : 'Kontynuuj'}
+                                        </Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+                        </KeyboardAvoidingView>
                     )}
                 </View>
             </ScrollView>
@@ -410,7 +419,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 24,
         paddingTop: 40,
-        paddingBottom: 100, // Więcej miejsca na przełącznik logowania
+        paddingBottom: 40,
     },
     footerContainer: {
         backgroundColor: Colors.light.background,
@@ -419,6 +428,9 @@ const styles = StyleSheet.create({
         paddingBottom: 16,
         borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.05)',
+    },
+    keyboardAvoidingView: {
+        flex: 0,
     },
     emailForm: {
         marginTop: 16,
@@ -467,7 +479,8 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     toggleButton: {
-        marginTop: 24,
+        marginTop: 16,
+        marginBottom: 8,
         paddingVertical: 12,
         paddingHorizontal: 20,
         alignItems: 'center',
