@@ -133,245 +133,245 @@ export function AddHabitModal({ visible, onClose, onAdd }: AddHabitModalProps) {
             <View style={styles.modalOverlay}>
                 <View style={styles.modalContent}>                    {/* Modal Handle */}
                     <View style={styles.modalHandle} />
-                                    <View style={styles.modalHeader}>
-                    <ThemedText style={styles.modalTitle}>Nowy nawyk</ThemedText>
-                    <TouchableOpacity
-                        onPress={() => { resetForm(); onClose(); }}
-                        style={styles.closeButton}
-                    >
-                        <IconSymbol name="xmark" size={24} color={Colors.light.textSecondary} />
-                    </TouchableOpacity>
-                </View>
-
-                <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-                    {/* Quick Presets */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Szybkie szablony</ThemedText>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            style={styles.presetsContainer}
-                            contentContainerStyle={styles.presetsContent}
+                    <View style={styles.modalHeader}>
+                        <ThemedText style={styles.modalTitle}>Nowy nawyk</ThemedText>
+                        <TouchableOpacity
+                            onPress={() => { resetForm(); onClose(); }}
+                            style={styles.closeButton}
                         >
-                            {commonHabits.map((habit, index) => (
-                                <TouchableOpacity
-                                    key={index}
-                                    style={[
-                                        styles.presetCard,
-                                        { borderColor: categoryConfig[habit.category].color + '40' }
-                                    ]}
-                                    onPress={() => handlePresetSelect(habit)}
-                                >
-                                    <View style={[
-                                        styles.presetIcon,
-                                        { backgroundColor: categoryConfig[habit.category].color + '20' }
-                                    ]}>
-                                        <IconSymbol
-                                            name={categoryConfig[habit.category].icon}
-                                            size={20}
-                                            color={categoryConfig[habit.category].color}
-                                        />
-                                    </View>
-                                    <ThemedText style={styles.presetName}>{habit.name}</ThemedText>
-                                    <ThemedText style={styles.presetDescription} numberOfLines={2}>
-                                        {habit.description}
-                                    </ThemedText>
-                                </TouchableOpacity>
-                            ))}
-                        </ScrollView>
+                            <IconSymbol name="xmark" size={24} color={Colors.light.textSecondary} />
+                        </TouchableOpacity>
                     </View>
 
-                    {/* Basic Information */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Podstawowe informacje</ThemedText>
-
-                        <View style={styles.inputGroup}>
-                            <ThemedText style={styles.inputLabel}>Nazwa nawyku *</ThemedText>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={name}
-                                    onChangeText={setName}
-                                    placeholder="np. Codzienny spacer"
-                                    placeholderTextColor={Colors.light.textSecondary}
-                                    maxLength={100}
-                                />
-                            </View>
-                        </View>
-
-                        <View style={styles.inputGroup}>
-                            <ThemedText style={styles.inputLabel}>Opis (opcjonalnie)</ThemedText>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={[styles.textInput, styles.multilineInput]}
-                                    value={description}
-                                    onChangeText={setDescription}
-                                    placeholder="Opisz szczegóły swojego nawyku..."
-                                    placeholderTextColor={Colors.light.textSecondary}
-                                    multiline
-                                    numberOfLines={3}
-                                    maxLength={500}
-                                />
-                            </View>
-                        </View>
-                    </View>
-
-                    {/* Category Selection */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Kategoria</ThemedText>
-                        <View style={styles.categoryGrid}>
-                            {Object.entries(categoryConfig).map(([key, config]) => {
-                                const isSelected = category === key;
-                                return (
+                    <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+                        {/* Quick Presets */}
+                        <View style={styles.section}>
+                            <ThemedText style={styles.sectionTitle}>Szybkie szablony</ThemedText>
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                style={styles.presetsContainer}
+                                contentContainerStyle={styles.presetsContent}
+                            >
+                                {commonHabits.map((habit, index) => (
                                     <TouchableOpacity
-                                        key={key}
+                                        key={index}
                                         style={[
-                                            styles.categoryButton,
-                                            isSelected && styles.categoryButtonActive,
-                                            { borderColor: config.color + '40' }
+                                            styles.presetCard,
+                                            { borderColor: categoryConfig[habit.category].color + '40' }
                                         ]}
-                                        onPress={() => setCategory(key as HabitCategory)}
+                                        onPress={() => handlePresetSelect(habit)}
                                     >
                                         <View style={[
-                                            styles.categoryIcon,
-                                            { backgroundColor: isSelected ? config.color : config.color + '20' }
+                                            styles.presetIcon,
+                                            { backgroundColor: categoryConfig[habit.category].color + '20' }
                                         ]}>
                                             <IconSymbol
-                                                name={config.icon}
-                                                size={18}
-                                                color={isSelected ? 'white' : config.color}
+                                                name={categoryConfig[habit.category].icon}
+                                                size={20}
+                                                color={categoryConfig[habit.category].color}
                                             />
                                         </View>
-                                        <ThemedText style={[
-                                            styles.categoryLabel,
-                                            { color: isSelected ? config.color : Colors.light.text }
-                                        ]}>
-                                            {config.label}
+                                        <ThemedText style={styles.presetName}>{habit.name}</ThemedText>
+                                        <ThemedText style={styles.presetDescription} numberOfLines={2}>
+                                            {habit.description}
                                         </ThemedText>
                                     </TouchableOpacity>
-                                );
-                            })}
+                                ))}
+                            </ScrollView>
                         </View>
-                    </View>
 
-                    {/* Frequency Selection */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Częstotliwość</ThemedText>
-                        <View style={styles.frequencyContainer}>
-                            {Object.entries(frequencyConfig).map(([key, config]) => {
-                                const isSelected = frequency === key;
-                                return (
-                                    <TouchableOpacity
-                                        key={key}
-                                        style={[
-                                            styles.frequencyButton,
-                                            isSelected && [styles.frequencyButtonActive, { backgroundColor: config.color + '20' }]
-                                        ]}
-                                        onPress={() => setFrequency(key as HabitFrequency)}
-                                    >
-                                        <IconSymbol
-                                            name={config.icon}
-                                            size={16}
-                                            color={isSelected ? config.color : Colors.light.textSecondary}
-                                        />
-                                        <ThemedText style={[
-                                            styles.frequencyLabel,
-                                            { color: isSelected ? config.color : Colors.light.text }
-                                        ]}>
-                                            {config.label}
-                                        </ThemedText>
-                                    </TouchableOpacity>
-                                );
-                            })}
-                        </View>
-                    </View>
+                        {/* Basic Information */}
+                        <View style={styles.section}>
+                            <ThemedText style={styles.sectionTitle}>Podstawowe informacje</ThemedText>
 
-                    {/* Advanced Options */}
-                    <View style={styles.section}>
-                        <ThemedText style={styles.sectionTitle}>Opcje zaawansowane</ThemedText>
+                            <View style={styles.inputGroup}>
+                                <ThemedText style={styles.inputLabel}>Nazwa nawyku *</ThemedText>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={name}
+                                        onChangeText={setName}
+                                        placeholder="np. Codzienny spacer"
+                                        placeholderTextColor={Colors.light.textSecondary}
+                                        maxLength={100}
+                                    />
+                                </View>
+                            </View>
 
-                        <View style={styles.inputGroup}>
-                            <ThemedText style={styles.inputLabel}>Cel (dni)</ThemedText>
-                            <View style={styles.inputContainer}>
-                                <TextInput
-                                    style={styles.textInput}
-                                    value={targetDays}
-                                    onChangeText={setTargetDays}
-                                    placeholder="np. 30 (opcjonalnie)"
-                                    placeholderTextColor={Colors.light.textSecondary}
-                                    keyboardType="numeric"
-                                />
+                            <View style={styles.inputGroup}>
+                                <ThemedText style={styles.inputLabel}>Opis (opcjonalnie)</ThemedText>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={[styles.textInput, styles.multilineInput]}
+                                        value={description}
+                                        onChangeText={setDescription}
+                                        placeholder="Opisz szczegóły swojego nawyku..."
+                                        placeholderTextColor={Colors.light.textSecondary}
+                                        multiline
+                                        numberOfLines={3}
+                                        maxLength={500}
+                                    />
+                                </View>
                             </View>
                         </View>
 
-                        <View style={styles.reminderSection}>
-                            <TouchableOpacity
-                                style={styles.reminderToggle}
-                                onPress={() => setReminderEnabled(!reminderEnabled)}
-                            >
-                                <View style={styles.reminderToggleLeft}>
-                                    <IconSymbol
-                                        name="bell"
-                                        size={20}
-                                        color={reminderEnabled ? Colors.light.tint : Colors.light.textSecondary}
-                                    />
-                                    <ThemedText style={styles.reminderToggleLabel}>
-                                        Przypomnienia
-                                    </ThemedText>
-                                </View>
-                                <View style={[
-                                    styles.toggle,
-                                    reminderEnabled && styles.toggleActive
-                                ]}>
-                                    <View style={[
-                                        styles.toggleThumb,
-                                        reminderEnabled && styles.toggleThumbActive
-                                    ]} />
-                                </View>
-                            </TouchableOpacity>
-
-                            {reminderEnabled && (
-                                <View style={styles.reminderTimeContainer}>
-                                    <ThemedText style={styles.inputLabel}>Godzina przypomnienia</ThemedText>
-                                    <View style={styles.inputContainer}>
-                                        <TextInput
-                                            style={styles.textInput}
-                                            value={reminderTime}
-                                            onChangeText={setReminderTime}
-                                            placeholder="09:00"
-                                            placeholderTextColor={Colors.light.textSecondary}
-                                        />
-                                    </View>
-                                </View>
-                            )}
+                        {/* Category Selection */}
+                        <View style={styles.section}>
+                            <ThemedText style={styles.sectionTitle}>Kategoria</ThemedText>
+                            <View style={styles.categoryGrid}>
+                                {Object.entries(categoryConfig).map(([key, config]) => {
+                                    const isSelected = category === key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={key}
+                                            style={[
+                                                styles.categoryButton,
+                                                isSelected && styles.categoryButtonActive,
+                                                { borderColor: config.color + '40' }
+                                            ]}
+                                            onPress={() => setCategory(key as HabitCategory)}
+                                        >
+                                            <View style={[
+                                                styles.categoryIcon,
+                                                { backgroundColor: isSelected ? config.color : config.color + '20' }
+                                            ]}>
+                                                <IconSymbol
+                                                    name={config.icon}
+                                                    size={18}
+                                                    color={isSelected ? 'white' : config.color}
+                                                />
+                                            </View>
+                                            <ThemedText style={[
+                                                styles.categoryLabel,
+                                                { color: isSelected ? config.color : Colors.light.text }
+                                            ]}>
+                                                {config.label}
+                                            </ThemedText>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
                         </View>
-                    </View>
-                </ScrollView>
 
-                <View style={styles.modalActions}>
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.cancelButton]}
-                        onPress={() => { resetForm(); onClose(); }}
-                        disabled={isSubmitting}
-                    >
-                        <ThemedText style={styles.cancelButtonText}>Anuluj</ThemedText>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[
-                            styles.actionButton,
-                            styles.saveButton,
-                            isSubmitting && styles.saveButtonDisabled
-                        ]}
-                        onPress={handleSubmit}
-                        disabled={isSubmitting}
-                    >
-                        <ThemedText style={styles.saveButtonText}>
-                            {isSubmitting ? 'Tworzenie...' : 'Utwórz nawyk'}
-                        </ThemedText>
-                    </TouchableOpacity>
+                        {/* Frequency Selection */}
+                        <View style={styles.section}>
+                            <ThemedText style={styles.sectionTitle}>Częstotliwość</ThemedText>
+                            <View style={styles.frequencyContainer}>
+                                {Object.entries(frequencyConfig).map(([key, config]) => {
+                                    const isSelected = frequency === key;
+                                    return (
+                                        <TouchableOpacity
+                                            key={key}
+                                            style={[
+                                                styles.frequencyButton,
+                                                isSelected && [styles.frequencyButtonActive, { backgroundColor: config.color + '20' }]
+                                            ]}
+                                            onPress={() => setFrequency(key as HabitFrequency)}
+                                        >
+                                            <IconSymbol
+                                                name={config.icon}
+                                                size={16}
+                                                color={isSelected ? config.color : Colors.light.textSecondary}
+                                            />
+                                            <ThemedText style={[
+                                                styles.frequencyLabel,
+                                                { color: isSelected ? config.color : Colors.light.text }
+                                            ]}>
+                                                {config.label}
+                                            </ThemedText>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        </View>
+
+                        {/* Advanced Options */}
+                        <View style={styles.section}>
+                            <ThemedText style={styles.sectionTitle}>Opcje zaawansowane</ThemedText>
+
+                            <View style={styles.inputGroup}>
+                                <ThemedText style={styles.inputLabel}>Cel (dni)</ThemedText>
+                                <View style={styles.inputContainer}>
+                                    <TextInput
+                                        style={styles.textInput}
+                                        value={targetDays}
+                                        onChangeText={setTargetDays}
+                                        placeholder="np. 30 (opcjonalnie)"
+                                        placeholderTextColor={Colors.light.textSecondary}
+                                        keyboardType="numeric"
+                                    />
+                                </View>
+                            </View>
+
+                            <View style={styles.reminderSection}>
+                                <TouchableOpacity
+                                    style={styles.reminderToggle}
+                                    onPress={() => setReminderEnabled(!reminderEnabled)}
+                                >
+                                    <View style={styles.reminderToggleLeft}>
+                                        <IconSymbol
+                                            name="bell"
+                                            size={20}
+                                            color={reminderEnabled ? Colors.light.tint : Colors.light.textSecondary}
+                                        />
+                                        <ThemedText style={styles.reminderToggleLabel}>
+                                            Przypomnienia
+                                        </ThemedText>
+                                    </View>
+                                    <View style={[
+                                        styles.toggle,
+                                        reminderEnabled && styles.toggleActive
+                                    ]}>
+                                        <View style={[
+                                            styles.toggleThumb,
+                                            reminderEnabled && styles.toggleThumbActive
+                                        ]} />
+                                    </View>
+                                </TouchableOpacity>
+
+                                {reminderEnabled && (
+                                    <View style={styles.reminderTimeContainer}>
+                                        <ThemedText style={styles.inputLabel}>Godzina przypomnienia</ThemedText>
+                                        <View style={styles.inputContainer}>
+                                            <TextInput
+                                                style={styles.textInput}
+                                                value={reminderTime}
+                                                onChangeText={setReminderTime}
+                                                placeholder="09:00"
+                                                placeholderTextColor={Colors.light.textSecondary}
+                                            />
+                                        </View>
+                                    </View>
+                                )}
+                            </View>
+                        </View>
+                    </ScrollView>
+
+                    <View style={styles.modalActions}>
+                        <TouchableOpacity
+                            style={[styles.actionButton, styles.cancelButton]}
+                            onPress={() => { resetForm(); onClose(); }}
+                            disabled={isSubmitting}
+                        >
+                            <ThemedText style={styles.cancelButtonText}>Anuluj</ThemedText>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[
+                                styles.actionButton,
+                                styles.saveButton,
+                                isSubmitting && styles.saveButtonDisabled
+                            ]}
+                            onPress={handleSubmit}
+                            disabled={isSubmitting}
+                        >
+                            <ThemedText style={styles.saveButtonText}>
+                                {isSubmitting ? 'Tworzenie...' : 'Utwórz nawyk'}
+                            </ThemedText>
+                        </TouchableOpacity>
+                    </View>
                 </View>
             </View>
-        </View>
         </Modal>
     );
 }

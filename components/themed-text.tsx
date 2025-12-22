@@ -26,6 +26,17 @@ export function ThemedText({
 
   const typographyStyle = DesignSystem.typography[variant];
 
+  // Debug logging for troubleshooting
+  if (__DEV__) {
+    console.log('🎨 ThemedText rendering:', {
+      variant,
+      color,
+      colorKey,
+      resolvedColor: textColor,
+      hasCustomColors: !!lightColor || !!darkColor
+    });
+  }
+
   return (
     <Text
       style={[

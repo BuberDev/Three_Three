@@ -8,11 +8,11 @@ import {
     VoiceNote,
     VoiceNoteResponse
 } from '../types';
+import { getApiUrl } from '../utils/config';
 import { AppError, AuthError, ErrorHandler, NetworkError, ServerError, ValidationError } from '../utils/errors';
 
 export class ApiService {
     private static instance: ApiService;
-    private readonly baseURL: string = __DEV__ ? 'http://localhost:3000/api' : 'https://your-api.com/api';
     private authToken: string | null = null;
     private backendAvailable: boolean | null = null;
     private lastBackendCheck: number = 0;
@@ -20,6 +20,10 @@ export class ApiService {
     private hasLoggedBackendUnavailable = false;
 
     private constructor() { }
+
+    private get baseURL(): string {
+        return `${getApiUrl()}/api`;
+    }
 
     public static getInstance(): ApiService {
         if (!ApiService.instance) {

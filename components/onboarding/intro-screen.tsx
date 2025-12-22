@@ -27,30 +27,33 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
             style={{
                 flex: 1,
                 paddingTop: insets.top,
-                paddingBottom: insets.bottom
+                paddingBottom: insets.bottom,
             }}
         >
             <View style={{
                 flex: 1,
                 paddingHorizontal: DesignSystem.spacing.xl,
-                justifyContent: 'space-between',
+                flexDirection: 'column',
             }}>
                 {/* Main Content */}
                 <View style={{
-                    flex: 1,
+                    flexGrow: 1,
+                    flexShrink: 1,
                     justifyContent: 'center',
                     alignItems: 'center',
+                    minHeight: 400, // Ensure minimum space for content
+                    paddingVertical: DesignSystem.spacing.xl, // Vertical padding for spacing
                 }}>
                     <View style={{
                         backgroundColor: 'rgba(255,255,255,0.15)',
                         borderRadius: DesignSystem.borderRadius.full,
-                        padding: DesignSystem.spacing['3xl'],
-                        marginBottom: DesignSystem.spacing['4xl'],
+                        padding: DesignSystem.spacing['2xl'],
+                        marginVertical: DesignSystem.spacing['xl'],
                         ...DesignSystem.elevation[2],
                     }}>
                         <IconSymbol
                             name="chart.line.uptrend.xyaxis"
-                            size={80}
+                            size={50}
                             color="white"
                         />
                     </View>
@@ -170,14 +173,18 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
 
                 {/* Bottom Button Section */}
                 <View style={{
+                    flexShrink: 0, // Prevent shrinking
+                    marginVertical: DesignSystem.spacing['2xl'],
                     paddingBottom: DesignSystem.spacing.lg,
                     alignItems: 'center',
+                    paddingTop: DesignSystem.spacing.md, // Extra space buffer
+                    minHeight: 120, // Ensure minimum space for button section
                 }}>
                     <View style={{
                         backgroundColor: 'rgba(255,255,255,0.15)',
                         borderRadius: DesignSystem.borderRadius.xl,
                         padding: 2,
-                        marginBottom: DesignSystem.spacing.lg,
+                        marginTop: DesignSystem.spacing['2xl'],
                         width: '100%',
                     }}>
                         <TouchableOpacity

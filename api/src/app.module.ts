@@ -18,6 +18,9 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+// Health
+import { HealthController } from './health/health.controller';
+
 // Auth
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
@@ -162,6 +165,9 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
         AnalyticsModule,
         AiModule,
         ChatModule,
+    ],
+    controllers: [
+        HealthController,
     ],
     providers: [
         // Global guards

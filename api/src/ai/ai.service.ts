@@ -251,4 +251,17 @@ export class AiService {
             throw error;
         }
     }
+
+    /**
+     * Convert speech to text - placeholder implementation
+     */
+    async speechToText(audioBuffer: Buffer, filename: string): Promise<{ transcription: string; confidence?: number }> {
+        this.logger.log(`Audio received: ${filename} (${audioBuffer.length} bytes)`);
+
+        // Return empty transcription - real speech-to-text would go here
+        return {
+            transcription: '',
+            confidence: 0.0,
+        };
+    }
 }

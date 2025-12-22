@@ -18,9 +18,19 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
+  const colors = Colors[colorScheme];
 
   const { initialize, isOnboarding, isAuthenticated, user, setOnboardingComplete } = useAppStore();
+
+  useEffect(() => {
+    // Debug color scheme for troubleshooting
+    console.log('🎨 RootLayout colorScheme:', {
+      scheme: colorScheme,
+      textColor: colors.text,
+      backgroundColor: colors.background,
+      platform: require('react-native').Platform.OS
+    });
+  }, [colorScheme, colors.text, colors.background]);
 
   useEffect(() => {
     // Initialize the app store and services

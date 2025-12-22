@@ -17,6 +17,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors, DesignSystem } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
+import { useVoiceRecording } from '../../hooks/use-voice-recording';
+import { AudioRecording } from '../../lib/types';
 import { ThemedText } from '../themed-text';
 import { IconSymbol } from '../ui/icon-symbol';
 
@@ -44,6 +46,115 @@ interface EnterpriseChatInterfaceProps {
 const { width: screenWidth } = Dimensions.get('window');
 const SIDEBAR_WIDTH = screenWidth * 0.75;
 
+/**
+ * Process voice recording to text using backend API
+ */
+const processVoiceToText = async (audioUri: string): Promise<string | null> => {
+    try {
+        console.log('🔊 Processing audio file:', audioUri);
+
+        // For React Native - send to our backend
+        if (audioUri.startsWith('file://')) {
+            try {
+                console.log('📤 Preparing to send audio to backend...');
+                console.log('🔗 Backend URL:', process.env.EXPO_PUBLIC_API_URL);
+
+                // Read the audio file
+                const response = await fetch(audioUri);
+                console.log('📁 Audio file fetch response:', response.status);
+                const audioBlob = await response.blob();
+                console.log('📦 Audio blob size:', audioBlob.size, 'bytes');
+
+                // Create FormData for upload
+                const formData = new FormData();
+                formData.append('audio', audioBlob, 'recording.m4a');
+                console.log('📋 FormData created with audio file');
+
+                const backendUrl = `${process.env.EXPO_PUBLIC_API_URL}/api/ai/speech-to-text`;
+                console.log('🚀 Sending request to:', backendUrl);
+
+                // Send to our backend speech-to-text endpoint
+                const backendResponse = await fetch(backendUrl, {
+                    method: 'POST',
+                    body: formData,
+                });
+
+                console.log('📨 Backend response status:', backendResponse.status);
+                console.log('📨 Backend response headers:', Object.fromEntries(backendResponse.headers.entries()));
+
+                if (backendResponse.ok) {
+                    const result = await backendResponse.json();
+                    console.log('✅ Backend response data:', result);
+
+                    // Parse nested response structure: result.data.data.transcription
+                    const transcriptionData = result?.data?.data;
+                    if (transcriptionData?.success && transcriptionData?.transcription) {
+                        console.log('✅ Backend transcription:', transcriptionData.transcription);
+                        return transcriptionData.transcription;
+                    } else {
+                        console.log('⚠️ No valid transcription in response:', transcriptionData);
+                    }
+                } else {
+                    const errorText = await backendResponse.text();
+                    console.error('❌ Backend error response:', errorText);
+                }
+            } catch (backendError) {
+                console.error('❌ Backend request failed:', backendError);
+                console.log('❌ Falling back to Web Speech API');
+            }
+        }
+
+        // Fallback: Try Web Speech API for browser
+        if (typeof window !== 'undefined' && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+            return new Promise((resolve, reject) => {
+                try {
+                    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                    const recognition = new SpeechRecognition();
+
+                    recognition.continuous = false;
+                    recognition.interimResults = false;
+                    recognition.lang = 'pl-PL';
+                    recognition.maxAlternatives = 1;
+
+                    let hasResult = false;
+
+                    recognition.onresult = (event: any) => {
+                        hasResult = true;
+                        const transcript = event.results[0][0].transcript;
+                        console.log('✅ Web Speech API transcription:', transcript);
+                        resolve(transcript);
+                    };
+
+                    recognition.onerror = (event: any) => {
+                        if (!hasResult) {
+                            console.error('❌ Web Speech API error:', event.error);
+                            reject(new Error(`Speech recognition error: ${event.error}`));
+                        }
+                    };
+
+                    recognition.onend = () => {
+                        if (!hasResult) {
+                            reject(new Error('No speech detected'));
+                        }
+                    };
+
+                    console.log('🎤 Starting Web Speech API recognition...');
+                    recognition.start();
+
+                } catch (error) {
+                    reject(error);
+                }
+            });
+        }
+
+        throw new Error('No speech recognition method available');
+
+    } catch (error) {
+        console.error('❌ All speech recognition methods failed:', error);
+        return null;
+    }
+};
+
 export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = ({
     session,
     messages,
@@ -59,11 +170,40 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
     const colors = Colors[colorScheme ?? 'light'];
     const [inputText, setInputText] = useState('');
     const [sidebarVisible, setSidebarVisible] = useState(false);
+    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+
+    // Wrap setInputText to debug changes
+    const debugSetInputText = React.useCallback((value: string | ((prev: string) => string)) => {
+        const finalValue = typeof value === 'function' ? value(inputText) : value;
+        console.log('🔍 setInputText called with:', JSON.stringify(finalValue));
+        setInputText(finalValue);
+    }, [inputText]);
     const flatListRef = useRef<FlatList>(null);
     const inputRef = useRef<TextInput>(null);
     const insets = useSafeAreaInsets();
     const slideAnim = useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
     const overlayOpacity = useRef(new Animated.Value(0)).current;
+
+    // Voice recording hook
+    const {
+        isRecording,
+        duration,
+        canRecord,
+        recordOnly,
+    } = useVoiceRecording();
+
+    // Debug effect to monitor inputText changes
+    React.useEffect(() => {
+        console.log('🔍 inputText state changed to:', inputText);
+        // If inputText contains voice recording indicator, focus the input
+        if (inputText.includes('[Nagranie głosowe') && inputRef.current) {
+            console.log('🔍 Voice text detected, but skipping focus for debugging...');
+            // Temporarily disable focus to test if it's the issue
+            // setTimeout(() => {
+            //     inputRef.current?.focus();
+            // }, 100);
+        }
+    }, [inputText]);
 
     React.useEffect(() => {
         if (sidebarVisible) {
@@ -111,6 +251,87 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
         } catch (error) {
             console.error('Failed to send message:', error);
         }
+    };
+
+    const handleVoiceRecording = async () => {
+        if (!canRecord) {
+            console.warn('Voice recording not available');
+            return;
+        }
+
+        try {
+            setIsVoiceRecording(true);
+            const result = await recordOnly();
+            console.log('🎯 handleVoiceRecording result:', result, 'type:', typeof result);
+
+            if (result && typeof result === 'object' && 'uri' in result) {
+                // Recording completed successfully
+                const audioRecording = result as AudioRecording;
+                console.log('🎙️ Audio recording completed:', audioRecording);
+
+                // Show temporary placeholder while processing
+                const tempIndicator = `[Przetwarzanie nagrania ${Math.ceil(audioRecording.duration / 1000)}s...]`;
+                console.log('📝 Adding temporary placeholder:', tempIndicator);
+                console.log('📝 Current inputText before update:', inputText);
+
+                const tempText = inputText + tempIndicator;
+                console.log('📝 Temp text to set:', tempText);
+                debugSetInputText(tempText);
+
+                // Reset recording state immediately after successful completion
+                setIsVoiceRecording(false);
+
+                // Process speech-to-text
+                try {
+                    console.log('🔊 Starting speech-to-text processing...');
+                    const transcription = await processVoiceToText(audioRecording.uri);
+
+                    if (transcription && transcription.trim()) {
+                        // Replace placeholder with actual transcription
+                        console.log('✅ Speech-to-text successful:', transcription);
+                        const finalText = inputText + transcription;
+                        debugSetInputText(finalText);
+                    } else {
+                        // If transcription failed, replace with error message
+                        console.log('❌ Speech-to-text failed or returned empty');
+                        const errorText = inputText + '[Nie udało się rozpoznać mowy]';
+                        debugSetInputText(errorText);
+                    }
+                } catch (error) {
+                    console.error('❌ Speech-to-text error:', error);
+                    // Replace placeholder with error message
+                    const errorText = inputText + '[Błąd rozpoznawania mowy]';
+                    debugSetInputText(errorText);
+                }
+
+                // Log current state for debugging
+                console.log('🔍 Voice recording processing completed');
+            } else if (result === 'recording-started') {
+                console.log('🎬 Recording started, waiting for user to stop...');
+                // Recording started, keep the UI in recording state
+                // The user will tap again to stop
+            } else {
+                console.log('⚠️ Unexpected result from recordOnly:', result);
+            }
+        } catch (error) {
+            console.error('Voice recording failed:', error);
+        } finally {
+            // Only reset recording state if we're not actively recording
+            if (!isRecording) {
+                setIsVoiceRecording(false);
+            }
+        }
+    };
+
+    const getVoiceButtonColor = () => {
+        if (isRecording) return colors.error;
+        if (isVoiceRecording) return colors.primary;
+        return colors.textSecondary;
+    };
+
+    const getVoiceButtonIcon = (): keyof typeof Ionicons.glyphMap => {
+        if (isRecording) return 'stop-circle';
+        return 'mic';
     };
 
     const formatTimestamp = (date: Date) => {
@@ -275,11 +496,30 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                         placeholder="Wpisz wiadomość..."
                         placeholderTextColor={colors.textSecondary}
                         value={inputText}
-                        onChangeText={setInputText}
+                        onChangeText={debugSetInputText}
                         multiline
                         maxLength={4000}
                         onSubmitEditing={handleSend}
+                        textAlignVertical="center"
                     />
+
+                    {/* Voice Recording Button */}
+                    <TouchableOpacity
+                        style={[
+                            styles.voiceButton,
+                            {
+                                backgroundColor: (isRecording || isVoiceRecording) ? getVoiceButtonColor() + '15' : 'transparent',
+                            }
+                        ]}
+                        onPress={handleVoiceRecording}
+                        disabled={!canRecord}
+                    >
+                        <Ionicons
+                            name={getVoiceButtonIcon()}
+                            size={22}
+                            color={getVoiceButtonColor()}
+                        />
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={[
@@ -299,8 +539,17 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                     </TouchableOpacity>
                 </View>
 
+                {isRecording && (
+                    <View style={styles.recordingIndicator}>
+                        <View style={[styles.recordingDot, { backgroundColor: colors.error }]} />
+                        <Text style={[styles.recordingText, { color: colors.error }]}>
+                            Nagrywanie... {Math.ceil(duration / 1000)}s
+                        </Text>
+                    </View>
+                )}
+
                 <Text style={[styles.inputHint, { color: colors.textTertiary }]}>
-                    {inputText.length}/4000 • Shift+Enter dla nowej linii
+                    {inputText.length}/4000 • Shift+Enter dla nowej linii • Mikrofon dla nagrania głosu
                 </Text>
             </View>
 
@@ -661,18 +910,30 @@ const styles = StyleSheet.create({
     },
     inputWrapper: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         borderRadius: DesignSystem.borderRadius.xl,
         borderWidth: 1,
         paddingHorizontal: DesignSystem.spacing.md,
         paddingVertical: DesignSystem.spacing.sm,
         marginBottom: DesignSystem.spacing.xs,
+        minHeight: 48,
     },
     textInput: {
         flex: 1,
         fontSize: 16,
         maxHeight: 120,
         lineHeight: 22,
+        paddingVertical: DesignSystem.spacing.xs,
+        textAlignVertical: 'center',
+        includeFontPadding: false,
+    },
+    voiceButton: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: DesignSystem.spacing.xs,
     },
     sendButton: {
         width: 36,
@@ -680,7 +941,23 @@ const styles = StyleSheet.create({
         borderRadius: 18,
         alignItems: 'center',
         justifyContent: 'center',
-        marginLeft: DesignSystem.spacing.sm,
+        marginLeft: DesignSystem.spacing.xs,
+    },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: DesignSystem.spacing.xs,
+        gap: DesignSystem.spacing.xs,
+    },
+    recordingDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    recordingText: {
+        fontSize: 12,
+        fontWeight: '500',
     },
     inputHint: {
         fontSize: 11,

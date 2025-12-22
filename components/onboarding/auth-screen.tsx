@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import GoogleAuthService from '../../lib/services/google-auth';
+import { getApiUrl } from '../../lib/utils/config';
 
 interface AuthScreenProps {
     onContinue: (authData: {
@@ -118,7 +119,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
         try {
             if (isLoginMode) {
                 // Handle login
-                const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/login`, {
+                const apiUrl = getApiUrl();
+                console.log('🔗 Using API URL:', apiUrl);
+
+                const response = await fetch(`${apiUrl}/api/auth/login`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

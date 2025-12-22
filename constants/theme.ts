@@ -51,9 +51,9 @@ interface ColorsType {
 
 export const Colors: ColorsType = {
   light: {
-    text: '#0F172A', // Slate-900
+    text: '#0F172A', // Slate-900 - Dark text for light backgrounds
     textSecondary: '#475569', // Slate-600
-    textTertiary: '#94A3B8', // Slate-400
+    textTertiary: '#64748B', // Slate-500 (changed from 400 for better contrast)
     background: '#FFFFFF',
     backgroundSecondary: '#F8FAFC', // Slate-50
     backgroundTertiary: '#F1F5F9', // Slate-100
@@ -66,11 +66,11 @@ export const Colors: ColorsType = {
     primary: PRIMARY,
     primaryLight: PRIMARY_LIGHT,
     primaryDark: PRIMARY_DARK,
-    gray: '#94A3B8', // Slate-400
+    gray: '#64748B', // Slate-500 (changed from 400 for better contrast)
     shadow: '#000000', // Shadow color
     icon: '#64748B', // Slate-500
     iconSecondary: '#94A3B8', // Slate-400
-    tabIconDefault: '#94A3B8',
+    tabIconDefault: '#64748B', // Improved contrast
     tabIconSelected: PRIMARY,
     success: '#10B981', // Emerald-500
     warning: '#F59E0B', // Amber-500

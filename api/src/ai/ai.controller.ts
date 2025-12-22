@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Logger, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Req, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -186,5 +187,65 @@ export class AiController {
     @Public()
     async getAvailableModels() {
         return this.aiService.getAvailableModels();
+    }
+
+    @Post('speech-to-text')
+    @Public()
+    @UseInterceptors(
+        FileInterceptor('audio', {
+            limits: {
+                fileSize: 50 * 1024 * 1024, // 50MB max
+            },
+            fileFilter: (req, file, cb) => {
+                // Accept audio files only
+                const allowedMimeTypes = [
+                    'audio/wav',
+                    'audio/mp3',
+                    'audio/mpeg',
+                    'audio/aac',
+                    'audio/m4a',
+                    'audio/mp4',
+                    'audio/x-m4a',
+                    'audio/flac',
+                    'audio/ogg',
+                ];
+
+                if (file && allowedMimeTypes.includes(file.mimetype)) {
+                    cb(null, true);
+                } else {
+                    console.warn(`Invalid audio format: ${file?.mimetype || 'unknown'}`);
+                    cb(new Error(`Invalid audio format. Allowed formats: ${allowedMimeTypes.join(', ')}`), false);
+                }
+            },
+        })
+    )
+    async speechToText(
+        @UploadedFile() audioFile: Express.Multer.File,
+    ) {
+        try {
+            if (!audioFile) {
+                return {
+                    success: false,
+                    error: 'No audio file provided',
+                };
+            }
+
+            this.logger.log(`Processing speech-to-text for: ${audioFile.originalname} (${audioFile.size} bytes)`);
+
+            const result = await this.aiService.speechToText(audioFile.buffer, audioFile.originalname);
+
+            return {
+                success: true,
+                transcription: result.transcription,
+                confidence: result.confidence,
+                timestamp: new Date().toISOString(),
+            };
+        } catch (error) {
+            this.logger.error('Speech-to-text endpoint error:', error);
+            return {
+                success: false,
+                error: error.message || 'Failed to process audio',
+            };
+        }
     }
 }
