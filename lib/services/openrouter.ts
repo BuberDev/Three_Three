@@ -5,7 +5,7 @@ export class OpenRouterService {
     private readonly apiBaseUrl: string;
 
     private constructor() {
-        this.apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001';
+        this.apiBaseUrl = process.env.API_URL || 'http://localhost:3001';
     }
 
     public static getInstance(): OpenRouterService {

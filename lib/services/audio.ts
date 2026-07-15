@@ -1,26 +1,42 @@
-import {
-    AudioModule,
-    createAudioPlayer,
-    getRecordingPermissionsAsync,
-    RecordingPresets,
-    requestRecordingPermissionsAsync,
-    setAudioModeAsync
-} from 'expo-audio';
-import * as FileSystem from 'expo-file-system/legacy';
+import AudioRecorderPlayer, {
+    AudioEncoderAndroidType,
+    AudioSet,
+    AudioSourceAndroidType,
+    AVEncoderAudioQualityIOSType,
+} from 'react-native-audio-recorder-player';
+import { PermissionsAndroid, Platform } from 'react-native';
+import RNFS from 'react-native-fs';
 
 import { RecordingState } from '../types';
 import { SleepRecordingAnalysis } from '../types/sleep';
 import { ApiService } from './api';
 
+const HIGH_QUALITY_SET: AudioSet = {
+    AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+    AudioSourceAndroid: AudioSourceAndroidType.MIC,
+    AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+    AVFormatIDKeyIOS: 'aac',
+    AVNumberOfChannelsKeyIOS: 1,
+};
+
+const LOW_QUALITY_SET: AudioSet = {
+    AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+    AudioSourceAndroid: AudioSourceAndroidType.MIC,
+    AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.low,
+    AVFormatIDKeyIOS: 'aac',
+    AVNumberOfChannelsKeyIOS: 1,
+};
+
 /**
  * Enterprise Audio Service
- * Manages audio recording and playbook with expo-audio
+ * Manages audio recording and playback with react-native-audio-recorder-player
  */
 export class AudioService {
     private static instance: AudioService;
-    private player: InstanceType<typeof AudioModule.AudioPlayer> | null = null;
-    private recorder: InstanceType<typeof AudioModule.AudioRecorder> | null = null;
     private isInitialized = false;
+    private isCurrentlyRecording = false;
+    private isCurrentlyPlaying = false;
+    private currentRecordingUri: string | null = null;
     private listeners: Array<(state: RecordingState) => void> = [];
     private recordingState: RecordingState = {
         isRecording: false,
@@ -31,7 +47,7 @@ export class AudioService {
     private cacheDir: string;
 
     constructor() {
-        this.cacheDir = `${FileSystem.cacheDirectory}audio/`;
+        this.cacheDir = `${RNFS.CachesDirectoryPath}/audio/`;
         this.initialize();
     }
 
@@ -43,24 +59,17 @@ export class AudioService {
     }
 
     /**
-     * Initialize the audio service with proper permissions and mode
+     * Initialize the audio service with proper permissions
      */
     public async initialize(): Promise<void> {
         if (this.isInitialized) return;
 
         try {
-            // Request recording permissions
-            const { status } = await requestRecordingPermissionsAsync();
+            const granted = await this.requestRecordingPermission();
 
-            if (status !== 'granted') {
+            if (!granted) {
                 throw new Error('Audio recording permission not granted');
             }
-
-            // Configure audio mode for both recording and playbook
-            await setAudioModeAsync({
-                allowsRecording: true,
-                playsInSilentMode: true,
-            });
 
             this.isInitialized = true;
             console.log('Audio service initialized successfully');
@@ -70,13 +79,24 @@ export class AudioService {
         }
     }
 
+    private async requestRecordingPermission(): Promise<boolean> {
+        if (Platform.OS === 'android') {
+            const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+            return granted === PermissionsAndroid.RESULTS.GRANTED;
+        }
+        // iOS prompts automatically the first time the recorder is started.
+        return true;
+    }
+
     /**
      * Check if recording permissions are granted
      */
     public async hasRecordingPermissions(): Promise<boolean> {
         try {
-            const { status } = await getRecordingPermissionsAsync();
-            return status === 'granted';
+            if (Platform.OS === 'android') {
+                return await PermissionsAndroid.check(PermissionsAndroid.PERMISSIONS.RECORD_AUDIO);
+            }
+            return true;
         } catch (error) {
             console.error('Error checking recording permissions:', error);
             return false;
@@ -101,12 +121,9 @@ export class AudioService {
                 throw new Error('Recording permissions not granted');
             }
 
-            // Create new recorder instance with high quality settings
-            this.recorder = new AudioModule.AudioRecorder(RecordingPresets.HIGH_QUALITY);
-
-            // Prepare and start recording
-            await this.recorder.prepareToRecordAsync();
-            this.recorder.record();
+            const uri = await AudioRecorderPlayer.startRecorder(undefined, HIGH_QUALITY_SET);
+            this.isCurrentlyRecording = true;
+            this.currentRecordingUri = uri;
 
             // Track recording start time
             this.recordingStartTime = Date.now();
@@ -137,15 +154,14 @@ export class AudioService {
      * Stop recording and return the file URI
      */
     public async stopRecording(): Promise<string> {
-        if (!this.recorder) {
+        if (!this.isCurrentlyRecording) {
             throw new Error('No active recording');
         }
 
         try {
-            await this.recorder.stop();
-            const uri = this.recorder.uri;
+            const uri = await AudioRecorderPlayer.stopRecorder();
 
-            // Calculate duration manually since expo-audio currentTime is unreliable
+            // Calculate duration manually, consistent with the previous implementation
             const duration = this.recordingStartTime
                 ? Date.now() - this.recordingStartTime
                 : 0;
@@ -168,7 +184,7 @@ export class AudioService {
             console.error('Failed to stop voice recording:', error);
             throw error;
         } finally {
-            this.recorder = null;
+            this.isCurrentlyRecording = false;
             this.recordingStartTime = null;
         }
     }
@@ -194,11 +210,12 @@ export class AudioService {
                 playableUri = await this.downloadAuthenticatedAudio(uri);
             }
 
-            // Create player with the audio source (local file or already accessible URI)
-            this.player = createAudioPlayer({ uri: playableUri });
-
-            // Start playback
-            this.player.play();
+            await AudioRecorderPlayer.startPlayer(playableUri);
+            this.isCurrentlyPlaying = true;
+            AudioRecorderPlayer.addPlaybackEndListener(() => {
+                this.isCurrentlyPlaying = false;
+                AudioRecorderPlayer.removePlaybackEndListener();
+            });
 
             console.log('Audio playback started for URI:', playableUri);
         } catch (error) {
@@ -217,14 +234,14 @@ export class AudioService {
             const localPath = `${this.cacheDir}${filename}`;
 
             // Create cache directory if it doesn't exist
-            const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
-            if (!dirInfo.exists) {
-                await FileSystem.makeDirectoryAsync(this.cacheDir, { intermediates: true });
+            const dirExists = await RNFS.exists(this.cacheDir);
+            if (!dirExists) {
+                await RNFS.mkdir(this.cacheDir);
             }
 
             // Check if file already exists in cache
-            const fileInfo = await FileSystem.getInfoAsync(localPath);
-            if (fileInfo.exists) {
+            const fileExists = await RNFS.exists(localPath);
+            if (fileExists) {
                 console.log('Using cached audio file:', localPath);
                 return localPath;
             }
@@ -239,18 +256,17 @@ export class AudioService {
 
             console.log('Downloading authenticated audio file:', remoteUri);
 
-            const downloadResult = await FileSystem.downloadAsync(
-                remoteUri,
-                localPath,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`
-                    }
+            const { promise } = RNFS.downloadFile({
+                fromUrl: remoteUri,
+                toFile: localPath,
+                headers: {
+                    'Authorization': `Bearer ${authToken}`
                 }
-            );
+            });
+            const downloadResult = await promise;
 
-            if (downloadResult.status !== 200) {
-                throw new Error(`Failed to download audio file: ${downloadResult.status}`);
+            if (downloadResult.statusCode !== 200) {
+                throw new Error(`Failed to download audio file: ${downloadResult.statusCode}`);
             }
 
             console.log('Audio file downloaded successfully:', localPath);
@@ -262,7 +278,7 @@ export class AudioService {
     }
 
     /**
-     * Stop audio playbook
+     * Stop audio playback
      */
     public stopAudio(): void {
         return this.stopPlayback();
@@ -272,11 +288,11 @@ export class AudioService {
      * Stop audio playback
      */
     public stopPlayback(): void {
-        if (this.player) {
-            this.player.pause();
-            this.player.remove();
-            this.player = null;
-            console.log('Audio playbook stopped');
+        if (this.isCurrentlyPlaying) {
+            AudioRecorderPlayer.stopPlayer();
+            AudioRecorderPlayer.removePlaybackEndListener();
+            this.isCurrentlyPlaying = false;
+            console.log('Audio playback stopped');
         }
     }
 
@@ -291,14 +307,14 @@ export class AudioService {
      * Check if currently playing
      */
     public isPlaying(): boolean {
-        return this.player?.playing || false;
+        return this.isCurrentlyPlaying;
     }
 
     /**
      * Get current recording duration in milliseconds
      */
     public getRecordingDuration(): number {
-        if (this.recorder && this.recordingState.isRecording && this.recordingStartTime) {
+        if (this.isCurrentlyRecording && this.recordingState.isRecording && this.recordingStartTime) {
             return Date.now() - this.recordingStartTime; // Live duration during recording
         }
         return this.recordingState.duration; // Stored duration after recording
@@ -308,12 +324,13 @@ export class AudioService {
      * Clean up resources
      */
     public cleanup(): void {
-        if (this.player) {
-            this.player.remove();
-            this.player = null;
+        if (this.isCurrentlyPlaying) {
+            AudioRecorderPlayer.stopPlayer();
+            this.isCurrentlyPlaying = false;
         }
-        if (this.recorder) {
-            this.recorder = null;
+        if (this.isCurrentlyRecording) {
+            AudioRecorderPlayer.stopRecorder();
+            this.isCurrentlyRecording = false;
         }
         console.log('Audio service cleaned up');
     }
@@ -323,9 +340,12 @@ export class AudioService {
      */
     public async deleteRecording(uri: string): Promise<void> {
         try {
-            // For now, just log - would require file system operations
-            console.log('Recording deletion requested for:', uri);
-            // TODO: Implement actual file deletion using expo-file-system
+            const path = uri.replace('file://', '');
+            const fileExists = await RNFS.exists(path);
+            if (fileExists) {
+                await RNFS.unlink(path);
+            }
+            console.log('Recording deleted:', uri);
         } catch (error) {
             console.error('Failed to delete recording:', error);
             throw error;
@@ -377,13 +397,9 @@ export class AudioService {
                 throw new Error('Recording permissions not granted');
             }
 
-            // Create recorder with optimized settings for long recordings
-            const sleepRecordingOptions = {
-                ...RecordingPresets.LOW_QUALITY, // Use lower quality for long recordings
-            };
-
-            this.recorder = new AudioModule.AudioRecorder(sleepRecordingOptions);
-            await this.recorder.prepareToRecordAsync();
+            const uri = await AudioRecorderPlayer.startRecorder(undefined, LOW_QUALITY_SET);
+            this.isCurrentlyRecording = true;
+            this.currentRecordingUri = uri;
 
             // Start recording timestamp for duration tracking
             this.recordingStartTime = Date.now();
@@ -396,9 +412,6 @@ export class AudioService {
             };
             this.notifyListeners();
 
-            // Start recording (will continue until stopped)
-            this.recorder.record();
-
             console.log('Nocturnal recording started for sleep analysis', options);
         } catch (error) {
             console.error('Failed to start nocturnal recording:', error);
@@ -410,13 +423,12 @@ export class AudioService {
      * Stop nocturnal recording and return analysis data
      */
     public async stopNocturnalRecording(): Promise<SleepRecordingAnalysis> {
-        if (!this.recorder) {
+        if (!this.isCurrentlyRecording) {
             throw new Error('No active nocturnal recording');
         }
 
         try {
-            await this.recorder.stop();
-            const uri = this.recorder.uri;
+            const uri = await AudioRecorderPlayer.stopRecorder();
             const duration = this.getRecordingDuration();
 
             if (!uri) {
@@ -453,7 +465,7 @@ export class AudioService {
             console.error('Failed to stop nocturnal recording:', error);
             throw error;
         } finally {
-            this.recorder = null;
+            this.isCurrentlyRecording = false;
             this.recordingStartTime = null;
         }
     }
@@ -462,13 +474,13 @@ export class AudioService {
      * Get current sleep analysis data
      */
     public getCurrentSleepAnalysis(): SleepRecordingAnalysis | null {
-        if (!this.recorder) return null;
+        if (!this.isCurrentlyRecording) return null;
 
         const duration = this.getRecordingDuration();
 
         return {
             id: 'current',
-            uri: this.recorder.uri || '',
+            uri: this.currentRecordingUri || '',
             duration,
             timestamp: new Date(),
             audioLevels: [],
@@ -487,9 +499,9 @@ export class AudioService {
      */
     public async clearAudioCache(): Promise<void> {
         try {
-            const dirInfo = await FileSystem.getInfoAsync(this.cacheDir);
-            if (dirInfo.exists) {
-                await FileSystem.deleteAsync(this.cacheDir, { idempotent: true });
+            const dirExists = await RNFS.exists(this.cacheDir);
+            if (dirExists) {
+                await RNFS.unlink(this.cacheDir);
                 console.log('Audio cache cleared successfully');
             }
         } catch (error) {

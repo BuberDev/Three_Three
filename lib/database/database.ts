@@ -1,10 +1,10 @@
-import * as Crypto from 'expo-crypto';
-import * as SQLite from 'expo-sqlite';
+import uuid from 'react-native-uuid';
+import { open, DB } from '@op-engineering/op-sqlite';
 import { AppEvent, DailyEntry, Task, User, VoiceNote } from '../types';
 
 export class DatabaseService {
     private static instance: DatabaseService;
-    private db: SQLite.SQLiteDatabase | null = null;
+    private db: DB | null = null;
 
     private constructor() { }
 
@@ -21,7 +21,7 @@ export class DatabaseService {
 
     public async initialize(): Promise<void> {
         try {
-            this.db = await SQLite.openDatabaseAsync('threethree.db');
+            this.db = open({ name: 'threethree.db' });
             await this.createTables();
             await this.runMigrations();
         } catch (error) {
@@ -30,12 +30,42 @@ export class DatabaseService {
         }
     }
 
+    // op-sqlite adapter methods (keep the same call shape the rest of this
+    // file already used with expo-sqlite, so CRUD methods below stay unchanged)
+    private async execAsync(sql: string): Promise<void> {
+        if (!this.db) throw new Error('Database not initialized');
+        const statements = sql
+            .split(';')
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+        for (const statement of statements) {
+            await this.db.execute(statement);
+        }
+    }
+
+    private async runAsync(sql: string, params: any[] = []): Promise<void> {
+        if (!this.db) throw new Error('Database not initialized');
+        await this.db.execute(sql, params);
+    }
+
+    private async getFirstAsync<T>(sql: string, params: any[] = []): Promise<T | null> {
+        if (!this.db) throw new Error('Database not initialized');
+        const result = await this.db.execute(sql, params);
+        return (result.rows[0] as T) ?? null;
+    }
+
+    private async getAllAsync<T>(sql: string, params: any[] = []): Promise<T[]> {
+        if (!this.db) throw new Error('Database not initialized');
+        const result = await this.db.execute(sql, params);
+        return result.rows as T[];
+    }
+
     private async runMigrations(): Promise<void> {
         if (!this.db) throw new Error('Database not initialized');
 
         try {
             // 🔧 Migration: Add missing summary column if it doesn't exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN summary TEXT;
             `);
             console.log('✅ Database migration: Added summary column');
@@ -50,7 +80,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Add missing duration column if it doesn't exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN duration REAL;
             `);
             console.log('✅ Database migration: Added duration column');
@@ -65,7 +95,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Add missing audioUrl column if it doesn't exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN audioUrl TEXT;
             `);
             console.log('✅ Database migration: Added audioUrl column');
@@ -80,7 +110,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Clean up tasks with invalid UUIDs (remove non-UUID format IDs)
-            await this.db.execAsync(`
+            await this.execAsync(`
                 DELETE FROM tasks WHERE id NOT LIKE '%-%-%-%-%' OR length(id) != 36;
             `);
             console.log('✅ Database migration: Cleaned up tasks with invalid UUIDs');
@@ -89,7 +119,7 @@ export class DatabaseService {
         }
         try {
             // 🔧 Migration: Add missing file_size column if it does not exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN file_size INTEGER;
             `);
             console.log("✅ Database migration: Added file_size column");
@@ -104,7 +134,7 @@ export class DatabaseService {
 
         try {
             // �� Migration: Add missing mime_type column if it does not exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN mime_type TEXT;
             `);
             console.log("✅ Database migration: Added mime_type column");
@@ -119,7 +149,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Add missing processing_status column if it does not exist
-            await this.db.execAsync(`
+            await this.execAsync(`
                 ALTER TABLE voice_notes ADD COLUMN processing_status TEXT;
             `);
             console.log("✅ Database migration: Added processing_status column");
@@ -134,7 +164,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Clean old tasks with invalid UUID format
-            await this.db.execAsync(`
+            await this.execAsync(`
                 DELETE FROM tasks WHERE id NOT LIKE '%-%-%-%-%';
             `);
             console.log('✅ Database migration: Cleaned old tasks with invalid UUID format');
@@ -144,7 +174,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Clean old daily_entries with invalid UUID format  
-            await this.db.execAsync(`
+            await this.execAsync(`
                 DELETE FROM daily_entries WHERE id NOT LIKE '%-%-%-%-%';
             `);
             console.log('✅ Database migration: Cleaned old daily_entries with invalid UUID format');
@@ -154,7 +184,7 @@ export class DatabaseService {
 
         try {
             // 🔧 Migration: Clean old voice_notes with invalid UUID format
-            await this.db.execAsync(`
+            await this.execAsync(`
                 DELETE FROM voice_notes WHERE id NOT LIKE '%-%-%-%-%';
             `);
             console.log('✅ Database migration: Cleaned old voice_notes with invalid UUID format');
@@ -267,7 +297,7 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_events_timestamp ON events(timestamp);
     `;
 
-        await this.db.execAsync(createTablesSQL);
+        await this.execAsync(createTablesSQL);
     }
 
     // User methods
@@ -278,7 +308,7 @@ export class DatabaseService {
         const now = new Date().toISOString();
         const newUser: User = { ...user, id, createdAt: now, updatedAt: now };
 
-        await this.db.runAsync(
+        await this.runAsync(
             'INSERT INTO users (id, email, auth_provider, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
             [newUser.id, newUser.email, newUser.authProvider, newUser.createdAt, newUser.updatedAt]
         );
@@ -289,7 +319,7 @@ export class DatabaseService {
     public async getUserById(id: string): Promise<User | null> {
         if (!this.db) throw new Error('Database not initialized');
 
-        const result = await this.db.getFirstAsync<User>(
+        const result = await this.getFirstAsync<User>(
             'SELECT * FROM users WHERE id = ?',
             [id]
         );
@@ -336,7 +366,7 @@ export class DatabaseService {
             processed
         });
 
-        await this.db.runAsync(
+        await this.runAsync(
             `INSERT OR REPLACE INTO voice_notes (id, user_id, audio_url, transcription, raw_transcript, 
        summary, duration, file_size, mime_type, processing_status, processed_at,
        sentiment_score, topics, extracted_items, embedding, created_at) 
@@ -371,7 +401,7 @@ export class DatabaseService {
         console.log(`🔍 Querying voice notes for user: ${userId}, limit: ${limit}`);
 
         try {
-            const results = await this.db.getAllAsync<any>(
+            const results = await this.getAllAsync<any>(
                 'SELECT * FROM voice_notes WHERE user_id = ? ORDER BY created_at DESC LIMIT ?',
                 [userId, limit]
             );
@@ -405,7 +435,7 @@ export class DatabaseService {
         const now = new Date().toISOString();
         const newTask: Task = { ...task, id };
 
-        await this.db.runAsync(
+        await this.runAsync(
             `INSERT INTO tasks (id, user_id, title, description, priority, completed, 
        due_date, category, extracted_from_voice_note_id, created_at, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -440,14 +470,14 @@ export class DatabaseService {
 
         query += ' ORDER BY created_at DESC';
 
-        const results = await this.db.getAllAsync<any>(query, params);
+        const results = await this.getAllAsync<any>(query, params);
         return results.map(this.mapTaskFromDb);
     }
 
     public async updateTaskCompletion(taskId: string, completed: boolean): Promise<void> {
         if (!this.db) throw new Error('Database not initialized');
 
-        await this.db.runAsync(
+        await this.runAsync(
             'UPDATE tasks SET completed = ?, updated_at = ? WHERE id = ?',
             [completed ? 1 : 0, new Date().toISOString(), taskId]
         );
@@ -457,7 +487,7 @@ export class DatabaseService {
         if (!this.db) throw new Error('Database not initialized');
 
         const now = new Date().toISOString();
-        await this.db.runAsync(
+        await this.runAsync(
             `INSERT OR REPLACE INTO tasks 
             (id, user_id, title, description, priority, completed, due_date, category, extracted_from_voice_note_id, created_at, updated_at) 
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -515,14 +545,14 @@ export class DatabaseService {
         params.push(taskId);
 
         const query = `UPDATE tasks SET ${setParts.join(', ')} WHERE id = ?`;
-        await this.db.runAsync(query, params);
+        await this.runAsync(query, params);
     }
 
     // Daily Entries methods
     public async getDailyEntry(userId: string, date: string): Promise<DailyEntry | null> {
         if (!this.db) throw new Error('Database not initialized');
 
-        const result = await this.db.getFirstAsync<any>(
+        const result = await this.getFirstAsync<any>(
             'SELECT * FROM daily_entries WHERE user_id = ? AND date = ?',
             [userId, date]
         );
@@ -537,7 +567,7 @@ export class DatabaseService {
         const now = new Date().toISOString();
         const newEntry: DailyEntry = { ...entry, id, updatedAt: now };
 
-        await this.db.runAsync(
+        await this.runAsync(
             `INSERT OR REPLACE INTO daily_entries (id, user_id, date, auto_summary, tasks, habits, mood, updated_at) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
             [
@@ -561,7 +591,7 @@ export class DatabaseService {
 
         const id = this.generateId();
 
-        await this.db.runAsync(
+        await this.runAsync(
             'INSERT INTO events (id, user_id, event_type, payload, timestamp) VALUES (?, ?, ?, ?, ?)',
             [id, event.userId, event.eventType, JSON.stringify(event.payload), event.timestamp]
         );
@@ -569,7 +599,7 @@ export class DatabaseService {
 
     // Helper methods
     private generateId(): string {
-        return Crypto.randomUUID();
+        return uuid.v4() as string;
     }
 
     private mapVoiceNoteFromDb(row: any): VoiceNote {
@@ -628,7 +658,7 @@ export class DatabaseService {
     public async clearAllData(): Promise<void> {
         if (!this.db) throw new Error('Database not initialized');
 
-        await this.db.execAsync(`
+        await this.execAsync(`
       DELETE FROM events;
       DELETE FROM tasks;
       DELETE FROM habits;

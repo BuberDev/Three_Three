@@ -30,7 +30,8 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (contains real secrets: DB password, Redis token, etc.)
+.env
 .env*.local
 
 # typescript
@@ -38,6 +39,10 @@ yarn-error.*
 
 app-example
 
-# generated native folders
-/ios
-/android
+# native build artifacts (ios/ and android/ are tracked, like Nutrilabify's bare RN workflow)
+ios/build/
+ios/Pods/
+android/build/
+android/app/build/
+android/.gradle/
+android/local.properties

@@ -1,5 +1,5 @@
-import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
+import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
+import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
 import { DimensionValue, TouchableOpacity, TouchableOpacityProps, View, ViewStyle } from 'react-native';
 
@@ -60,7 +60,7 @@ export function ModernButton({
 
     const handlePress = (event: any) => {
         if (!disabled && onPress) {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            ReactNativeHapticFeedback.trigger('impactLight');
             onPress(event);
         }
     };

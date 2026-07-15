@@ -341,7 +341,7 @@ export const useAppStore = create<AppStore>()(
                                 price: 39.99, // 39.99 PLN
                                 currency: 'pln',
                                 interval: 'month',
-                                stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
+                                stripePriceId: process.env.STRIPE_PREMIUM_PRICE_ID || '',
                                 recommended: true,
                                 features: [
                                     'Nieograniczony AI asystent zdrowia',
@@ -358,7 +358,7 @@ export const useAppStore = create<AppStore>()(
                                 price: 399.99, // 399.99 PLN (savings vs monthly)
                                 currency: 'pln',
                                 interval: 'year',
-                                stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
+                                stripePriceId: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
                                 recommended: false,
                                 features: [
                                     'Wszystko z planu miesięcznego',
@@ -421,7 +421,7 @@ export const useAppStore = create<AppStore>()(
                                     price: 3999,
                                     currency: 'pln',
                                     interval: 'month',
-                                    stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
+                                    stripePriceId: process.env.STRIPE_PREMIUM_PRICE_ID || '',
                                     recommended: true,
                                     features: ['AI asystent', 'Zaawansowane analityki', 'Monitor snu', 'Eksport danych', 'Wsparcie 24/7']
                                 },
@@ -432,7 +432,7 @@ export const useAppStore = create<AppStore>()(
                                     price: 39999,
                                     currency: 'pln',
                                     interval: 'year',
-                                    stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
+                                    stripePriceId: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
                                     recommended: false,
                                     features: ['Wszystko z planu miesięcznego', 'Oszczędność 20%', 'Dedykowany support']
                                 }
@@ -1645,8 +1645,8 @@ export const useAppStore = create<AppStore>()(
 
                     // Haptic feedback for success
                     try {
-                        const { HapticFeedback } = await import('expo-haptics');
-                        await HapticFeedback.notificationAsync(HapticFeedback.NotificationFeedbackType.Success);
+                        const ReactNativeHapticFeedback = (await import('react-native-haptic-feedback')).default;
+                        ReactNativeHapticFeedback.trigger('notificationSuccess');
                     } catch (e) {
                         // Platform doesn't support haptics
                     }
@@ -1688,8 +1688,8 @@ export const useAppStore = create<AppStore>()(
                     if (error.message.includes('already completed on this date')) {
                         // Haptic warning feedback
                         try {
-                            const { HapticFeedback } = await import('expo-haptics');
-                            await HapticFeedback.notificationAsync(HapticFeedback.NotificationFeedbackType.Warning);
+                            const ReactNativeHapticFeedback = (await import('react-native-haptic-feedback')).default;
+                            ReactNativeHapticFeedback.trigger('notificationWarning');
                         } catch (e) { }
                     } else {
                         setError('Failed to complete habit');
@@ -2027,7 +2027,7 @@ export const useAppStore = create<AppStore>()(
                             console.log('🏥 Checking backend health before token verification...');
                             let backendHealthy = false;
                             try {
-                                const healthResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/health`, {
+                                const healthResponse = await fetch(`${process.env.API_URL}/api/health`, {
                                     method: 'GET',
                                     timeout: 5000
                                 });
@@ -2063,10 +2063,10 @@ export const useAppStore = create<AppStore>()(
                                 // Try to fetch user profile to verify token is still valid
                                 try {
                                     console.log('🔍 Verifying stored token with backend...');
-                                    console.log('🔗 API URL:', process.env.EXPO_PUBLIC_API_URL);
+                                    console.log('🔗 API URL:', process.env.API_URL);
 
                                     // Validate token with backend
-                                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
+                                    const response = await fetch(`${process.env.API_URL}/api/auth/profile`, {
                                         method: 'POST',
                                         headers: {
                                             'Authorization': `Bearer ${accessToken}`,
@@ -2119,7 +2119,7 @@ export const useAppStore = create<AppStore>()(
                                         // Try to refresh token before clearing
                                         if (refreshToken && (response.status === 401 || response.status === 403)) {
                                             console.log('🔄 Attempting token refresh during initialization...');
-                                            const refreshResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/refresh`, {
+                                            const refreshResponse = await fetch(`${process.env.API_URL}/api/auth/refresh`, {
                                                 method: 'POST',
                                                 headers: { 'Content-Type': 'application/json' },
                                                 body: JSON.stringify({ refreshToken }),
@@ -2135,7 +2135,7 @@ export const useAppStore = create<AppStore>()(
                                                     await AsyncStorage.setItem('@access_token', newAccessToken);
 
                                                     // Retry auth check with new token
-                                                    const retryResponse = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/profile`, {
+                                                    const retryResponse = await fetch(`${process.env.API_URL}/api/auth/profile`, {
                                                         method: 'POST',
                                                         headers: { 'Authorization': `Bearer ${newAccessToken}` },
                                                     });
@@ -2341,7 +2341,7 @@ export const useAppStore = create<AppStore>()(
 
                     console.log('🔄 Attempting to refresh access token...');
 
-                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/refresh`, {
+                    const response = await fetch(`${process.env.API_URL}/api/auth/refresh`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -2382,7 +2382,7 @@ export const useAppStore = create<AppStore>()(
                 if (!accessToken) return;
 
                 try {
-                    const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/me`, {
+                    const response = await fetch(`${process.env.API_URL}/api/auth/me`, {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
                         },

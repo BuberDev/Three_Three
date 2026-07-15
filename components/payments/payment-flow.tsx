@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -71,7 +71,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({
     const handleCardPayment = async () => {
         try {
             // Get setup intent from backend
-            const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/payments/stripe/setup-intent`, {
+            const response = await fetch(`${process.env.API_URL}/api/payments/stripe/setup-intent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

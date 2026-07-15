@@ -1,7 +1,6 @@
-// Fallback for using MaterialIcons on Android and web.
+// Icon component using MaterialIcons (react-native-vector-icons) on all platforms.
 
-import MaterialIcons from '@expo/vector-icons/MaterialIcons';
-import { SymbolWeight } from 'expo-symbols';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 
 type IconMapping = Record<string, string>;
@@ -17,25 +16,76 @@ const MAPPING: IconMapping = {
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'mic': 'mic',
   'mic.fill': 'mic',
+  'mic.slash': 'mic-off',
+  'moon': 'nightlight-round',
+  'moon.fill': 'nightlight-round',
+  'moon.zzz': 'bedtime',
   'list.bullet': 'list',
+  'list.bullet.clipboard': 'assignment',
   'brain': 'psychology',
   'person.circle': 'person',
+  'person.fill': 'person',
+  'chart.bar': 'bar-chart',
   'chart.bar.fill': 'bar-chart',
+  'chart.bar.xaxis': 'bar-chart',
+  'chart.line.uptrend.xyaxis': 'trending-up',
+  'chart.pie': 'pie-chart',
+  'chart.pie.fill': 'pie-chart',
   'message.circle.fill': 'chat',
   'plus': 'add',
+  'plus.circle.fill': 'add-circle',
+  'waveform': 'graphic-eq',
+  'waveform.circle.fill': 'graphic-eq',
+  'square.and.pencil': 'edit',
+  'pencil': 'edit',
+  'creditcard.fill': 'credit-card',
   'arrow.left': 'arrow-back',
   'ellipsis.horizontal': 'more-horiz',
   'chatbubble': 'chat-bubble',
   'folder': 'folder',
   'analytics': 'analytics',
   'code': 'code',
+  'airplane': 'flight',
+  'app.badge': 'apps',
+  'battery.100': 'battery-full',
+  'bell.fill': 'notifications',
+  'bolt.fill': 'bolt',
+  'briefcase.fill': 'work',
+  'calendar': 'event',
+  'calendar.badge.plus': 'event',
+  'checkmark': 'check',
+  'checkmark.circle': 'check-circle',
+  'checkmark.circle.fill': 'check-circle',
+  'checkmark.seal.fill': 'verified',
+  'clock': 'schedule',
+  'cloud': 'cloud',
+  'crown.fill': 'workspace-premium',
+  'exclamationmark.triangle': 'warning',
+  'figure.run': 'directions-run',
+  'flame.fill': 'local-fire-department',
+  'flask': 'science',
+  'heart.fill': 'favorite',
+  'hourglass': 'hourglass-empty',
+  'info.circle': 'info',
+  'lightbulb': 'lightbulb',
+  'location': 'location-on',
+  'star': 'star-border',
+  'star.fill': 'star',
+  'sun.haze.fill': 'wb-sunny',
+  'sun.max.fill': 'wb-sunny',
+  'sunrise': 'wb-twilight',
+  'target': 'track-changes',
+  'trash': 'delete',
+  'trophy': 'emoji-events',
+  'trophy.fill': 'emoji-events',
+  'wand.and.stars': 'auto-fix-high',
+  'xmark': 'close',
 };
 
 /**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
+ * An icon component that renders Material Icons on every platform, mapped from SF Symbols names.
  */
 export function IconSymbol({
   name,
@@ -47,7 +97,7 @@ export function IconSymbol({
   size?: number;
   color: string | OpaqueColorValue;
   style?: StyleProp<TextStyle>;
-  weight?: SymbolWeight;
+  weight?: string;
 }) {
-  return <MaterialIcons color={color} size={size} name={MAPPING[name] as any} style={style} />;
+  return <MaterialIcons color={color as string} size={size} name={MAPPING[name] ?? name} style={style} />;
 }

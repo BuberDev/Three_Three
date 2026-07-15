@@ -1,6 +1,5 @@
 import { useAppStore } from '@/stores/app-store';
-import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import notifee, { AndroidImportance, TimestampTrigger, TriggerType } from '@notifee/react-native';
 
 export interface NotificationSettings {
     enabled: boolean;
@@ -24,6 +23,8 @@ export interface LocalNotification {
     scheduledAt?: Date;
     data?: Record<string, any>;
 }
+
+const DEFAULT_CHANNEL_ID = 'default';
 
 export class NotificationService {
     private static instance: NotificationService;
@@ -64,13 +65,11 @@ export class NotificationService {
                 return false;
             }
 
-            // Set notification handler
-            await Notifications.setNotificationHandler({
-                handleNotification: async () => ({
-                    shouldShowAlert: true,
-                    shouldPlaySound: true,
-                    shouldSetBadge: false,
-                }),
+            // Android requires a channel for any notification to display
+            await notifee.createChannel({
+                id: DEFAULT_CHANNEL_ID,
+                name: 'Default Channel',
+                importance: AndroidImportance.DEFAULT,
             });
 
             this.isInitialized = true;
@@ -92,8 +91,8 @@ export class NotificationService {
                 return false;
             }
 
-            const { status } = await Notifications.requestPermissionsAsync();
-            return status === 'granted';
+            const settings = await notifee.requestPermission();
+            return settings.authorizationStatus >= 1;
         } catch (error) {
             console.error('❌ Error requesting push permissions:', error);
             return false;
@@ -113,22 +112,27 @@ export class NotificationService {
             console.log(`📢 Sending notification: ${notification.title} - ${notification.body}`);
 
             if (notification.scheduledAt) {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
+                const trigger: TimestampTrigger = {
+                    type: TriggerType.TIMESTAMP,
+                    timestamp: notification.scheduledAt.getTime(),
+                };
+                await notifee.createTriggerNotification(
+                    {
+                        id: notification.id,
                         title: notification.title,
                         body: notification.body,
                         data: notification.data,
+                        android: { channelId: DEFAULT_CHANNEL_ID },
                     },
-                    trigger: { date: notification.scheduledAt },
-                });
+                    trigger
+                );
             } else {
-                await Notifications.scheduleNotificationAsync({
-                    content: {
-                        title: notification.title,
-                        body: notification.body,
-                        data: notification.data,
-                    },
-                    trigger: null,
+                await notifee.displayNotification({
+                    id: notification.id,
+                    title: notification.title,
+                    body: notification.body,
+                    data: notification.data,
+                    android: { channelId: DEFAULT_CHANNEL_ID },
                 });
             }
 
@@ -238,16 +242,14 @@ export class NotificationService {
      */
     async cancelHabitReminders(habitName: string): Promise<void> {
         try {
-            const scheduledNotifications = await Notifications.getAllScheduledNotificationsAsync();
-            const habitNotifications = scheduledNotifications.filter(notification =>
-                notification.identifier.startsWith(`habit_${habitName}`)
-            );
+            const scheduledIds = await notifee.getTriggerNotificationIds();
+            const habitNotificationIds = scheduledIds.filter(id => id.startsWith(`habit_${habitName}`));
 
-            for (const notification of habitNotifications) {
-                await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+            for (const id of habitNotificationIds) {
+                await notifee.cancelNotification(id);
             }
 
-            console.log(`📢 Cancelled ${habitNotifications.length} habit reminders for: ${habitName}`);
+            console.log(`📢 Cancelled ${habitNotificationIds.length} habit reminders for: ${habitName}`);
         } catch (error) {
             console.error('❌ Error cancelling habit reminders:', error);
         }
@@ -258,7 +260,7 @@ export class NotificationService {
      */
     async cancelAllNotifications(): Promise<void> {
         try {
-            await Notifications.cancelAllScheduledNotificationsAsync();
+            await notifee.cancelAllNotifications();
             console.log('📢 All notifications cancelled');
         } catch (error) {
             console.error('❌ Error cancelling notifications:', error);
@@ -270,7 +272,7 @@ export class NotificationService {
      */
     async clearBadge(): Promise<void> {
         try {
-            await Notifications.setBadgeCountAsync(0);
+            await notifee.setBadgeCount(0);
             console.log('📢 Badge cleared');
         } catch (error) {
             console.error('❌ Error clearing badge:', error);
@@ -286,21 +288,13 @@ export class NotificationService {
 
     /**
      * Pobierz token do push powiadomień
+     *
+     * Note: this was previously backed by Expo's push notification service,
+     * which has no bare-RN equivalent without setting up FCM/APNs directly.
+     * No caller currently consumes this token server-side, so it returns null.
      */
     async getPushToken(): Promise<string | null> {
-        try {
-            if (!this.arePushNotificationsEnabled()) {
-                return null;
-            }
-
-            const token = await Notifications.getExpoPushTokenAsync({
-                projectId: Constants.expoConfig?.extra?.eas?.projectId,
-            });
-            return token.data;
-        } catch (error) {
-            console.error('❌ Error getting push token:', error);
-            return null;
-        }
+        return null;
     }
 }
 

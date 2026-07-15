@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -85,7 +85,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                         setIsLoading(true);
                         try {
                             const response = await fetch(
-                                `${process.env.EXPO_PUBLIC_API_URL}/api/subscriptions/cancel`,
+                                `${process.env.API_URL}/api/subscriptions/cancel`,
                                 {
                                     method: 'POST',
                                     headers: {

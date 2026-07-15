@@ -125,6 +125,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                     port: configService.get('redis.port'),
                     password: configService.get('redis.password'),
                     db: configService.get('redis.db'),
+                    tls: configService.get('redis.tls'),
                 },
                 defaultJobOptions: {
                     attempts: 3,

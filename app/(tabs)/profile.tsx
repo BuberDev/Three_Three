@@ -1,5 +1,4 @@
-import { router } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +11,7 @@ import { notificationService } from '@/lib/services/notification-service';
 import { useAppStore } from '@/stores/app-store';
 
 export default function ProfileScreen() {
+    const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
     const { user, userSettings, setUserSettings, updateUserSettings, logout, subscription, subscriptionStatus } = useAppStore();
 
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
             title: 'Zarządzanie subskrypcją',
             description: `${subscriptionInfo.planName} • ${subscriptionInfo.status}`,
             icon: 'creditcard.fill' as const,
-            onPress: () => router.push('/subscription' as any),
+            onPress: () => navigation.navigate('Subscription'),
             isPremium: true,
         },
         {
@@ -236,7 +236,6 @@ export default function ProfileScreen() {
 
     return (
         <View style={styles.container}>
-            <StatusBar style="auto" />
 
             <ScrollView
                 style={styles.scrollView}
@@ -291,7 +290,7 @@ export default function ProfileScreen() {
                             }
                         </ThemedText>
                         {!subscriptionInfo.isPremium && (
-                            <TouchableOpacity style={styles.subscriptionButton} onPress={() => router.push('/subscription' as any)}>
+                            <TouchableOpacity style={styles.subscriptionButton} onPress={() => navigation.navigate('Subscription')}>
                                 <ThemedText style={styles.subscriptionButtonText}>Przejdź na Premium</ThemedText>
                             </TouchableOpacity>
                         )}

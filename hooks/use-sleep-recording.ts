@@ -1,11 +1,7 @@
-import * as TaskManager from 'expo-task-manager';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { AudioService } from '../lib/services/audio';
 import { useAppStore } from '../stores/app-store';
-
-const SLEEP_RECORDING_TASK = 'sleep-recording';
-const SLEEP_MONITORING_TASK = 'sleep-monitoring';
 
 interface SleepRecordingConfig {
     startTime: Date;
@@ -30,43 +26,6 @@ interface SleepAnalysis {
     sleepQuality: number;
 }
 
-TaskManager.defineTask(SLEEP_RECORDING_TASK, async () => {
-    try {
-        const audioService = AudioService.getInstance();
-        const isNightTime = isCurrentlyNightTime();
-        const isCurrentlyRecording = audioService.isRecording();
-
-        if (isNightTime) {
-            // Continue or start recording during night time
-            if (!isCurrentlyRecording) {
-                await audioService.startNocturnalRecording();
-            }
-        } else {
-            // During day time, only stop if it's an automatic recording
-            // Don't stop manually started recordings for testing purposes
-            if (isCurrentlyRecording) {
-                // Get current sleep analysis to check if recording has been long enough
-                const currentSession = audioService.getCurrentSleepAnalysis();
-                if (currentSession && currentSession.duration > 0) {
-                    // Only auto-stop if recording has been running for more than 30 seconds
-                    // This prevents immediate stopping of manually started test recordings
-                    if (currentSession.duration > 30000) {
-                        const recording = await audioService.stopNocturnalRecording();
-                        if (recording) {
-                            await processSleepRecording(recording);
-                        }
-                    }
-                }
-            }
-        }
-
-        return { data: null, error: null }; // Success
-    } catch (error) {
-        console.error('Sleep recording task error:', error);
-        return { data: null, error: error }; // Failure
-    }
-});
-
 export const useSleepRecording = () => {
     const audioService = AudioService.getInstance();
     const { uploadSleepRecording, setError } = useAppStore();
@@ -80,26 +39,6 @@ export const useSleepRecording = () => {
         airplaneMode: true,
         sensitivity: 'medium',
     });
-
-    // Initialize background tasks
-    useEffect(() => {
-        const registerBackgroundTasks = async () => {
-            try {
-                // Background tasks are already registered via TaskManager.defineTask above
-                console.log('Background sleep recording task registered');
-            } catch (error) {
-                console.error('Failed to register background task:', error);
-                setError('Failed to set up sleep recording');
-            }
-        };
-
-        registerBackgroundTasks();
-
-        return () => {
-            // Cleanup if needed
-            TaskManager.unregisterTaskAsync(SLEEP_RECORDING_TASK);
-        };
-    }, []);
 
     // Monitor app state for sleep mode
     useEffect(() => {

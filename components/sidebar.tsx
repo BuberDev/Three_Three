@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import React from 'react';
 import {
     Animated,
@@ -24,7 +24,18 @@ interface SidebarProps {
 const { width: screenWidth } = Dimensions.get('window');
 const SIDEBAR_WIDTH = screenWidth * 0.75; // 75% szerokości ekranu
 
+const TAB_ROUTES: Record<string, string> = {
+    '/(tabs)/': 'Home',
+    '/(tabs)': 'Home',
+    '/(tabs)/routines': 'Routines',
+    '/(tabs)/voice': 'Voice',
+    '/(tabs)/sleep': 'Sleep',
+    '/(tabs)/ai': 'AI',
+    '/(tabs)/profile': 'Profile',
+};
+
 export function Sidebar({ visible, onClose }: SidebarProps) {
+    const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
     const slideAnim = React.useRef(new Animated.Value(-SIDEBAR_WIDTH)).current;
     const overlayOpacity = React.useRef(new Animated.Value(0)).current;
@@ -126,7 +137,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
             icon: 'waveform.circle.fill',
             action: () => {
                 onClose();
-                router.push('/(tabs)/voice');
+                navigation.navigate('Tabs', { screen: 'Voice' });
             }
         },
         {
@@ -142,7 +153,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
 
     const handleNavigate = (route: string) => {
         onClose();
-        router.push(route as any);
+        navigation.navigate('Tabs', { screen: TAB_ROUTES[route] ?? 'Home' });
     };
 
     if (!visible) return null;
@@ -244,7 +255,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
                                     style={[styles.dataItem, { backgroundColor: backgroundColor + '80' }]}
                                     onPress={() => {
                                         onClose();
-                                        router.push('/(tabs)/routines');
+                                        navigation.navigate('Tabs', { screen: 'Routines' });
                                     }}
                                     activeOpacity={0.7}
                                 >
@@ -293,7 +304,7 @@ export function Sidebar({ visible, onClose }: SidebarProps) {
                                     style={[styles.dataItem, { backgroundColor: backgroundColor + '80' }]}
                                     onPress={() => {
                                         onClose();
-                                        router.push('/(tabs)');
+                                        navigation.navigate('Tabs', { screen: 'Home' });
                                     }}
                                     activeOpacity={0.7}
                                 >

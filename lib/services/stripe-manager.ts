@@ -24,7 +24,7 @@ export class PaymentServiceManager {
             return;
         }
 
-        const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+        const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
 
         // Enhanced validation with better error handling
         const stripeConfig = this.validateStripeConfiguration(publishableKey);
@@ -41,10 +41,10 @@ export class PaymentServiceManager {
         try {
             await initStripe({
                 publishableKey: stripeConfig.key!,
-                merchantIdentifier: process.env.EXPO_PUBLIC_APPLE_MERCHANT_ID,
+                merchantIdentifier: process.env.APPLE_MERCHANT_ID,
                 ...(Platform.OS === 'ios' && {
                     applePay: {
-                        merchantIdentifier: process.env.EXPO_PUBLIC_APPLE_MERCHANT_ID || '',
+                        merchantIdentifier: process.env.APPLE_MERCHANT_ID || '',
                         merchantCountryCode: 'PL',
                     },
                 }),

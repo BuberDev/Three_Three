@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useRef, useState } from 'react';
 import {
     Animated,
@@ -57,7 +57,7 @@ const processVoiceToText = async (audioUri: string): Promise<string | null> => {
         if (audioUri.startsWith('file://')) {
             try {
                 console.log('📤 Preparing to send audio to backend...');
-                console.log('🔗 Backend URL:', process.env.EXPO_PUBLIC_API_URL);
+                console.log('🔗 Backend URL:', process.env.API_URL);
 
                 // Read the audio file
                 const response = await fetch(audioUri);
@@ -70,7 +70,7 @@ const processVoiceToText = async (audioUri: string): Promise<string | null> => {
                 formData.append('audio', audioBlob, 'recording.m4a');
                 console.log('📋 FormData created with audio file');
 
-                const backendUrl = `${process.env.EXPO_PUBLIC_API_URL}/api/ai/speech-to-text`;
+                const backendUrl = `${process.env.API_URL}/api/ai/speech-to-text`;
                 console.log('🚀 Sending request to:', backendUrl);
 
                 // Send to our backend speech-to-text endpoint

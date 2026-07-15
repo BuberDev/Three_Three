@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useState } from 'react';
 import {
     Alert,
@@ -64,7 +64,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
 
             // Validate configuration
             if (!googleAuthService.validateConfiguration()) {
-                throw new Error('Google OAuth not properly configured. Please check app.json and Google Cloud Console setup.');
+                throw new Error('Google OAuth not properly configured. Please check your .env and Google Cloud Console setup.');
             }
 
             const result = await googleAuthService.signIn();

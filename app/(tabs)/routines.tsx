@@ -1,5 +1,4 @@
-import * as Crypto from 'expo-crypto';
-import { StatusBar } from 'expo-status-bar';
+import uuid from 'react-native-uuid';
 import React from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -419,7 +418,7 @@ export default function RoutinesScreen() {
         try {
             const taskWithId: Task = {
                 ...task,
-                id: Crypto.randomUUID()
+                id: uuid.v4() as string
             };
             await addTask(taskWithId);
             Alert.alert('Sukces', 'Zadanie zostało dodane');
@@ -437,7 +436,7 @@ export default function RoutinesScreen() {
         try {
             const taskWithId: Task = {
                 ...routine,
-                id: Crypto.randomUUID()
+                id: uuid.v4() as string
             };
             await addTask(taskWithId);
             Alert.alert('Sukces', 'Rutyna została dodana');
@@ -515,7 +514,6 @@ export default function RoutinesScreen() {
             screenTitle="Ekran główny"
         >
             <View style={styles.container}>
-                <StatusBar style="auto" />
 
                 {/* Header */}
                 <View style={[styles.header, { paddingTop: insets.top + 20 }]}>

@@ -1,5 +1,6 @@
 import { useAppStore } from '@/stores/app-store';
-import * as Location from 'expo-location';
+import Geolocation from '@react-native-community/geolocation';
+import { PermissionsAndroid, Platform } from 'react-native';
 
 export interface LocationData {
     latitude: number;
@@ -14,7 +15,7 @@ export interface LocationData {
 
 export class LocationService {
     private static instance: LocationService;
-    private watchPositionSubscription: Location.LocationSubscription | null = null;
+    private watchId: number | null = null;
     private isWatching = false;
 
     static getInstance(): LocationService {
@@ -43,21 +44,18 @@ export class LocationService {
                 return false;
             }
 
-            // Sprawdź obecne uprawnienia
-            const { status: existingStatus } = await Location.getForegroundPermissionsAsync();
-
-            if (existingStatus === 'granted') {
+            if (Platform.OS === 'android') {
+                const granted = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION
+                );
+                if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+                    console.log('📍 Location permission denied');
+                    return false;
+                }
                 return true;
             }
 
-            // Poproś o uprawnienia
-            const { status } = await Location.requestForegroundPermissionsAsync();
-
-            if (status !== 'granted') {
-                console.log('📍 Location permission denied');
-                return false;
-            }
-
+            // iOS prompts automatically on first Geolocation call.
             return true;
         } catch (error) {
             console.error('❌ Error requesting location permissions:', error);
@@ -69,37 +67,37 @@ export class LocationService {
      * Pobierz aktualną lokalizację
      */
     async getCurrentLocation(): Promise<LocationData | null> {
-        try {
-            if (!this.isLocationTrackingEnabled()) {
-                console.log('📍 Location tracking disabled');
-                return null;
-            }
-
-            const hasPermission = await this.requestLocationPermissions();
-            if (!hasPermission) {
-                return null;
-            }
-
-            const location = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.Balanced,
-                timeInterval: 1000,
-                distanceInterval: 10,
-            });
-
-            return {
-                latitude: location.coords.latitude,
-                longitude: location.coords.longitude,
-                accuracy: location.coords.accuracy,
-                altitude: location.coords.altitude,
-                altitudeAccuracy: location.coords.altitudeAccuracy,
-                heading: location.coords.heading,
-                speed: location.coords.speed,
-                timestamp: location.timestamp,
-            };
-        } catch (error) {
-            console.error('❌ Error getting current location:', error);
+        if (!this.isLocationTrackingEnabled()) {
+            console.log('📍 Location tracking disabled');
             return null;
         }
+
+        const hasPermission = await this.requestLocationPermissions();
+        if (!hasPermission) {
+            return null;
+        }
+
+        return new Promise((resolve) => {
+            Geolocation.getCurrentPosition(
+                (position) => {
+                    resolve({
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        altitude: position.coords.altitude ?? undefined,
+                        altitudeAccuracy: position.coords.altitudeAccuracy ?? undefined,
+                        heading: position.coords.heading ?? undefined,
+                        speed: position.coords.speed ?? undefined,
+                        timestamp: position.timestamp,
+                    });
+                },
+                (error) => {
+                    console.error('❌ Error getting current location:', error);
+                    resolve(null);
+                },
+                { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 }
+            );
+        });
     }
 
     /**
@@ -122,27 +120,26 @@ export class LocationService {
                 return false;
             }
 
-            this.watchPositionSubscription = await Location.watchPositionAsync(
-                {
-                    accuracy: Location.Accuracy.Balanced,
-                    timeInterval: 30000, // Update every 30 seconds
-                    distanceInterval: 50, // Update every 50 meters
-                },
-                (location) => {
+            this.watchId = Geolocation.watchPosition(
+                (position) => {
                     const locationData: LocationData = {
-                        latitude: location.coords.latitude,
-                        longitude: location.coords.longitude,
-                        accuracy: location.coords.accuracy,
-                        altitude: location.coords.altitude,
-                        altitudeAccuracy: location.coords.altitudeAccuracy,
-                        heading: location.coords.heading,
-                        speed: location.coords.speed,
-                        timestamp: location.timestamp,
+                        latitude: position.coords.latitude,
+                        longitude: position.coords.longitude,
+                        accuracy: position.coords.accuracy,
+                        altitude: position.coords.altitude ?? undefined,
+                        altitudeAccuracy: position.coords.altitudeAccuracy ?? undefined,
+                        heading: position.coords.heading ?? undefined,
+                        speed: position.coords.speed ?? undefined,
+                        timestamp: position.timestamp,
                     };
 
                     // You could store this in app store or send to backend
                     console.log('📍 Location update:', locationData);
-                }
+                },
+                (error) => {
+                    console.error('❌ Error watching location:', error);
+                },
+                { enableHighAccuracy: false, distanceFilter: 50, interval: 30000 }
             );
 
             this.isWatching = true;
@@ -159,9 +156,9 @@ export class LocationService {
      */
     async stopLocationTracking(): Promise<void> {
         try {
-            if (this.watchPositionSubscription) {
-                this.watchPositionSubscription.remove();
-                this.watchPositionSubscription = null;
+            if (this.watchId !== null) {
+                Geolocation.clearWatch(this.watchId);
+                this.watchId = null;
             }
             this.isWatching = false;
             console.log('📍 Location tracking stopped');
@@ -179,30 +176,13 @@ export class LocationService {
 
     /**
      * Pobierz nazwę miasta/obszaru na podstawie współrzędnych
+     *
+     * Note: reverse geocoding has no bare-RN equivalent bundled with the
+     * geolocation library (it required a separate maps/geocoding provider
+     * even before this migration). No caller uses this today.
      */
-    async reverseGeocode(latitude: number, longitude: number): Promise<string | null> {
-        try {
-            if (!this.isLocationTrackingEnabled()) {
-                return null;
-            }
-
-            const results = await Location.reverseGeocodeAsync({
-                latitude,
-                longitude
-            });
-
-            if (results.length > 0) {
-                const result = results[0];
-                return [result.city, result.region, result.country]
-                    .filter(Boolean)
-                    .join(', ');
-            }
-
-            return null;
-        } catch (error) {
-            console.error('❌ Error reverse geocoding:', error);
-            return null;
-        }
+    async reverseGeocode(_latitude: number, _longitude: number): Promise<string | null> {
+        return null;
     }
 }
 

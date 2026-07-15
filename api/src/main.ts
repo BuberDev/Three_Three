@@ -27,11 +27,12 @@ async function bootstrap() {
     );
 
     // CORS
+    // Auth is Bearer-token based (no cookies), so credentials/cookies are not
+    // needed here — `origin: true` is safe without `credentials: true`.
     app.enableCors({
-        origin: process.env.NODE_ENV === 'production'
-            ? ['https://your-domain.com']
-            : ['http://localhost:8081', 'exp://192.168.1.102:8081'],
-        credentials: true,
+        origin: process.env.CORS_ORIGINS
+            ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
+            : true,
     });
 
     // API versioning

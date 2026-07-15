@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system/legacy';
+import RNFS from 'react-native-fs';
 import {
     ApiResponse,
     DailyEntry,
@@ -184,7 +184,15 @@ export class ApiService {
             console.log('📄 Audio URI to upload:', audioUri);
 
             // Check if file exists and get its info
-            const fileInfo = await FileSystem.getInfoAsync(audioUri);
+            const audioPath = audioUri.replace('file://', '');
+            const fileExists = await RNFS.exists(audioPath);
+            const fileStat = fileExists ? await RNFS.stat(audioPath) : null;
+            const fileInfo = {
+                exists: fileExists,
+                size: fileStat?.size,
+                isDirectory: fileStat ? fileStat.isDirectory() : false,
+                modificationTime: fileStat?.mtime ? new Date(fileStat.mtime).getTime() : undefined,
+            };
             console.log('📋 File info:', {
                 exists: fileInfo.exists,
                 size: fileInfo.exists ? (fileInfo as any).size : undefined,
@@ -361,8 +369,7 @@ export class ApiService {
             const blob = await response.blob();
 
             // In React Native, we can create a temporary file
-            const FileSystem = await import('expo-file-system/legacy');
-            const tempUri = FileSystem.documentDirectory + `temp_audio_${Date.now()}.m4a`;
+            const tempUri = `${RNFS.DocumentDirectoryPath}/temp_audio_${Date.now()}.m4a`;
 
             // Convert blob to base64 and write to file
             const reader = new FileReader();
@@ -372,9 +379,7 @@ export class ApiService {
                         const base64 = reader.result as string;
                         const base64Data = base64.split(',')[1]; // Remove data:audio/... prefix
 
-                        await FileSystem.writeAsStringAsync(tempUri, base64Data, {
-                            encoding: FileSystem.EncodingType.Base64,
-                        });
+                        await RNFS.writeFile(tempUri, base64Data, 'base64');
 
                         console.log('📱 Audio file cached locally:', tempUri);
                         resolve(tempUri);

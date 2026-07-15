@@ -1,5 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
+import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
 import { Alert, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,10 +16,11 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/stores/app-store';
-import { router } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
 import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 
 export default function HomeScreen() {
+  const navigation = useNavigation<any>();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
@@ -122,7 +122,7 @@ export default function HomeScreen() {
   const handleQuickAction = (action: string) => {
     switch (action) {
       case 'record':
-        router.push('/voice');
+        navigation.navigate('Voice');
         break;
       case 'add-task':
         setShowAddTaskModal(true);
@@ -139,7 +139,7 @@ export default function HomeScreen() {
           'Opowiedz mi, co dzisiaj osiągnąłeś i jak się czujesz.',
           [
             { text: 'Anuluj', style: 'cancel' },
-            { text: 'Nagraj podsumowanie', onPress: () => router.push('/voice') }
+            { text: 'Nagraj podsumowanie', onPress: () => navigation.navigate('Voice') }
           ]
         );
         break;
@@ -152,7 +152,6 @@ export default function HomeScreen() {
       screenTitle="Ekran główny"
     >
     <ModernView style={{ flex: 1 }}>
-      <StatusBar style="auto" />
 
       <ScrollView
         style={{ flex: 1 }}

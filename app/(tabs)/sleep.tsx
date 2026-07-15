@@ -1,5 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
+import LinearGradient from 'react-native-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -300,7 +299,6 @@ export default function SleepScreen() {
               screenTitle="Ekran główny"
             >
         <ModernView style={{ flex: 1 }}>
-            <StatusBar style="auto" />
 
             <ScrollView
                 style={{ flex: 1 }}

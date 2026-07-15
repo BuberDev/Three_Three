@@ -1,4 +1,4 @@
-import { Tabs } from 'expo-router';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
 import { Platform } from 'react-native';
 
@@ -7,12 +7,30 @@ import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
-export default function TabLayout() {
+import HomeScreen from '@/app/(tabs)/index';
+import VoiceScreen from '@/app/(tabs)/voice';
+import SleepScreen from '@/app/(tabs)/sleep';
+import RoutinesScreen from '@/app/(tabs)/routines';
+import AIScreen from '@/app/(tabs)/ai';
+import ProfileScreen from '@/app/(tabs)/profile';
+
+export type TabParamList = {
+  Home: undefined;
+  Voice: undefined;
+  Sleep: undefined;
+  Routines: undefined;
+  AI: undefined;
+  Profile: undefined;
+};
+
+const Tab = createBottomTabNavigator<TabParamList>();
+
+export function TabNavigator() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
 
   return (
-    <Tabs
+    <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.iconSecondary,
@@ -38,8 +56,9 @@ export default function TabLayout() {
           marginBottom: 2,
         },
       }}>
-      <Tabs.Screen
-        name="index"
+      <Tab.Screen
+        name="Home"
+        component={HomeScreen}
         options={{
           title: 'Dzisiaj',
           tabBarIcon: ({ color, focused }) => (
@@ -52,8 +71,9 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="voice"
+      <Tab.Screen
+        name="Voice"
+        component={VoiceScreen}
         options={{
           title: 'Nagranie',
           tabBarIcon: ({ color, focused }) => (
@@ -66,8 +86,9 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="sleep"
+      <Tab.Screen
+        name="Sleep"
+        component={SleepScreen}
         options={{
           title: 'Sen',
           tabBarIcon: ({ color, focused }) => (
@@ -80,8 +101,9 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="routines"
+      <Tab.Screen
+        name="Routines"
+        component={RoutinesScreen}
         options={{
           title: 'Rutyny',
           tabBarIcon: ({ color, focused }) => (
@@ -94,8 +116,9 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="ai"
+      <Tab.Screen
+        name="AI"
+        component={AIScreen}
         options={{
           title: 'Analiza',
           tabBarIcon: ({ color, focused }) => (
@@ -108,8 +131,9 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
         options={{
           title: 'Profil',
           tabBarIcon: ({ color, focused }) => (
@@ -122,6 +146,6 @@ export default function TabLayout() {
           ),
         }}
       />
-    </Tabs>
+    </Tab.Navigator>
   );
 }

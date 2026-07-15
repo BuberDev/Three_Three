@@ -21,7 +21,7 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
         price: 3999, // 39.99 PLN in cents
         currency: 'pln',
         interval: 'month',
-        stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '',
+        stripePriceId: process.env.STRIPE_PREMIUM_PRICE_ID || '',
         recommended: true,
         features: [
             'AI asystent zdrowia 24/7',
@@ -41,7 +41,7 @@ const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
         price: 38390, // 383.90 PLN in cents (equivalent to ~31.99/month)
         currency: 'pln',
         interval: 'year',
-        stripePriceId: process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
+        stripePriceId: process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID || '',
         features: [
             'Wszystko z planu Premium',
             'Oszczędność 20% w stosunku do planu miesięcznego',
@@ -125,8 +125,8 @@ export const SubscriptionScreen: React.FC = () => {
 
         // Map Stripe price IDs to plan IDs
         const priceIdToPlanId = {
-            [process.env.EXPO_PUBLIC_STRIPE_PREMIUM_PRICE_ID || '']: 'premium',
-            [process.env.EXPO_PUBLIC_STRIPE_PREMIUM_YEARLY_PRICE_ID || '']: 'premium-yearly',
+            [process.env.STRIPE_PREMIUM_PRICE_ID || '']: 'premium',
+            [process.env.STRIPE_PREMIUM_YEARLY_PRICE_ID || '']: 'premium-yearly',
         };
 
         return priceIdToPlanId[subscription.stripePriceId] || undefined;

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
@@ -51,7 +51,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
     const loadPaymentMethods = async () => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/payments/methods`, {
+            const response = await fetch(`${process.env.API_URL}/api/payments/methods`, {
                 headers: {
                     'Authorization': `Bearer ${accessToken}`,
                 },
@@ -72,7 +72,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
         setIsAddingMethod(true);
         try {
             // Get setup intent from backend
-            const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/payments/stripe/setup-intent`, {
+            const response = await fetch(`${process.env.API_URL}/api/payments/stripe/setup-intent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -114,7 +114,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     onPress: async () => {
                         try {
                             const response = await fetch(
-                                `${process.env.EXPO_PUBLIC_API_URL}/api/payments/methods/${paymentMethodId}`,
+                                `${process.env.API_URL}/api/payments/methods/${paymentMethodId}`,
                                 {
                                     method: 'DELETE',
                                     headers: {
@@ -141,7 +141,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
     const handleSetDefaultPaymentMethod = async (paymentMethodId: string) => {
         try {
             const response = await fetch(
-                `${process.env.EXPO_PUBLIC_API_URL}/api/payments/methods/${paymentMethodId}/set-default`,
+                `${process.env.API_URL}/api/payments/methods/${paymentMethodId}/set-default`,
                 {
                     method: 'POST',
                     headers: {

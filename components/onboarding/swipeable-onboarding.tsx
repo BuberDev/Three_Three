@@ -191,7 +191,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     goalsCount: requestBody.primaryGoals.length
                 });
 
-                const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/auth/register`, {
+                const response = await fetch(`${process.env.API_URL}/api/auth/register`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

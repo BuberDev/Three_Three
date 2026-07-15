@@ -1,8 +1,8 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useEffect } from 'react';
-import 'react-native-reanimated';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ErrorBoundary } from '@/components/error-boundary';
 import { SwipeableOnboarding } from '@/components/onboarding/swipeable-onboarding';
@@ -10,41 +10,37 @@ import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { stripeManager } from '@/lib/services/stripe-manager';
 import { useAppStore } from '@/stores/app-store';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { TabNavigator } from '@/navigation/TabNavigator';
 
-export const unstable_settings = {
-  anchor: '(tabs)',
+import ModalScreen from '@/app/modal';
+import SubscriptionScreen from '@/app/subscription';
+
+export type RootStackParamList = {
+  Tabs: undefined;
+  Modal: undefined;
+  Subscription: undefined;
 };
 
-export default function RootLayout() {
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const linking = {
+  prefixes: ['threethree://'],
+};
+
+export default function App() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
   const { initialize, isOnboarding, isAuthenticated, user, setOnboardingComplete } = useAppStore();
 
   useEffect(() => {
-    // Debug color scheme for troubleshooting
-    console.log('🎨 RootLayout colorScheme:', {
-      scheme: colorScheme,
-      textColor: colors.text,
-      backgroundColor: colors.background,
-      platform: require('react-native').Platform.OS
-    });
-  }, [colorScheme, colors.text, colors.background]);
-
-  useEffect(() => {
-    // Initialize the app store and services
     const initializeApp = async () => {
       try {
-        // Initialize Stripe first
         await stripeManager.initialize();
         console.log('✅ Stripe initialized in app layout');
-
-        // Then initialize app store
         initialize();
       } catch (error) {
         console.error('❌ Failed to initialize app services:', error);
-        // Still initialize the app even if Stripe fails
         initialize();
       }
     };
@@ -56,7 +52,6 @@ export default function RootLayout() {
     setOnboardingComplete();
   };
 
-  // Create custom theme based on our design system - use proper React Navigation theme structure
   const customTheme = colorScheme === 'dark' ? {
     ...DarkTheme,
     colors: {
@@ -84,27 +79,32 @@ export default function RootLayout() {
   // CRITICAL: Niezalogowany user ZAWSZE musi przejść przez onboarding/auth!
   // Tylko zalogowany user może ominąć onboarding
   if (isOnboarding || !isAuthenticated || !user) {
-    return <SwipeableOnboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <SafeAreaProvider>
+        <SwipeableOnboarding onComplete={handleOnboardingComplete} />
+      </SafeAreaProvider>
+    );
   }
 
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
-        <ThemeProvider value={customTheme}>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+        <NavigationContainer theme={customTheme} linking={linking}>
+          <Stack.Navigator>
+            <Stack.Screen name="Tabs" component={TabNavigator} options={{ headerShown: false }} />
+            <Stack.Screen name="Modal" component={ModalScreen} options={{ presentation: 'modal', title: 'Modal' }} />
             <Stack.Screen
-              name="subscription"
+              name="Subscription"
+              component={SubscriptionScreen}
               options={{
                 title: 'Subskrypcja',
                 presentation: 'modal',
-                headerBackTitle: 'Wstecz'
+                headerBackTitle: 'Wstecz',
               }}
             />
-          </Stack>
-          <StatusBar style="auto" />
-        </ThemeProvider>
+          </Stack.Navigator>
+          <StatusBar barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'} />
+        </NavigationContainer>
       </ErrorBoundary>
     </SafeAreaProvider>
   );

@@ -1,6 +1,5 @@
-import { StatusBar } from 'expo-status-bar';
 import React, { useState } from 'react';
-import { StyleSheet, TouchableOpacity, View } from 'react-native';
+import { StatusBar, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AISettingsModal } from '@/components/ai/ai-settings-modal';
@@ -72,7 +71,7 @@ export default function AIScreen() {
             screenTitle="AI Asystent"
         >
             <View style={styles.container}>
-                <StatusBar style="light" backgroundColor={Colors.light.tint} />
+                <StatusBar barStyle="light-content" backgroundColor={Colors.light.tint} />
 
                 {/* Navigation Header */}
                 <View style={[

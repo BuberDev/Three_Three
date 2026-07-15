@@ -1,5 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
-import { StatusBar } from 'expo-status-bar';
+import LinearGradient from 'react-native-linear-gradient';
 import React, { useCallback, useEffect, useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -165,7 +164,6 @@ export default function VoiceScreen() {
             screenTitle="Notatki głosowe"
         >
             <ModernView style={{ flex: 1 }}>
-                <StatusBar style="auto" />
 
                 <ScrollView
                     style={{ flex: 1 }}

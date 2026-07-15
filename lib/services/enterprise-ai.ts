@@ -10,7 +10,7 @@ export class EnterpriseAIService {
     private readonly apiBaseUrl: string;
 
     private constructor() {
-        this.apiBaseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000';
+        this.apiBaseUrl = process.env.API_URL || 'http://localhost:3000';
     }
 
     public static getInstance(): EnterpriseAIService {
