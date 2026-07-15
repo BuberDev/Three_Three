@@ -7,10 +7,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bull';
+import { randomUUID as uuidv4 } from 'crypto';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { FindManyOptions, Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { CreateVoiceNoteDto } from './dto/create-voice-note.dto';
 import { SearchVoiceNotesDto } from './dto/search-voice-notes.dto';
 import { UpdateVoiceNoteDto } from './dto/update-voice-note.dto';

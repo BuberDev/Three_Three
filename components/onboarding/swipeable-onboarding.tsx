@@ -5,6 +5,7 @@ import { Dimensions, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiService } from '../../lib/services/api';
+import { getApiUrl } from '../../lib/utils/config';
 import { useAppStore } from '../../stores/app-store';
 import { AuthScreen } from './auth-screen';
 import CompletionScreen from './completion-screen';
@@ -191,7 +192,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     goalsCount: requestBody.primaryGoals.length
                 });
 
-                const response = await fetch(`${process.env.API_URL}/api/auth/register`, {
+                const response = await fetch(`${getApiUrl()}/api/auth/register`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

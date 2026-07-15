@@ -1,4 +1,5 @@
 import { ChatCompletionResponse } from '../types/llm';
+import { getApiUrl } from '../utils/config';
 import { apiService } from './api';
 
 /**
@@ -10,7 +11,7 @@ export class EnterpriseAIService {
     private readonly apiBaseUrl: string;
 
     private constructor() {
-        this.apiBaseUrl = process.env.API_URL || 'http://localhost:3000';
+        this.apiBaseUrl = getApiUrl();
     }
 
     public static getInstance(): EnterpriseAIService {

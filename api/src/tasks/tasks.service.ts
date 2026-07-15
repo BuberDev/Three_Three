@@ -6,8 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bull';
+import { randomUUID as uuidv4 } from 'crypto';
 import { Between, FindManyOptions, Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { EventType } from '../events/entities/event.entity';
 import { EventsService } from '../events/events.service';
 import { CreateTaskDto } from './dto/create-task.dto';

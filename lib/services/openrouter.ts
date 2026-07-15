@@ -1,11 +1,12 @@
 import { ChatCompletionRequest, ChatCompletionResponse } from '../types/llm';
+import { getApiUrl } from '../utils/config';
 
 export class OpenRouterService {
     private static instance: OpenRouterService;
     private readonly apiBaseUrl: string;
 
     private constructor() {
-        this.apiBaseUrl = process.env.API_URL || 'http://localhost:3001';
+        this.apiBaseUrl = getApiUrl();
     }
 
     public static getInstance(): OpenRouterService {

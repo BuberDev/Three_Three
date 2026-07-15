@@ -46,7 +46,7 @@
       </dict>
     </array>
     <key>CFBundleVersion</key>
-    <string>1</string>
+    <string>2</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
     <key>LSMinimumSystemVersion</key>
@@ -68,6 +68,8 @@
     <string>Ta aplikacja potrzebuje dostępu do lokalizacji aby powiązać aktywności z miejscami i zapewnić lepszą analitykę.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your microphone</string>
+    <key>NSCameraUsageDescription</key>
+    <string>Aplikacja używa aparatu tylko wtedy, gdy wybierzesz zrobienie zdjęcia w aplikacji.</string>
     <key>NSUserActivityTypes</key>
     <array>
       <string>$(PRODUCT_BUNDLE_IDENTIFIER).expo.index_route</string>

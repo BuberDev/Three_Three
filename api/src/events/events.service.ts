@@ -2,8 +2,8 @@ import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Queue } from 'bull';
+import { randomUUID as uuidv4 } from 'crypto';
 import { FindManyOptions, Repository } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
 import { CreateEventDto } from './dto/create-event.dto';
 import {
     Event,

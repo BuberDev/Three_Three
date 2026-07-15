@@ -9,7 +9,13 @@ import { Platform } from 'react-native';
  * Get the appropriate API URL based on the environment and device type
  */
 export function getApiUrl(): string {
-    return process.env.API_URL || 'http://localhost:3000';
+    const configuredUrl = process.env.API_URL;
+
+    if (configuredUrl) {
+        return configuredUrl.replace(/\/+$/, '');
+    }
+
+    return __DEV__ ? 'http://localhost:3000' : 'https://your-production-api.com';
 }
 
 /**

@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 import { paymentService } from '../../lib/services/payment';
+import { getApiUrl } from '../../lib/utils/config';
 import { useAppStore } from '../../stores/app-store';
 import { PaymentMethodSelect } from './payment-method-select';
 
@@ -71,7 +72,7 @@ export const PaymentFlow: React.FC<PaymentFlowProps> = ({
     const handleCardPayment = async () => {
         try {
             // Get setup intent from backend
-            const response = await fetch(`${process.env.API_URL}/api/payments/stripe/setup-intent`, {
+            const response = await fetch(`${getApiUrl()}/api/payments/stripe/setup-intent`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

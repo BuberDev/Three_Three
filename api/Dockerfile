@@ -48,12 +48,12 @@ COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 # Create uploads directory
 RUN mkdir -p uploads/voice-notes
 
-# Expose port
-EXPOSE 3001
+# Expose default local port. Render injects PORT at runtime.
+EXPOSE 3000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
+  CMD node -e "const port = process.env.PORT || 3000; require('http').get('http://localhost:' + port + '/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))"
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]

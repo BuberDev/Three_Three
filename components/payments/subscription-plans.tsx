@@ -10,6 +10,7 @@ import {
     View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { getApiUrl } from '../../lib/utils/config';
 import { useAppStore } from '../../stores/app-store';
 import { PaymentFlow } from './payment-flow';
 import { PaymentMethodManager } from './payment-method-manager';
@@ -85,7 +86,7 @@ export const SubscriptionPlans: React.FC<SubscriptionPlansProps> = ({
                         setIsLoading(true);
                         try {
                             const response = await fetch(
-                                `${process.env.API_URL}/api/subscriptions/cancel`,
+                                `${getApiUrl()}/api/subscriptions/cancel`,
                                 {
                                     method: 'POST',
                                     headers: {
