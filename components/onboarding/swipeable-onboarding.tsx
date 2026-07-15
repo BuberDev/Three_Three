@@ -1,7 +1,7 @@
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useRef, useState } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, StatusBar, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiService } from '../../lib/services/api';
@@ -392,6 +392,11 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         }
     }; return (
         <View style={styles.container}>
+            <StatusBar
+                barStyle={currentPage === 0 ? 'light-content' : 'dark-content'}
+                translucent
+                backgroundColor="transparent"
+            />
             <PagerView
                 ref={pagerRef}
                 style={styles.pager}
@@ -439,7 +444,13 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
             </PagerView>
 
             {/* Page Indicators */}
-            <View style={styles.indicators}>
+            <View
+                pointerEvents="none"
+                style={[
+                    styles.indicators,
+                    { bottom: Math.max(insets.bottom, 8) + 8 },
+                ]}
+            >
                 {[0, 1, 2, 3, 4].map((index) => (
                     <View
                         key={index}
@@ -480,9 +491,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: DesignSystem.spacing.xl,
         backgroundColor: 'transparent',
         position: 'absolute',
-        bottom: 20,
         left: 0,
         right: 0,
+        zIndex: 1,
     },
     indicator: {
         width: 8,

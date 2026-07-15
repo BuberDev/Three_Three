@@ -1,6 +1,6 @@
 import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
-import { TouchableOpacity, View } from 'react-native';
+import { ScrollView, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, DesignSystem } from '@/constants/theme';
@@ -26,29 +26,32 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
             end={DesignSystem.gradients.primary.end}
             style={{
                 flex: 1,
-                paddingTop: insets.top,
-                paddingBottom: insets.bottom,
             }}
         >
-            <View style={{
-                flex: 1,
-                paddingHorizontal: DesignSystem.spacing.xl,
-                flexDirection: 'column',
-            }}>
+            <ScrollView
+                style={{ flex: 1 }}
+                contentContainerStyle={{
+                    flexGrow: 1,
+                    paddingTop: insets.top + DesignSystem.spacing.lg,
+                    paddingBottom: insets.bottom + 72,
+                    paddingHorizontal: DesignSystem.spacing.xl,
+                }}
+                bounces={false}
+                showsVerticalScrollIndicator={false}
+            >
                 {/* Main Content */}
                 <View style={{
                     flexGrow: 1,
                     flexShrink: 1,
                     justifyContent: 'center',
                     alignItems: 'center',
-                    minHeight: 400, // Ensure minimum space for content
-                    paddingVertical: DesignSystem.spacing.xl, // Vertical padding for spacing
+                    paddingVertical: DesignSystem.spacing.lg,
                 }}>
                     <View style={{
                         backgroundColor: 'rgba(255,255,255,0.15)',
                         borderRadius: DesignSystem.borderRadius.full,
                         padding: DesignSystem.spacing['2xl'],
-                        marginVertical: DesignSystem.spacing['xl'],
+                        marginBottom: DesignSystem.spacing.xl,
                         ...DesignSystem.elevation[2],
                     }}>
                         <IconSymbol
@@ -64,7 +67,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                         darkColor="white"
                         style={{
                             textAlign: 'center',
-                            marginBottom: DesignSystem.spacing.xl,
+                            marginBottom: DesignSystem.spacing.lg,
                             fontWeight: '700',
                         }}
                     >
@@ -77,7 +80,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                         darkColor="rgba(255,255,255,0.9)"
                         style={{
                             textAlign: 'center',
-                            marginBottom: DesignSystem.spacing['3xl'],
+                            marginBottom: DesignSystem.spacing['2xl'],
                             lineHeight: 26,
                         }}
                     >
@@ -174,17 +177,14 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                 {/* Bottom Button Section */}
                 <View style={{
                     flexShrink: 0, // Prevent shrinking
-                    marginVertical: DesignSystem.spacing['2xl'],
-                    paddingBottom: DesignSystem.spacing.lg,
+                    marginTop: DesignSystem.spacing.xl,
                     alignItems: 'center',
-                    paddingTop: DesignSystem.spacing.md, // Extra space buffer
-                    minHeight: 120, // Ensure minimum space for button section
                 }}>
                     <View style={{
                         backgroundColor: 'rgba(255,255,255,0.15)',
                         borderRadius: DesignSystem.borderRadius.xl,
                         padding: 2,
-                        marginTop: DesignSystem.spacing['2xl'],
+                        marginBottom: DesignSystem.spacing.md,
                         width: '100%',
                     }}>
                         <TouchableOpacity
@@ -222,7 +222,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                         Rozpoczęcie zajmuje mniej niż 2 minuty
                     </ThemedText>
                 </View>
-            </View>
+            </ScrollView>
         </LinearGradient>
     );
 };

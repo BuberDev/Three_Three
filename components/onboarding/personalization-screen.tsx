@@ -66,18 +66,24 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <TouchableOpacity style={styles.backButton} onPress={onBack}>
                     <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
                 </TouchableOpacity>
-                <TouchableOpacity onPress={handleSkip}>
+                <TouchableOpacity
+                    onPress={handleSkip}
+                    hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+                >
                     <Text style={styles.skipButton}>Pomiń</Text>
                 </TouchableOpacity>
             </View>
 
             <ScrollView
                 style={styles.scrollView}
-                contentContainerStyle={styles.scrollContent}
+                contentContainerStyle={[
+                    styles.scrollContent,
+                    { paddingBottom: insets.bottom + 120 },
+                ]}
                 showsVerticalScrollIndicator={false}
             >
                 <View style={styles.titleContainer}>
@@ -144,10 +150,11 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 
             </ScrollView>
 
-            <View style={styles.footerContainer}>
+            <View style={[styles.footerContainer, { paddingBottom: insets.bottom + 44 }]}>
                 <TouchableOpacity
                     style={styles.continueButton}
                     onPress={handleContinue}
+                    activeOpacity={0.85}
                 >
                     <Text style={styles.continueButtonText}>
                         {selectedGoals.length > 0
@@ -171,9 +178,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        paddingTop: 20,
         paddingBottom: 10,
-        zIndex: 1,
+        zIndex: 2,
     },
     backButton: {
         width: 40,
@@ -187,13 +193,14 @@ const styles = StyleSheet.create({
         color: Colors.light.tabIconDefault,
         fontSize: 16,
         fontWeight: '600',
+        paddingVertical: 8,
+        paddingHorizontal: 4,
     },
     scrollView: {
         flex: 1,
     },
     scrollContent: {
         paddingHorizontal: 24,
-        paddingBottom: 20,
     },
     titleContainer: {
         alignItems: 'center',
@@ -291,9 +298,9 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.light.background,
         paddingHorizontal: 24,
         paddingTop: 16,
-        paddingBottom: 16,
         borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.05)',
+        zIndex: 2,
     },
     continueButton: {
         backgroundColor: '#4CAF50',

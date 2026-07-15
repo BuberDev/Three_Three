@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, Switch, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
@@ -18,6 +18,7 @@ interface ConsentScreenProps {
 export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack }) => {
     const [voiceProcessingConsent, setVoiceProcessingConsent] = useState(false);
     const [personalizationConsent, setPersonalizationConsent] = useState(false);
+    const insets = useSafeAreaInsets();
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
 
@@ -60,7 +61,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     style={{ flex: 1 }}
                     contentContainerStyle={{
                         paddingHorizontal: DesignSystem.spacing.lg,
-                        paddingBottom: DesignSystem.spacing['6xl'], // More space for bottom button
+                        paddingBottom: insets.bottom + 128,
                     }}
                     showsVerticalScrollIndicator={false}
                     bounces={false}
@@ -254,10 +255,11 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                 {/* Bottom Action */}
                 <View style={{
                     padding: DesignSystem.spacing.lg,
-                    paddingBottom: DesignSystem.spacing.xl,
+                    paddingBottom: insets.bottom + 44,
                     backgroundColor: colors.background,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
+                    zIndex: 2,
                 }}>
                     <ModernButton
                         title="Kontynuuj"
