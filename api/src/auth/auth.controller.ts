@@ -24,6 +24,7 @@ import { AuthResponse, AuthService } from './auth.service';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from './decorators/public.decorator';
 import { LoginDto } from './dto/login.dto';
+import { GoogleMobileAuthDto } from './dto/google-mobile-auth.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -74,6 +75,22 @@ export class AuthController {
         @Request() req: any,
     ): Promise<AuthResponse> {
         return this.authService.login(loginDto);
+    }
+
+    @Public()
+    @Post('google/mobile')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({ summary: 'Authenticate native mobile Google sign-in' })
+    @ApiBody({ type: GoogleMobileAuthDto })
+    @ApiResponse({
+        status: 200,
+        description: 'Google user authenticated successfully',
+        type: Object,
+    })
+    async googleMobile(
+        @Body() googleMobileAuthDto: GoogleMobileAuthDto,
+    ): Promise<AuthResponse> {
+        return this.authService.authenticateGoogleMobile(googleMobileAuthDto);
     }
 
     @Public()

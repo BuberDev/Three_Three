@@ -18,10 +18,29 @@ interface UserData {
     email?: string;
     password?: string;
     authProvider?: string;
+    googleAuth?: {
+        accessToken?: string;
+        refreshToken?: string;
+        idToken?: string;
+        user?: any;
+    };
     voiceProcessingConsent?: boolean;
     personalizationConsent?: boolean;
     goals: string[];
 }
+
+type AuthData = {
+    email: string;
+    password?: string;
+    authProvider: string;
+    googleAuth?: {
+        accessToken?: string;
+        refreshToken?: string;
+        idToken?: string;
+        user?: any;
+    };
+    authData?: any;
+};
 
 export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComplete }) => {
     const pagerRef = useRef<PagerView>(null);
@@ -71,7 +90,47 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         goToNext();
     };
 
-    const handleAuthComplete = async (authData: { email: string; password?: string; authProvider: string; authData?: any }) => {
+    const applyAuthenticatedSession = async (
+        tokenData: any,
+        onboardingData?: Partial<UserData>,
+    ) => {
+        if (!tokenData?.accessToken || !tokenData?.refreshToken || !tokenData?.user) {
+            console.error('❌ Invalid authentication response structure:', {
+                hasAccessToken: !!tokenData?.accessToken,
+                hasRefreshToken: !!tokenData?.refreshToken,
+                hasUser: !!tokenData?.user,
+            });
+            throw new Error('Nieprawidłowa odpowiedź serwera. Spróbuj ponownie.');
+        }
+
+        const { setTokens } = useAppStore.getState();
+        await setTokens(tokenData.accessToken, tokenData.refreshToken);
+
+        const apiService = ApiService.getInstance();
+        apiService.setAuthToken(tokenData.accessToken);
+
+        setUser(tokenData.user);
+        setAuthenticated(true);
+
+        const now = new Date().toISOString();
+        setUserSettings({
+            id: tokenData.user.settings?.id || `${tokenData.user.id}-settings`,
+            userId: tokenData.user.id,
+            consentVoiceProcessing: onboardingData?.voiceProcessingConsent || false,
+            consentPersonalization: onboardingData?.personalizationConsent || false,
+            primaryGoals: onboardingData?.goals || [],
+            createdAt: tokenData.user.settings?.createdAt || now,
+            updatedAt: tokenData.user.settings?.updatedAt || now,
+        });
+
+        console.log('✅ Authenticated session stored:', {
+            email: tokenData.user.email,
+            userId: tokenData.user.id,
+            provider: tokenData.user.authProvider,
+        });
+    };
+
+    const handleAuthComplete = async (authData: AuthData) => {
         // Enterprise guard - prevent duplicate processing
         if (isProcessingAuth) {
             console.log('🔒 Auth processing already in progress, ignoring duplicate call');
@@ -89,35 +148,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     // Extract tokens and user data from nested API response structure
                     const responseData = authData.authData?.data?.data || authData.authData?.data || authData.authData;
 
-                    if (!responseData || !responseData.accessToken || !responseData.refreshToken || !responseData.user) {
-                        console.error('❌ Invalid login response structure:', {
-                            hasResponseData: !!responseData,
-                            hasAccessToken: !!responseData?.accessToken,
-                            hasRefreshToken: !!responseData?.refreshToken,
-                            hasUser: !!responseData?.user
-                        });
-                        throw new Error('Invalid login response: missing required authentication data');
-                    }
-
-                    // Store tokens securely
-                    const { setTokens } = useAppStore.getState();
-                    await setTokens(responseData.accessToken, responseData.refreshToken);
-                    console.log('🔐 Login tokens stored successfully');
-
-                    // Initialize API service with authentication
-                    const apiService = ApiService.getInstance();
-                    apiService.setAuthToken(responseData.accessToken);
-                    console.log('🔗 API service authenticated for user session');
-
-                    // Update application state
-                    setUser(responseData.user);
-                    setAuthenticated(true);
-
-                    console.log('✅ User logged in successfully:', {
-                        email: responseData.user.email,
-                        userId: responseData.user.id,
-                        isAuthenticated: true
-                    });
+                    await applyAuthenticatedSession(responseData);
 
                     // Enterprise complete onboarding - single call with guard
                     completeOnboardingSafely();
@@ -153,18 +184,64 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         setUserData(finalUserData);
 
         const currentAuthState = useAppStore.getState();
-        if (currentAuthState.isAuthenticated && currentAuthState.user && (!finalUserData.email || !finalUserData.password)) {
-            console.log('✅ User is already authenticated, skipping local registration and continuing onboarding');
+        if (currentAuthState.isAuthenticated && currentAuthState.user) {
+            const now = new Date().toISOString();
+            setUserSettings({
+                id: `${currentAuthState.user.id}-settings`,
+                userId: currentAuthState.user.id,
+                consentVoiceProcessing: finalUserData.voiceProcessingConsent || false,
+                consentPersonalization: finalUserData.personalizationConsent || false,
+                primaryGoals: finalUserData.goals || [],
+                createdAt: now,
+                updatedAt: now,
+            });
+            console.log('✅ User is already authenticated, continuing onboarding');
             goToNext();
             return;
         }
 
-        // Enterprise-grade validation
-        if (!finalUserData.email || !finalUserData.password) {
-            console.error('❌ Critical error: Missing required user data', finalUserData);
-            pagerRef.current?.setPage(1);
-            setCurrentPage(1);
-            throw new Error('Wróć do logowania i uzupełnij dane konta.');
+        if (!finalUserData.email) {
+            console.error('❌ Missing email in onboarding data', finalUserData);
+            throw new Error('Nie udało się odczytać danych logowania. Wróć do poprzedniego kroku i spróbuj ponownie.');
+        }
+
+        if (finalUserData.authProvider === 'google') {
+            if (!finalUserData.googleAuth?.idToken) {
+                throw new Error('Sesja Google wygasła. Wróć do poprzedniego kroku i zaloguj się ponownie.');
+            }
+
+            const response = await fetch(`${getApiUrl()}/api/auth/google/mobile`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    idToken: finalUserData.googleAuth.idToken,
+                    consentVoiceProcessing: finalUserData.voiceProcessingConsent || false,
+                    consentPersonalization: finalUserData.personalizationConsent || false,
+                    primaryGoals: finalUserData.goals || [],
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    language: 'pl',
+                }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({
+                    message: `HTTP ${response.status}: ${response.statusText}`,
+                }));
+                throw new Error(errorData.message || 'Nie udało się zalogować przez Google.');
+            }
+
+            const authResponse = await response.json();
+            const tokenData = authResponse.data?.data || authResponse.data || authResponse;
+            await applyAuthenticatedSession(tokenData, finalUserData);
+            goToNext();
+            return;
+        }
+
+        if (!finalUserData.password) {
+            console.error('❌ Missing password for email registration', finalUserData);
+            throw new Error('Nie udało się odczytać hasła. Wróć do poprzedniego kroku i spróbuj ponownie.');
         }
 
         let registrationAttempts = 0;
@@ -233,42 +310,8 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     dataDataLevel: authResponse.data?.data ? Object.keys(authResponse.data.data) : null
                 });
 
-                // Enterprise validation of response structure
                 const tokenData = authResponse.data?.data || authResponse.data || authResponse;
-
-                if (!tokenData.accessToken || !tokenData.refreshToken || !tokenData.user) {
-                    console.error('❌ Invalid API response structure:', {
-                        hasAccessToken: !!tokenData.accessToken,
-                        hasRefreshToken: !!tokenData.refreshToken,
-                        hasUser: !!tokenData.user
-                    });
-                    throw new Error('Invalid server response: missing required data');
-                }
-
-                // Secure token storage
-                try {
-                    const { setTokens } = useAppStore.getState();
-                    await setTokens(tokenData.accessToken, tokenData.refreshToken);
-                    console.log('🔐 JWT tokens securely stored');
-                } catch (tokenError) {
-                    console.error('❌ Token storage failed:', tokenError);
-                    throw new Error('Failed to store authentication tokens');
-                }
-
-                // Initialize API service
-                try {
-                    const { ApiService } = await import('../../lib/services/api');
-                    const apiService = ApiService.getInstance();
-                    apiService.setAuthToken(tokenData.accessToken);
-                    console.log('🔗 API service initialized with authentication');
-                } catch (apiError) {
-                    console.error('❌ API service initialization failed:', apiError);
-                    throw new Error('Failed to initialize API service');
-                }
-
-                // Update application state
-                setUser(tokenData.user);
-                setAuthenticated(true);
+                await applyAuthenticatedSession(tokenData, finalUserData);
 
                 console.log('✅ Enterprise registration completed successfully:', {
                     userId: tokenData.user.id,

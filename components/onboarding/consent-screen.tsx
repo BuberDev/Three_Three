@@ -276,14 +276,11 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     shadowRadius: 10,
                 }}>
                     <ModernButton
-                        title="Kontynuuj"
+                        title={canContinue ? 'Kontynuuj' : 'Zaakceptuj wymaganą zgodę'}
                         size="large"
                         fullWidth
                         onPress={handleContinue}
                         disabled={!canContinue}
-                        style={{
-                            opacity: canContinue ? 1 : 0.5,
-                        }}
                     />
                     {!canContinue && (
                         <ThemedText

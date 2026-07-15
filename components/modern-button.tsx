@@ -1,7 +1,15 @@
 import ReactNativeHapticFeedback from 'react-native-haptic-feedback';
 import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
-import { DimensionValue, TouchableOpacity, TouchableOpacityProps, View, ViewStyle } from 'react-native';
+import {
+    ActivityIndicator,
+    DimensionValue,
+    Text,
+    TouchableOpacity,
+    TouchableOpacityProps,
+    View,
+    ViewStyle,
+} from 'react-native';
 
 import { DesignSystem } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
@@ -31,8 +39,11 @@ export function ModernButton({
     ...props
 }: ModernButtonProps) {
     const primaryColor = useThemeColor({}, 'primary');
+    const primaryLight = useThemeColor({}, 'primaryLight');
     const surfaceColor = useThemeColor({}, 'surface');
+    const disabledSurfaceColor = useThemeColor({}, 'backgroundTertiary');
     const borderColor = useThemeColor({}, 'border');
+    const textSecondaryColor = useThemeColor({}, 'textSecondary');
 
     const sizeStyles = {
         small: {
@@ -72,37 +83,66 @@ export function ModernButton({
         justifyContent: 'center',
         ...sizeStyles[size],
         ...(fullWidth && { width: '100%' as DimensionValue }),
-        opacity: disabled || loading ? 0.6 : 1,
+        opacity: loading ? 0.85 : 1,
         ...DesignSystem.elevation[1],
     };
 
     if (variant === 'primary') {
-        const primaryColor = useThemeColor({}, 'primary');
-        const primaryLight = useThemeColor({}, 'primaryLight');
+        const isDisabled = disabled || loading;
+        const contentColor = isDisabled ? textSecondaryColor : 'white';
+        const gradientColors = isDisabled
+            ? [disabledSurfaceColor, disabledSurfaceColor]
+            : [primaryColor, primaryLight];
 
         return (
             <TouchableOpacity
                 onPress={handlePress}
                 disabled={disabled || loading}
-                style={[style]}
+                activeOpacity={0.85}
+                style={[
+                    fullWidth && { width: '100%' },
+                    style,
+                ]}
                 {...props}
             >
                 <LinearGradient
-                    colors={[primaryColor, primaryLight] as readonly [string, string, ...string[]]}
-                    locations={[0, 1] as readonly [number, number, ...number[]]}
+                    colors={gradientColors}
+                    locations={[0, 1]}
                     start={DesignSystem.gradients.primary.start}
                     end={DesignSystem.gradients.primary.end}
-                    style={baseStyle}
+                    style={[
+                        baseStyle,
+                        isDisabled ? {
+                            borderWidth: 1,
+                            borderColor,
+                            shadowOpacity: 0,
+                            elevation: 0,
+                        } : null,
+                    ]}
                 >
                     {leftIcon && <View style={{ marginRight: DesignSystem.spacing.sm }}>{leftIcon}</View>}
-                    <ThemedText
-                        variant={textVariants[size]}
-                        lightColor="white"
-                        darkColor="white"
-                        style={{ fontWeight: '600' }}
+                    {loading && (
+                        <ActivityIndicator
+                            size="small"
+                            color={contentColor}
+                            style={{ marginRight: DesignSystem.spacing.sm }}
+                        />
+                    )}
+                    <Text
+                        numberOfLines={1}
+                        adjustsFontSizeToFit
+                        minimumFontScale={0.82}
+                        style={{
+                            color: contentColor,
+                            fontSize: size === 'large' ? 16 : size === 'medium' ? 15 : 14,
+                            lineHeight: size === 'large' ? 22 : 20,
+                            fontWeight: '700',
+                            textAlign: 'center',
+                            includeFontPadding: false,
+                        }}
                     >
                         {title}
-                    </ThemedText>
+                    </Text>
                     {rightIcon && <View style={{ marginLeft: DesignSystem.spacing.sm }}>{rightIcon}</View>}
                 </LinearGradient>
             </TouchableOpacity>

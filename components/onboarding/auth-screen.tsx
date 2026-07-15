@@ -111,8 +111,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
             return;
         }
 
-        if (!isLoginMode && password.length < 6) {
-            Alert.alert('Błąd', 'Hasło musi mieć co najmniej 6 znaków');
+        if (!isLoginMode && password.length < 8) {
+            Alert.alert('Błąd', 'Hasło musi mieć co najmniej 8 znaków');
             return;
         }
 
