@@ -11,12 +11,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/theme';
 
 interface PersonalizationScreenProps {
-    onContinue: (goals: string[]) => void;
+    onContinue: (goals: string[]) => void | Promise<void>;
     onBack: () => void;
 }
 
 export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ onContinue, onBack }) => {
     const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
 
     const goals = [
@@ -56,25 +58,60 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
         });
     };
 
+    const submitGoals = async (goalsToSubmit: string[]) => {
+        if (isSubmitting) {
+            return;
+        }
+
+        setSubmitError(null);
+        setIsSubmitting(true);
+
+        try {
+            await Promise.resolve(onContinue(goalsToSubmit));
+        } catch (error) {
+            setSubmitError(error instanceof Error ? error.message : 'Nie udało się zakończyć konfiguracji. Spróbuj ponownie.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
     const handleContinue = () => {
-        onContinue(selectedGoals);
+        void submitGoals(selectedGoals);
     };
 
     const handleSkip = () => {
-        onContinue([]);
+        void submitGoals([]);
+    };
+
+    const getContinueLabel = () => {
+        if (isSubmitting) {
+            return 'Zapisywanie...';
+        }
+
+        if (selectedGoals.length > 0) {
+            return `Zakończ konfigurację (${selectedGoals.length} wybranych)`;
+        }
+
+        return 'Zakończ konfigurację';
     };
 
     return (
         <View style={styles.container}>
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                <TouchableOpacity style={styles.backButton} onPress={onBack}>
+                <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={onBack}
+                    disabled={isSubmitting}
+                >
                     <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={handleSkip}
+                    disabled={isSubmitting}
+                    style={styles.skipTouchTarget}
                     hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                 >
-                    <Text style={styles.skipButton}>Pomiń</Text>
+                    <Text style={[styles.skipButton, isSubmitting && styles.disabledText]}>Pomiń</Text>
                 </TouchableOpacity>
             </View>
 
@@ -82,9 +119,10 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
                 style={styles.scrollView}
                 contentContainerStyle={[
                     styles.scrollContent,
-                    { paddingBottom: insets.bottom + 120 },
+                    { paddingBottom: insets.bottom + 176 },
                 ]}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.titleContainer}>
                     <Ionicons name="flag" size={48} color="#4CAF50" />
@@ -150,18 +188,20 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 
             </ScrollView>
 
-            <View style={[styles.footerContainer, { paddingBottom: insets.bottom + 44 }]}>
+            <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+                {submitError && (
+                    <Text style={styles.errorText}>{submitError}</Text>
+                )}
                 <TouchableOpacity
-                    style={styles.continueButton}
+                    style={[
+                        styles.continueButton,
+                        isSubmitting && styles.continueButtonDisabled,
+                    ]}
                     onPress={handleContinue}
+                    disabled={isSubmitting}
                     activeOpacity={0.85}
                 >
-                    <Text style={styles.continueButtonText}>
-                        {selectedGoals.length > 0
-                            ? `Zakończ konfigurację (${selectedGoals.length} wybranych)`
-                            : 'Zakończ konfigurację'
-                        }
-                    </Text>
+                    <Text style={styles.continueButtonText}>{getContinueLabel()}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -179,7 +219,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingHorizontal: 20,
         paddingBottom: 10,
-        zIndex: 2,
+        zIndex: 20,
     },
     backButton: {
         width: 40,
@@ -193,8 +233,17 @@ const styles = StyleSheet.create({
         color: Colors.light.tabIconDefault,
         fontSize: 16,
         fontWeight: '600',
+    },
+    skipTouchTarget: {
+        minHeight: 44,
+        minWidth: 72,
+        alignItems: 'flex-end',
+        justifyContent: 'center',
         paddingVertical: 8,
         paddingHorizontal: 4,
+    },
+    disabledText: {
+        opacity: 0.45,
     },
     scrollView: {
         flex: 1,
@@ -295,19 +344,39 @@ const styles = StyleSheet.create({
         borderColor: '#4CAF50',
     },
     footerContainer: {
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom: 0,
         backgroundColor: Colors.light.background,
         paddingHorizontal: 24,
         paddingTop: 16,
         borderTopWidth: 1,
         borderTopColor: 'rgba(0,0,0,0.05)',
-        zIndex: 2,
+        zIndex: 30,
+        elevation: 12,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: -4,
+        },
+        shadowOpacity: 0.06,
+        shadowRadius: 10,
+    },
+    errorText: {
+        color: '#D32F2F',
+        fontSize: 13,
+        lineHeight: 18,
+        textAlign: 'center',
+        marginBottom: 10,
     },
     continueButton: {
         backgroundColor: '#4CAF50',
-        paddingVertical: 16,
+        minHeight: 56,
         paddingHorizontal: 32,
         borderRadius: 12,
         alignItems: 'center',
+        justifyContent: 'center',
         shadowColor: '#000',
         shadowOffset: {
             width: 0,
@@ -316,6 +385,9 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.1,
         shadowRadius: 4,
         elevation: 3,
+    },
+    continueButtonDisabled: {
+        opacity: 0.65,
     },
     continueButtonText: {
         color: 'white',

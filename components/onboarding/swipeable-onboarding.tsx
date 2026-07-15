@@ -1,9 +1,6 @@
-import { Colors, DesignSystem } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import React, { useRef, useState } from 'react';
 import { Dimensions, StatusBar, StyleSheet, View } from 'react-native';
 import PagerView from 'react-native-pager-view';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiService } from '../../lib/services/api';
 import { getApiUrl } from '../../lib/utils/config';
 import { useAppStore } from '../../stores/app-store';
@@ -60,10 +57,6 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
             onComplete();
         }, 100);
     };
-    const insets = useSafeAreaInsets();
-    const colorScheme = useColorScheme();
-    const colors = Colors[colorScheme ?? 'light'];
-
     const { setUser, setUserSettings, setAuthenticated } = useAppStore();
 
     const goToNext = () => {
@@ -159,10 +152,19 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         const finalUserData = { ...userData, goals };
         setUserData(finalUserData);
 
+        const currentAuthState = useAppStore.getState();
+        if (currentAuthState.isAuthenticated && currentAuthState.user && (!finalUserData.email || !finalUserData.password)) {
+            console.log('✅ User is already authenticated, skipping local registration and continuing onboarding');
+            goToNext();
+            return;
+        }
+
         // Enterprise-grade validation
         if (!finalUserData.email || !finalUserData.password) {
             console.error('❌ Critical error: Missing required user data', finalUserData);
-            throw new Error('Invalid user data: email and password are required');
+            pagerRef.current?.setPage(1);
+            setCurrentPage(1);
+            throw new Error('Wróć do logowania i uzupełnij dane konta.');
         }
 
         let registrationAttempts = 0;
@@ -443,33 +445,11 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                 </View>
             </PagerView>
 
-            {/* Page Indicators */}
-            <View
-                pointerEvents="none"
-                style={[
-                    styles.indicators,
-                    { bottom: Math.max(insets.bottom, 8) + 8 },
-                ]}
-            >
-                {[0, 1, 2, 3, 4].map((index) => (
-                    <View
-                        key={index}
-                        style={[
-                            styles.indicator,
-                            {
-                                backgroundColor: index === currentPage
-                                    ? colors.primary
-                                    : colors.border,
-                            }
-                        ]}
-                    />
-                ))}
-            </View>
         </View>
     );
 };
 
-const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: {
@@ -482,24 +462,5 @@ const styles = StyleSheet.create({
     page: {
         width: screenWidth,
         flex: 1,
-    },
-    indicators: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        paddingVertical: DesignSystem.spacing.md,
-        paddingHorizontal: DesignSystem.spacing.xl,
-        backgroundColor: 'transparent',
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        zIndex: 1,
-    },
-    indicator: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginHorizontal: 4,
-        opacity: 0.8,
     },
 });

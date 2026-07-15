@@ -32,7 +32,7 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
     const canContinue = voiceProcessingConsent; // Voice processing is required
 
     return (
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView edges={['top']} style={{ flex: 1 }}>
             <ModernView style={{ flex: 1 }}>
                 {/* Header */}
                 <View style={{
@@ -61,9 +61,10 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     style={{ flex: 1 }}
                     contentContainerStyle={{
                         paddingHorizontal: DesignSystem.spacing.lg,
-                        paddingBottom: insets.bottom + 128,
+                        paddingBottom: insets.bottom + 184,
                     }}
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
                     bounces={false}
                 >
                     {/* Header Section */}
@@ -254,12 +255,25 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
 
                 {/* Bottom Action */}
                 <View style={{
-                    padding: DesignSystem.spacing.lg,
-                    paddingBottom: insets.bottom + 44,
+                    position: 'absolute',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    paddingHorizontal: DesignSystem.spacing.lg,
+                    paddingTop: DesignSystem.spacing.lg,
+                    paddingBottom: Math.max(insets.bottom, 16) + 16,
                     backgroundColor: colors.background,
                     borderTopWidth: 1,
                     borderTopColor: colors.border,
-                    zIndex: 2,
+                    zIndex: 30,
+                    elevation: 12,
+                    shadowColor: '#000',
+                    shadowOffset: {
+                        width: 0,
+                        height: -4,
+                    },
+                    shadowOpacity: 0.06,
+                    shadowRadius: 10,
                 }}>
                     <ModernButton
                         title="Kontynuuj"
