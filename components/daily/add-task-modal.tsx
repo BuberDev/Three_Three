@@ -5,12 +5,16 @@ import { Task } from '@/lib/types';
 import React from 'react';
 import {
     Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface AddTaskModalProps {
     visible: boolean;
@@ -42,6 +46,7 @@ function getPriorityConfig(priority: 'low' | 'medium' | 'high') {
 }
 
 export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
+    const insets = useSafeAreaInsets();
     const [title, setTitle] = React.useState('');
     const [description, setDescription] = React.useState('');
     const [priority, setPriority] = React.useState<'low' | 'medium' | 'high'>('medium');
@@ -97,10 +102,27 @@ export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
         return today.toISOString().split('T')[0];
     };
 
-    if (!visible) return null;
-
     return (
-        <View style={styles.modalOverlay}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+                resetForm();
+                onClose();
+            }}
+        >
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={[
+                    styles.modalOverlay,
+                    {
+                        paddingTop: insets.top + DesignSystem.spacing.lg,
+                        paddingBottom: insets.bottom + DesignSystem.spacing.lg,
+                    },
+                ]}
+            >
             <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                     <ThemedText style={styles.modalTitle}>Dodaj nowe zadanie</ThemedText>
@@ -114,7 +136,12 @@ export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    style={styles.formContainer}
+                    contentContainerStyle={styles.formContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     {/* Title Input */}
                     <View style={styles.inputGroup}>
                         <ThemedText style={styles.inputLabel}>Tytuł zadania *</ThemedText>
@@ -269,29 +296,27 @@ export function AddTaskModal({ visible, onClose, onSave }: AddTaskModalProps) {
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+            </KeyboardAvoidingView>
+        </Modal>
     );
 }
 
 const styles = StyleSheet.create({
     modalOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1000,
+        paddingHorizontal: DesignSystem.spacing.lg,
     },
     modalContent: {
         backgroundColor: Colors.light.background,
         borderRadius: DesignSystem.borderRadius['2xl'],
-        marginHorizontal: DesignSystem.spacing.lg,
-        maxHeight: '85%',
-        width: '92%',
+        maxHeight: '100%',
+        width: '100%',
         maxWidth: 420,
+        overflow: 'hidden',
         ...DesignSystem.elevation[4],
     },
     modalHeader: {
@@ -308,8 +333,10 @@ const styles = StyleSheet.create({
         color: Colors.light.text,
     },
     formContainer: {
+        flexGrow: 0,
+    },
+    formContent: {
         padding: DesignSystem.spacing.lg,
-        maxHeight: 500,
     },
     inputGroup: {
         marginBottom: DesignSystem.spacing.xl,

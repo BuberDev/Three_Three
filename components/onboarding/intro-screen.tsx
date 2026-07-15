@@ -71,7 +71,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                             fontWeight: '700',
                         }}
                     >
-                        Zwieksz swoj performance zyciowy
+                        Zwiększ swój performance życiowy
                     </ThemedText>
 
                     <ThemedText
@@ -84,7 +84,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                             lineHeight: 26,
                         }}
                     >
-                        Analizuj zycie ze wsparciem AI i podejmuj lepsze decyzje kazdego dnia.
+                        Analizuj życie ze wsparciem AI i podejmuj lepsze decyzje każdego dnia.
                     </ThemedText>
 
                     <View style={{
@@ -114,7 +114,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 darkColor="white"
                                 style={{ flex: 1, fontWeight: '600' }}
                             >
-                                Analiza swojego zycia
+                                Analiza swojego życia
                             </ThemedText>
                         </ModernView>
 
@@ -141,7 +141,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                                 darkColor="white"
                                 style={{ flex: 1, fontWeight: '600' }}
                             >
-                                Rekomendacje dzialan
+                                Rekomendacje działań
                             </ThemedText>
                         </ModernView>
 
@@ -209,18 +209,6 @@ export const IntroScreen: React.FC<IntroScreenProps> = ({ onContinue }) => {
                             </ThemedText>
                         </TouchableOpacity>
                     </View>
-
-                    <ThemedText
-                        variant="bodySmall"
-                        lightColor="rgba(255,255,255,0.7)"
-                        darkColor="rgba(255,255,255,0.7)"
-                        style={{
-                            textAlign: 'center',
-                            lineHeight: 18,
-                        }}
-                    >
-                        Rozpoczęcie zajmuje mniej niż 2 minuty
-                    </ThemedText>
                 </View>
             </ScrollView>
         </LinearGradient>

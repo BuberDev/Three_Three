@@ -4,12 +4,16 @@ import { Colors, DesignSystem } from '@/constants/theme';
 import React from 'react';
 import {
     Alert,
+    KeyboardAvoidingView,
+    Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     TextInput,
     TouchableOpacity,
     View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface PlanningModalProps {
     visible: boolean;
@@ -31,6 +35,7 @@ interface TimeBlock {
 }
 
 export function PlanningModal({ visible, onClose, onSave }: PlanningModalProps) {
+    const insets = useSafeAreaInsets();
     const [mainGoal, setMainGoal] = React.useState('');
     const [priority1, setPriority1] = React.useState('');
     const [priority2, setPriority2] = React.useState('');
@@ -122,10 +127,27 @@ export function PlanningModal({ visible, onClose, onSave }: PlanningModalProps) 
         });
     };
 
-    if (!visible) return null;
-
     return (
-        <View style={styles.modalOverlay}>
+        <Modal
+            visible={visible}
+            transparent
+            animationType="fade"
+            statusBarTranslucent
+            onRequestClose={() => {
+                resetForm();
+                onClose();
+            }}
+        >
+            <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                style={[
+                    styles.modalOverlay,
+                    {
+                        paddingTop: insets.top + DesignSystem.spacing.lg,
+                        paddingBottom: insets.bottom + DesignSystem.spacing.lg,
+                    },
+                ]}
+            >
             <View style={styles.modalContent}>
                 <View style={styles.modalHeader}>
                     <View>
@@ -142,7 +164,12 @@ export function PlanningModal({ visible, onClose, onSave }: PlanningModalProps) 
                     </TouchableOpacity>
                 </View>
 
-                <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    style={styles.formContainer}
+                    contentContainerStyle={styles.formContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
                     <View style={styles.inputGroup}>
                         <ThemedText style={styles.inputLabel}>Szablony planowania</ThemedText>
                         <View style={styles.templateContainer}>
@@ -323,29 +350,27 @@ export function PlanningModal({ visible, onClose, onSave }: PlanningModalProps) 
                     </TouchableOpacity>
                 </View>
             </View>
-        </View>
+            </KeyboardAvoidingView>
+        </Modal>
     );
 }
 
 const styles = StyleSheet.create({
     modalOverlay: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.5)',
         justifyContent: 'center',
         alignItems: 'center',
         zIndex: 1000,
+        paddingHorizontal: DesignSystem.spacing.lg,
     },
     modalContent: {
         backgroundColor: Colors.light.background,
         borderRadius: DesignSystem.borderRadius['2xl'],
-        marginHorizontal: DesignSystem.spacing.lg,
-        maxHeight: '85%',
-        width: '92%',
+        maxHeight: '100%',
+        width: '100%',
         maxWidth: 420,
+        overflow: 'hidden',
         ...DesignSystem.elevation[4],
     },
     modalHeader: {
@@ -367,8 +392,10 @@ const styles = StyleSheet.create({
         marginTop: DesignSystem.spacing.xs,
     },
     formContainer: {
+        flexGrow: 0,
+    },
+    formContent: {
         padding: DesignSystem.spacing.lg,
-        maxHeight: 500,
     },
     inputGroup: {
         marginBottom: DesignSystem.spacing.xl,

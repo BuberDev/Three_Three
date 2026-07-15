@@ -71,7 +71,7 @@ export default function AIScreen() {
             screenTitle="AI Asystent"
         >
             <View style={styles.container}>
-                <StatusBar barStyle="light-content" backgroundColor={Colors.light.tint} />
+                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
                 {/* Navigation Header */}
                 <View style={[
@@ -218,10 +218,10 @@ export default function AIScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#00000',
+        backgroundColor: '#FFFFFF',
     },
     navigationHeader: {
-        backgroundColor: '#00000',
+        backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,

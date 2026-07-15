@@ -1,6 +1,6 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import React from 'react';
-import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -28,6 +28,9 @@ const Tab = createBottomTabNavigator<TabParamList>();
 export function TabNavigator() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 12);
+  const tabBarHeight = 58 + bottomPadding;
 
   return (
     <Tab.Navigator
@@ -39,9 +42,9 @@ export function TabNavigator() {
         tabBarStyle: {
           backgroundColor: colors.surface,
           borderTopWidth: 0,
-          paddingBottom: Platform.OS === 'ios' ? 20 : 12,
-          paddingTop: 12,
-          height: Platform.OS === 'ios' ? 90 : 80,
+          paddingBottom: bottomPadding,
+          paddingTop: 10,
+          height: tabBarHeight,
           ...DesignSystem.elevation[3],
           borderTopLeftRadius: DesignSystem.borderRadius.xl,
           borderTopRightRadius: DesignSystem.borderRadius.xl,

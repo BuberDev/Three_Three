@@ -1,7 +1,8 @@
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
 
@@ -13,6 +14,8 @@ interface CompletionScreenProps {
 }
 
 export default function CompletionScreen({ onComplete, userName }: Readonly<CompletionScreenProps>) {
+    const insets = useSafeAreaInsets();
+
     React.useEffect(() => {
         // Auto-complete after 3 seconds
         const timer = setTimeout(() => {
@@ -28,7 +31,18 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
                 colors={['#667eea', '#764ba2']}
                 style={styles.gradient}
             >
-                <View style={styles.content}>
+                <ScrollView
+                    style={{ flex: 1 }}
+                    contentContainerStyle={[
+                        styles.content,
+                        {
+                            paddingTop: insets.top + 24,
+                            paddingBottom: insets.bottom + 84,
+                        },
+                    ]}
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                >
                     {/* Success Animation */}
                     <View style={styles.iconContainer}>
                         <LinearGradient
@@ -46,40 +60,40 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
                     {/* Welcome Message */}
                     <View style={styles.textContainer}>
                         <ThemedText style={styles.title}>
-                            Welcome to Your Voice Journal!
+                            Gotowe, zaczynamy
                         </ThemedText>
 
                         <ThemedText style={styles.subtitle}>
-                            {userName ? `Hi ${userName}!` : 'Hello!'} You&apos;re all set to start your journey of self-reflection and growth.
+                            {userName ? `${userName}, konfiguracja zakończona.` : 'Konfiguracja zakończona.'} Możesz już korzystać z analizy notatek, zadań i swoich wzorców dnia.
                         </ThemedText>
 
                         <View style={styles.featureList}>
                             <View style={styles.featureItem}>
                                 <Ionicons name="mic" size={20} color="#ffffff" />
-                                <Text style={styles.featureText}>Record voice notes anywhere</Text>
+                                <Text style={styles.featureText}>Nagrywaj notatki głosowe</Text>
                             </View>
                             <View style={styles.featureItem}>
                                 <Ionicons name="analytics" size={20} color="#ffffff" />
-                                <Text style={styles.featureText}>Get daily insights</Text>
+                                <Text style={styles.featureText}>Otrzymuj dzienne wnioski</Text>
                             </View>
                             <View style={styles.featureItem}>
                                 <Ionicons name="heart" size={20} color="#ffffff" />
-                                <Text style={styles.featureText}>Track your well-being</Text>
+                                <Text style={styles.featureText}>Śledź samopoczucie i nawyki</Text>
                             </View>
                             <View style={styles.featureItem}>
                                 <Ionicons name="lock-closed" size={20} color="#ffffff" />
-                                <Text style={styles.featureText}>Privacy-first approach</Text>
+                                <Text style={styles.featureText}>Zachowaj kontrolę nad danymi</Text>
                             </View>
                         </View>
 
                         <ThemedText style={styles.startingText}>
-                            Starting in 3 seconds...
+                            Za chwilę przejdziesz do aplikacji...
                         </ThemedText>
                     </View>
-                </View>
+                </ScrollView>
 
                 {/* Background Decoration */}
-                <View style={styles.backgroundDecoration}>
+                <View pointerEvents="none" style={styles.backgroundDecoration}>
                     <View style={[styles.circle, styles.circle1]} />
                     <View style={[styles.circle, styles.circle2]} />
                     <View style={[styles.circle, styles.circle3]} />
@@ -98,7 +112,7 @@ const styles = StyleSheet.create({
         position: 'relative',
     },
     content: {
-        flex: 1,
+        flexGrow: 1,
         justifyContent: 'center',
         alignItems: 'center',
         paddingHorizontal: 30,

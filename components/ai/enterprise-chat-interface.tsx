@@ -442,7 +442,7 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
         <KeyboardAvoidingView
             style={[styles.container, { backgroundColor: colors.background }]}
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
         >
             {/* Header */}
             <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -478,7 +478,10 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                 renderItem={renderMessage}
                 keyExtractor={(item) => item.id}
                 style={styles.messagesList}
-                contentContainerStyle={styles.messagesContent}
+                contentContainerStyle={[
+                    styles.messagesContent,
+                    { paddingBottom: DesignSystem.spacing.md },
+                ]}
                 showsVerticalScrollIndicator={false}
                 ListEmptyComponent={renderEmptyState}
                 onContentSizeChange={() => {
@@ -489,7 +492,16 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
             />
 
             {/* Input Area */}
-            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+            <View
+                style={[
+                    styles.inputContainer,
+                    {
+                        backgroundColor: colors.surface,
+                        borderTopColor: colors.border,
+                        paddingBottom: Math.max(insets.bottom, DesignSystem.spacing.sm),
+                    },
+                ]}
+            >
                 <View style={[styles.inputWrapper, { backgroundColor: colors.background, borderColor: colors.border }]}>
                     <TextInput
                         ref={inputRef}
@@ -550,7 +562,7 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
                 )}
 
                 <Text style={[styles.inputHint, { color: colors.textTertiary }]}>
-                    {inputText.length}/4000 • Shift+Enter dla nowej linii • Mikrofon dla nagrania głosu
+                    {inputText.length}/4000 • Mikrofon dla nagrania głosu
                 </Text>
             </View>
 
@@ -752,7 +764,6 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        marginTop: 10
     },
     header: {
         flexDirection: 'row',
