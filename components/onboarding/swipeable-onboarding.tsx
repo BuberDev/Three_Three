@@ -42,7 +42,7 @@ type AuthData = {
     authData?: any;
 };
 
-const API_REQUEST_TIMEOUT_MS = 75000;
+const API_REQUEST_TIMEOUT_MS = 120000;
 
 const getApiErrorMessage = (body: any, fallback: string) => {
     if (typeof body?.error?.message === 'string') {
@@ -87,7 +87,7 @@ const fetchApiJson = async (
         return body;
     } catch (error: any) {
         if (error?.name === 'AbortError') {
-            throw new Error('Serwer API uruchamia się zbyt długo. Spróbuj ponownie za chwilę.');
+            throw new Error('Serwer API nie odpowiedział na czas. Spróbuj ponownie za chwilę.');
         }
 
         if (error instanceof TypeError || error?.message === 'Network request failed') {
@@ -268,8 +268,6 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                 throw new Error('Sesja Google wygasła. Wróć do poprzedniego kroku i zaloguj się ponownie.');
             }
 
-            await fetchApiJson('/api/health', { method: 'GET' });
-
             const authResponse = await fetchApiJson('/api/auth/google/mobile', {
                 method: 'POST',
                 headers: {
@@ -296,7 +294,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
         }
 
         let registrationAttempts = 0;
-        const maxRetries = 3;
+        const maxRetries = 1;
 
         while (registrationAttempts < maxRetries) {
             try {
@@ -321,8 +319,6 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     consentPersonalization: requestBody.consentPersonalization,
                     goalsCount: requestBody.primaryGoals.length
                 });
-
-                await fetchApiJson('/api/health', { method: 'GET' });
 
                 const authResponse = await fetchApiJson('/api/auth/register', {
                     method: 'POST',
@@ -373,15 +369,10 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
 
                 if (registrationAttempts >= maxRetries) {
                     console.error('❌ All registration attempts exhausted');
-                    // Continue to completion screen even on failure - let user know about the issue
-                    // They can try again later or contact support
-                    throw new Error(`Registration failed after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`);
+                    throw error instanceof Error
+                        ? error
+                        : new Error('Nie udało się zakończyć konfiguracji. Spróbuj ponownie.');
                 }
-
-                // Wait before retry (exponential backoff)
-                const delay = Math.pow(2, registrationAttempts) * 1000;
-                console.log(`⏳ Waiting ${delay}ms before retry...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
 

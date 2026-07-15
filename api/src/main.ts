@@ -13,6 +13,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 async function bootstrap() {
     const app = await NestFactory.create(AppModule);
     const configService = app.get(ConfigService);
+    const startedAt = new Date().toISOString();
 
     // Security
     app.use(helmet());
@@ -33,6 +34,32 @@ async function bootstrap() {
         origin: process.env.CORS_ORIGINS
             ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
             : true,
+    });
+
+    const expressApp = app.getHttpAdapter().getInstance();
+    const getHealthPayload = () => ({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        startedAt,
+        version: '1.0.0',
+    });
+
+    expressApp.get('/', (_req: any, res: any) => res.status(200).json(getHealthPayload()));
+    expressApp.head('/', (_req: any, res: any) => res.status(200).end());
+    expressApp.get('/health', (_req: any, res: any) => res.status(200).json(getHealthPayload()));
+    expressApp.head('/health', (_req: any, res: any) => res.status(200).end());
+
+    app.use((req: any, _res: any, next: any) => {
+        if (
+            req.originalUrl === '/api/health' ||
+            req.originalUrl === '/api/auth/register' ||
+            req.originalUrl === '/api/auth/google/mobile'
+        ) {
+            console.log(`[HTTP] ${req.method} ${req.originalUrl}`);
+        }
+
+        next();
     });
 
     // API versioning
