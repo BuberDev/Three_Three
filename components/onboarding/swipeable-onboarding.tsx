@@ -43,6 +43,19 @@ type AuthData = {
 };
 
 const API_REQUEST_TIMEOUT_MS = 120000;
+const API_STARTUP_RETRY_WINDOW_MS = 120000;
+const API_STARTUP_RETRY_DELAY_MS = 2000;
+
+class ApiStatusError extends Error {
+    constructor(
+        message: string,
+        public readonly status: number,
+        public readonly code?: string,
+    ) {
+        super(message);
+        this.name = 'ApiStatusError';
+    }
+}
 
 const getApiErrorMessage = (body: any, fallback: string) => {
     if (typeof body?.error?.message === 'string') {
@@ -81,7 +94,11 @@ const fetchApiJson = async (
         const body = await response.json().catch(() => null);
 
         if (!response.ok) {
-            throw new Error(getApiErrorMessage(body, `HTTP ${response.status}: ${response.statusText}`));
+            throw new ApiStatusError(
+                getApiErrorMessage(body, `HTTP ${response.status}: ${response.statusText}`),
+                response.status,
+                typeof body?.error?.code === 'string' ? body.error.code : undefined,
+            );
         }
 
         return body;
@@ -97,6 +114,40 @@ const fetchApiJson = async (
         throw error;
     } finally {
         clearTimeout(timeoutId);
+    }
+};
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+const fetchApiJsonAfterStartup = async (
+    path: string,
+    options: RequestInit = {},
+) => {
+    const deadline = Date.now() + API_STARTUP_RETRY_WINDOW_MS;
+    let attempt = 0;
+
+    while (true) {
+        attempt++;
+
+        try {
+            return await fetchApiJson(path, options);
+        } catch (error) {
+            const isStartupResponse =
+                error instanceof ApiStatusError &&
+                error.status === 503 &&
+                error.code === 'SERVICE_STARTING';
+
+            if (!isStartupResponse || Date.now() + API_STARTUP_RETRY_DELAY_MS >= deadline) {
+                throw isStartupResponse
+                    ? new Error('Serwer API nadal się uruchamia. Spróbuj ponownie za chwilę.')
+                    : error;
+            }
+
+            console.log(`⏳ API is still starting, retrying ${path} in ${API_STARTUP_RETRY_DELAY_MS}ms`, {
+                attempt,
+            });
+            await sleep(API_STARTUP_RETRY_DELAY_MS);
+        }
     }
 };
 
@@ -268,7 +319,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                 throw new Error('Sesja Google wygasła. Wróć do poprzedniego kroku i zaloguj się ponownie.');
             }
 
-            const authResponse = await fetchApiJson('/api/auth/google/mobile', {
+            const authResponse = await fetchApiJsonAfterStartup('/api/auth/google/mobile', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -320,7 +371,7 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     goalsCount: requestBody.primaryGoals.length
                 });
 
-                const authResponse = await fetchApiJson('/api/auth/register', {
+                const authResponse = await fetchApiJsonAfterStartup('/api/auth/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
