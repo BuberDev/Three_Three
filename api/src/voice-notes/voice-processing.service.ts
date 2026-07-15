@@ -21,11 +21,18 @@ export interface VoiceProcessingResult {
 @Injectable()
 export class VoiceProcessingService {
     private readonly logger = new Logger(VoiceProcessingService.name);
-    private openRouter: OpenAI;
+    private openRouter: OpenAI | null = null;
 
     constructor(private readonly configService: ConfigService) {
+        const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
+
+        if (!apiKey) {
+            this.logger.warn('OPENROUTER_API_KEY not configured. Voice note AI analysis will use fallback processing.');
+            return;
+        }
+
         this.openRouter = new OpenAI({
-            apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
+            apiKey,
             baseURL: 'https://openrouter.ai/api/v1',
         });
     }
@@ -111,13 +118,17 @@ Provide the analysis in this exact JSON structure:
   }
 }
 
-Rules:
+        Rules:
 - Sentiment should be a number between -1 (very negative) and 1 (very positive)
 - Entity confidence should be between 0 and 1
 - Keep tags relevant and lowercase
 - Extract specific, actionable insights
 - Focus on productivity, goals, and personal development context
 `;
+
+        if (!this.openRouter) {
+            return this.createFallbackAnalysis(transcription);
+        }
 
         try {
             const response = await this.openRouter.chat.completions.create({
@@ -237,6 +248,10 @@ Rules:
     }
 
     async generateTitleFromTranscription(transcription: string): Promise<string> {
+        if (!this.openRouter) {
+            return 'Voice Note';
+        }
+
         try {
             const response = await this.openRouter.chat.completions.create({
                 model: 'microsoft/phi-3-medium-128k-instruct:free',

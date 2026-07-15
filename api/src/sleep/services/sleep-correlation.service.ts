@@ -28,7 +28,7 @@ interface SleepInsight {
 @Injectable()
 export class SleepCorrelationService {
     private readonly logger = new Logger(SleepCorrelationService.name);
-    private readonly openRouter: OpenAI;
+    private readonly openRouter: OpenAI | null = null;
 
     constructor(
         @InjectRepository(SleepTracking)
@@ -41,8 +41,15 @@ export class SleepCorrelationService {
         private dailyActivitiesRepository: Repository<DailyActivity>,
         private configService: ConfigService,
     ) {
+        const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
+
+        if (!apiKey) {
+            this.logger.warn('OPENROUTER_API_KEY not configured. Sleep correlations will use fallback analysis.');
+            return;
+        }
+
         this.openRouter = new OpenAI({
-            apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
+            apiKey,
             baseURL: 'https://openrouter.ai/api/v1',
         });
     }
@@ -258,6 +265,10 @@ For each correlation found, provide:
 Return as JSON array of correlations. Be analytical and specific, not generic.
 `;
 
+        if (!this.openRouter) {
+            return this.generateFallbackCorrelations(contextData);
+        }
+
         try {
             const response = await this.openRouter.chat.completions.create({
                 model: 'microsoft/phi-3-medium-128k-instruct:free',
@@ -301,6 +312,10 @@ Write a personalized 2-3 sentence insight that:
 
 Write in Polish, be empathetic but analytical.
 `;
+
+        if (!this.openRouter) {
+            return this.generateFallbackInsight(contextData);
+        }
 
         try {
             const response = await this.openRouter.chat.completions.create({

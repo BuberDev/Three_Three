@@ -27,15 +27,22 @@ interface AudioAnalysisResult {
 @Injectable()
 export class SleepAnalysisService {
     private readonly logger = new Logger(SleepAnalysisService.name);
-    private readonly openRouter: OpenAI;
+    private readonly openRouter: OpenAI | null = null;
 
     constructor(
         @InjectRepository(SleepEvent)
         private sleepEventsRepository: Repository<SleepEvent>,
         private configService: ConfigService,
     ) {
+        const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
+
+        if (!apiKey) {
+            this.logger.warn('OPENROUTER_API_KEY not configured. Sleep audio analysis will use local fallback logic.');
+            return;
+        }
+
         this.openRouter = new OpenAI({
-            apiKey: this.configService.get<string>('OPENROUTER_API_KEY'),
+            apiKey,
             baseURL: 'https://openrouter.ai/api/v1',
         });
     }
