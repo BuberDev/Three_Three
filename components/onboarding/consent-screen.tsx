@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { ScrollView, Switch, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Colors, DesignSystem } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { ModernButton } from '../modern-button';
 import { ModernCard } from '../modern-card';
 import { ModernView } from '../modern-view';
 import { ThemedText } from '../themed-text';
@@ -275,13 +274,27 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                     shadowOpacity: 0.06,
                     shadowRadius: 10,
                 }}>
-                    <ModernButton
-                        title={canContinue ? 'Kontynuuj' : 'Zaakceptuj wymaganą zgodę'}
-                        size="large"
-                        fullWidth
+                    <TouchableOpacity
+                        activeOpacity={0.86}
                         onPress={handleContinue}
                         disabled={!canContinue}
-                    />
+                        style={[
+                            styles.primaryAction,
+                            !canContinue && styles.primaryActionDisabled,
+                        ]}
+                    >
+                        <Text
+                            numberOfLines={2}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.82}
+                            style={[
+                                styles.primaryActionText,
+                                !canContinue && styles.primaryActionTextDisabled,
+                            ]}
+                        >
+                            {canContinue ? 'Kontynuuj' : 'Włącz zgodę, aby kontynuować'}
+                        </Text>
+                    </TouchableOpacity>
                     {!canContinue && (
                         <ThemedText
                             variant="bodySmall"
@@ -299,3 +312,39 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
         </SafeAreaView>
     );
 };
+
+const styles = StyleSheet.create({
+    primaryAction: {
+        minHeight: 64,
+        borderRadius: 16,
+        backgroundColor: '#4CAF50',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 24,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+        elevation: 4,
+    },
+    primaryActionDisabled: {
+        backgroundColor: '#E5E7EB',
+        borderWidth: 1,
+        borderColor: '#CBD5E1',
+        shadowOpacity: 0,
+        elevation: 0,
+    },
+    primaryActionText: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        lineHeight: 24,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    primaryActionTextDisabled: {
+        color: '#475569',
+    },
+});

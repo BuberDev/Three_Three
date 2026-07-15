@@ -42,6 +42,64 @@ type AuthData = {
     authData?: any;
 };
 
+const API_REQUEST_TIMEOUT_MS = 75000;
+
+const getApiErrorMessage = (body: any, fallback: string) => {
+    if (typeof body?.error?.message === 'string') {
+        return body.error.message;
+    }
+
+    if (Array.isArray(body?.error?.message)) {
+        return body.error.message.join('\n');
+    }
+
+    if (typeof body?.message === 'string') {
+        return body.message;
+    }
+
+    if (Array.isArray(body?.message)) {
+        return body.message.join('\n');
+    }
+
+    return fallback;
+};
+
+const fetchApiJson = async (
+    path: string,
+    options: RequestInit = {},
+    timeoutMs = API_REQUEST_TIMEOUT_MS,
+) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const url = `${getApiUrl()}${path}`;
+
+    try {
+        const response = await fetch(url, {
+            ...options,
+            signal: controller.signal,
+        });
+        const body = await response.json().catch(() => null);
+
+        if (!response.ok) {
+            throw new Error(getApiErrorMessage(body, `HTTP ${response.status}: ${response.statusText}`));
+        }
+
+        return body;
+    } catch (error: any) {
+        if (error?.name === 'AbortError') {
+            throw new Error('Serwer API uruchamia się zbyt długo. Spróbuj ponownie za chwilę.');
+        }
+
+        if (error instanceof TypeError || error?.message === 'Network request failed') {
+            throw new Error('Nie mogę połączyć się z API. Sprawdź połączenie internetowe albo spróbuj ponownie za chwilę.');
+        }
+
+        throw error;
+    } finally {
+        clearTimeout(timeoutId);
+    }
+};
+
 export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComplete }) => {
     const pagerRef = useRef<PagerView>(null);
     const [currentPage, setCurrentPage] = useState(0);
@@ -210,7 +268,9 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                 throw new Error('Sesja Google wygasła. Wróć do poprzedniego kroku i zaloguj się ponownie.');
             }
 
-            const response = await fetch(`${getApiUrl()}/api/auth/google/mobile`, {
+            await fetchApiJson('/api/health', { method: 'GET' });
+
+            const authResponse = await fetchApiJson('/api/auth/google/mobile', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -224,15 +284,6 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     language: 'pl',
                 }),
             });
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({
-                    message: `HTTP ${response.status}: ${response.statusText}`,
-                }));
-                throw new Error(errorData.message || 'Nie udało się zalogować przez Google.');
-            }
-
-            const authResponse = await response.json();
             const tokenData = authResponse.data?.data || authResponse.data || authResponse;
             await applyAuthenticatedSession(tokenData, finalUserData);
             goToNext();
@@ -271,32 +322,15 @@ export const SwipeableOnboarding: React.FC<SwipeableOnboardingProps> = ({ onComp
                     goalsCount: requestBody.primaryGoals.length
                 });
 
-                const response = await fetch(`${getApiUrl()}/api/auth/register`, {
+                await fetchApiJson('/api/health', { method: 'GET' });
+
+                const authResponse = await fetchApiJson('/api/auth/register', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify(requestBody),
                 });
-
-                if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({
-                        message: `HTTP ${response.status}: ${response.statusText}`
-                    }));
-
-                    // Handle specific error cases
-                    if (response.status === 409) {
-                        throw new Error('User with this email already exists. Please try logging in instead.');
-                    } else if (response.status === 400) {
-                        throw new Error(errorData.message || 'Invalid registration data');
-                    } else if (response.status >= 500) {
-                        throw new Error('Server error. Please try again later.');
-                    }
-
-                    throw new Error(errorData.message || 'Registration failed');
-                }
-
-                const authResponse = await response.json();
                 console.log('✅ Registration successful:', {
                     success: authResponse.success,
                     timestamp: authResponse.timestamp,
