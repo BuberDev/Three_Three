@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
@@ -7,16 +7,22 @@ import { UsersService } from '../../users/users.service';
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+    private readonly logger = new Logger(GoogleStrategy.name);
+
     constructor(
         private readonly configService: ConfigService,
         private readonly usersService: UsersService,
     ) {
         super({
-            clientID: configService.get<string>('app.google.clientId'),
-            clientSecret: configService.get<string>('app.google.clientSecret'),
+            clientID: configService.get<string>('app.google.clientId') || 'google-oauth-not-configured',
+            clientSecret: configService.get<string>('app.google.clientSecret') || 'google-oauth-not-configured',
             callbackURL: configService.get<string>('app.google.callbackUrl'),
             scope: ['email', 'profile'],
         });
+
+        if (!configService.get<string>('app.google.clientId') || !configService.get<string>('app.google.clientSecret')) {
+            this.logger.warn('Google OAuth is not configured. /auth/google will be unavailable until GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET are set.');
+        }
     }
 
     async validate(
