@@ -86,7 +86,7 @@ export const Colors: ColorsType = {
     iconSecondary: '#9AA1AF',
     tabIconDefault: '#565D6B',
     tabIconSelected: EMBER,
-    success: '#0E9F6E',
+    success: '#0A7A54', // Darkened from #0E9F6E — white text on the lighter shade failed 4.5:1 (measured 3.39:1)
     warning: '#A16207', // Yellow-gold, not amber — amber would clash with ember
     error: '#DC2626',
   },
