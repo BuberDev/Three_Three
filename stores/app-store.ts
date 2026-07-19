@@ -71,6 +71,7 @@ interface AppStore {
     isLoading: boolean;
     error: string | null;
     isOnboarding: boolean;
+    themePreference: 'system' | 'light' | 'dark';
 
     // Actions
     setUser: (user: User | null) => void;
@@ -142,6 +143,7 @@ interface AppStore {
     setError: (error: string | null) => void;
     clearError: () => void;
     setOnboardingComplete: () => void;
+    setThemePreference: (preference: 'system' | 'light' | 'dark') => void;
     logout: () => Promise<void>;
     refreshAuthToken: () => Promise<boolean>;
     refreshUser: () => Promise<void>;
@@ -187,6 +189,7 @@ export const useAppStore = create<AppStore>()(
             isLoading: false,
             error: null,
             isOnboarding: true,
+            themePreference: 'system',
 
             // User actions
             setUser: (user) => set({ user }),
@@ -2294,6 +2297,7 @@ export const useAppStore = create<AppStore>()(
                 user: state.user ? { ...state.user, isOnboardingCompleted: true } : null,
                 isOnboarding: false
             })),
+            setThemePreference: (themePreference) => set({ themePreference }),
 
             logout: async () => {
                 try {
@@ -2409,6 +2413,7 @@ export const useAppStore = create<AppStore>()(
                 userSettings: state.userSettings,
                 isAuthenticated: state.isAuthenticated,
                 isOnboarding: state.isOnboarding,
+                themePreference: state.themePreference,
             }),
         }
     )
