@@ -5,15 +5,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { DesignSystem, getElevation } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useThemeColor } from '@/hooks/use-theme-color';
 // import { locationService } from '@/lib/services/location-service';
 import { notificationService } from '@/lib/services/notification-service';
 import { useAppStore } from '@/stores/app-store';
 
+type ThemePreference = 'system' | 'light' | 'dark';
+
 export default function ProfileScreen() {
     const navigation = useNavigation<any>();
     const insets = useSafeAreaInsets();
-    const { user, userSettings, setUserSettings, updateUserSettings, logout, subscription, subscriptionStatus } = useAppStore();
+    const colorScheme = useColorScheme();
+    const {
+        user, userSettings, setUserSettings, updateUserSettings, logout,
+        subscription, themePreference, setThemePreference
+    } = useAppStore();
+
+    const backgroundColor = useThemeColor({}, 'background');
+    const surfaceColor = useThemeColor({}, 'surface');
+    const surfaceSecondary = useThemeColor({}, 'surfaceSecondary');
+    const backgroundSecondary = useThemeColor({}, 'backgroundSecondary');
+    const textSecondary = useThemeColor({}, 'textSecondary');
+    const iconSecondary = useThemeColor({}, 'iconSecondary');
+    const borderColor = useThemeColor({}, 'border');
+    const primaryColor = useThemeColor({}, 'primary');
+    const onAccentColor = useThemeColor({}, 'onAccent');
+    const successColor = useThemeColor({}, 'success');
+    const errorColor = useThemeColor({}, 'error');
 
     // Get subscription details for enterprise display
     const getSubscriptionDisplayInfo = () => {
@@ -43,6 +63,7 @@ export default function ProfileScreen() {
     };
 
     const subscriptionInfo = getSubscriptionDisplayInfo();
+    const badgeTextColor = colorScheme === 'dark' ? onAccentColor : '#FFFFFF';
 
     // Lokalne stany dla ustawień
     const [notificationsEnabled, setNotificationsEnabled] = React.useState(
@@ -66,16 +87,12 @@ export default function ProfileScreen() {
             'Wyloguj się',
             'Czy na pewno chcesz się wylogować?',
             [
-                {
-                    text: 'Anuluj',
-                    style: 'cancel',
-                },
+                { text: 'Anuluj', style: 'cancel' },
                 {
                     text: 'Wyloguj',
                     style: 'destructive',
                     onPress: async () => {
                         await logout();
-                        // Logout sets isOnboarding to true, which will automatically show OnboardingFlow
                     },
                 },
             ]
@@ -86,84 +103,36 @@ export default function ProfileScreen() {
         if (!userSettings) return;
 
         try {
-            // Update locally first for immediate UI feedback
-            const newSettings = {
-                ...userSettings,
-                [setting]: value,
-            };
+            const newSettings = { ...userSettings, [setting]: value };
             setUserSettings(newSettings);
-
-            // Save to API
             await updateUserSettings({ [setting]: value });
 
-            // Apply real functionality based on setting
             switch (setting) {
                 case 'notificationsEnabled':
-                    // Kontroluje WSZYSTKIE powiadomienia w aplikacji
                     if (value) {
                         await notificationService.initialize();
-                        console.log('📧 Notifications enabled and service initialized');
                     } else {
                         await notificationService.cancelAllNotifications();
-                        console.log('📧 Notifications disabled, all cancelled');
                     }
                     break;
-
                 case 'pushNotifications':
-                    // Kontroluje push notifications
                     if (value) {
                         const granted = await notificationService.requestPushPermissions();
                         if (granted) {
-                            const token = await notificationService.getPushToken();
-                            console.log('📱 Push notifications enabled, token:', token);
-                        } else {
-                            console.log('📱 Push notification permissions denied');
+                            await notificationService.getPushToken();
                         }
-                    } else {
-                        console.log('📱 Push notifications disabled');
                     }
                     break;
-
-                case 'analyticsEnabled':
-                    // Kontroluje zaawansowaną analitykę - AnalyticsView już sprawdza to ustawienie
-                    console.log(`📊 Advanced analytics ${value ? 'enabled' : 'disabled'}`);
-                    break;
-
-                case 'locationTrackingEnabled':
-                    // Kontroluje dostęp do GPS
-                    if (value) {
-                        // TODO: Uncomment when development build includes expo-location
-                        // const started = await locationService.startLocationTracking();
-                        console.log('📍 Location tracking enabled (temporarily disabled - need new dev build)');
-                        // if (started) {
-                        //     console.log('📍 Location tracking enabled and started');
-                        // } else {
-                        //     console.log('📍 Failed to start location tracking');
-                        // }
-                    } else {
-                        // await locationService.stopLocationTracking();
-                        console.log('📍 Location tracking disabled (temporarily disabled - need new dev build)');
-                    }
-                    break;
-
                 case 'betaFeaturesEnabled':
-                    // Kontroluje widoczność funkcji beta - AI Lab w ai.tsx już sprawdza to ustawienie
-                    console.log(`🧪 Beta features ${value ? 'enabled' : 'disabled'}`);
                     if (value) {
                         await notificationService.notifyAI('Funkcje beta zostały włączone! Odkryj nowe możliwości.');
                     }
                     break;
             }
-
         } catch (error) {
             console.error('❌ Failed to update setting:', error);
-            // Revert local change on error
-            const revertedSettings = {
-                ...userSettings,
-                [setting]: !value,
-            };
+            const revertedSettings = { ...userSettings, [setting]: !value };
             setUserSettings(revertedSettings);
-
             Alert.alert(
                 'Błąd',
                 'Nie udało się zapisać ustawienia. Sprawdź połączenie internetowe i spróbuj ponownie.'
@@ -234,64 +203,118 @@ export default function ProfileScreen() {
         },
     ];
 
-    return (
-        <View style={styles.container}>
+    const themeOptions: { value: ThemePreference; label: string; icon: string }[] = [
+        { value: 'system', label: 'System', icon: 'circle.lefthalf.filled' },
+        { value: 'light', label: 'Jasny', icon: 'sun.max.fill' },
+        { value: 'dark', label: 'Ciemny', icon: 'moon.fill' },
+    ];
 
+    return (
+        <View style={[styles.container, { backgroundColor }]}>
             <ScrollView
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
                 {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+                <View style={[styles.header, { paddingTop: insets.top + 20, backgroundColor: surfaceColor, ...getElevation(colorScheme, 1) }]}>
                     <View style={styles.profileSection}>
-                        <View style={styles.avatarContainer}>
-                            <IconSymbol name="person.circle" size={48} color={Colors.light.tint} />
+                        <View style={[styles.avatarContainer, { backgroundColor: backgroundSecondary }]}>
+                            <IconSymbol name="person.circle" size={48} color={primaryColor} />
                         </View>
                         <View style={styles.profileInfo}>
                             <ThemedText variant="headlineMedium" style={styles.userName}>
                                 {user?.name || 'Użytkownik'}
                             </ThemedText>
-                            <ThemedText style={styles.userEmail}>
+                            <ThemedText variant="bodyMedium" color="secondary">
                                 {user?.email || 'email@example.com'}
                             </ThemedText>
                         </View>
                         <TouchableOpacity style={styles.editButton}>
-                            <IconSymbol name="chevron.right" size={16} color="#666" />
+                            <IconSymbol name="chevron.right" size={16} color={iconSecondary} />
                         </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Appearance Section */}
+                <View style={styles.section}>
+                    <ThemedText variant="titleMedium" style={styles.sectionTitle}>
+                        Wygląd
+                    </ThemedText>
+                    <View style={[styles.themeSwitcher, { backgroundColor: surfaceColor, borderColor, ...getElevation(colorScheme, 1) }]}>
+                        {themeOptions.map((option) => {
+                            const isSelected = themePreference === option.value;
+                            return (
+                                <TouchableOpacity
+                                    key={option.value}
+                                    style={[
+                                        styles.themeOption,
+                                        isSelected && { backgroundColor: primaryColor },
+                                    ]}
+                                    onPress={() => setThemePreference(option.value)}
+                                >
+                                    <IconSymbol
+                                        name={option.icon}
+                                        size={18}
+                                        color={isSelected ? onAccentColor : textSecondary}
+                                    />
+                                    <ThemedText
+                                        variant="labelLarge"
+                                        style={[
+                                            styles.themeOptionLabel,
+                                            { color: isSelected ? onAccentColor : textSecondary },
+                                        ]}
+                                    >
+                                        {option.label}
+                                    </ThemedText>
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </View>
 
                 {/* Subscription Status Section */}
                 <View style={styles.section}>
-                    <View style={[styles.subscriptionCard, !subscriptionInfo.isPremium && styles.subscriptionCardFree]}>
+                    <View style={[
+                        styles.subscriptionCard,
+                        { backgroundColor: surfaceColor, borderColor: subscriptionInfo.isPremium ? primaryColor : borderColor, ...getElevation(colorScheme, 2) },
+                        !subscriptionInfo.isPremium && { backgroundColor: surfaceSecondary },
+                    ]}>
                         <View style={styles.subscriptionHeader}>
                             <IconSymbol
                                 name={subscriptionInfo.isPremium ? "crown.fill" : "creditcard"}
                                 size={24}
-                                color={subscriptionInfo.isPremium ? "#FFD700" : Colors.light.tint}
+                                color={primaryColor}
                             />
-                            <ThemedText style={styles.subscriptionTitle}>{subscriptionInfo.planName}</ThemedText>
-                            <View style={[styles.subscriptionBadge, subscriptionInfo.isActive ? styles.activeBadge : styles.inactiveBadge]}>
-                                <ThemedText style={[styles.subscriptionBadgeText, subscriptionInfo.isActive ? styles.activeBadgeText : styles.inactiveBadgeText]}>
+                            <ThemedText variant="titleMedium" style={styles.subscriptionTitle}>{subscriptionInfo.planName}</ThemedText>
+                            <View style={[
+                                styles.subscriptionBadge,
+                                { backgroundColor: subscriptionInfo.isActive ? successColor : errorColor },
+                            ]}>
+                                <ThemedText variant="labelSmall" style={{ color: badgeTextColor }}>
                                     {subscriptionInfo.status}
                                 </ThemedText>
                             </View>
                         </View>
                         {subscriptionInfo.renewalDate && (
-                            <ThemedText style={styles.subscriptionRenewal}>
+                            <ThemedText variant="bodyMedium" color="secondary" style={styles.subscriptionRenewal}>
                                 Odnowienie: {new Date(subscriptionInfo.renewalDate).toLocaleDateString('pl-PL')}
                             </ThemedText>
                         )}
-                        <ThemedText style={styles.subscriptionDescription}>
+                        <ThemedText variant="bodyMedium" color="secondary" style={styles.subscriptionDescription}>
                             {subscriptionInfo.isPremium
                                 ? 'Masz dostęp do wszystkich funkcji Premium'
                                 : 'Przejdź na Premium aby odblokować zaawansowane funkcje'
                             }
                         </ThemedText>
                         {!subscriptionInfo.isPremium && (
-                            <TouchableOpacity style={styles.subscriptionButton} onPress={() => navigation.navigate('Subscription')}>
-                                <ThemedText style={styles.subscriptionButtonText}>Przejdź na Premium</ThemedText>
+                            <TouchableOpacity
+                                style={[styles.subscriptionButton, { backgroundColor: primaryColor }]}
+                                onPress={() => navigation.navigate('Subscription')}
+                            >
+                                <ThemedText variant="titleSmall" style={{ color: onAccentColor, fontWeight: '600' }}>
+                                    Przejdź na Premium
+                                </ThemedText>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -303,13 +326,13 @@ export default function ProfileScreen() {
                         Personalizacja
                     </ThemedText>
 
-                    <View style={styles.settingsContainer}>
-                        <View style={styles.settingItem}>
+                    <View style={[styles.settingsContainer, { backgroundColor: surfaceColor, ...getElevation(colorScheme, 1) }]}>
+                        <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="bell.fill" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="bell.fill" size={20} color={primaryColor} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Powiadomienia</ThemedText>
-                                    <ThemedText style={styles.settingDescription}>
+                                    <ThemedText variant="bodyLarge" style={styles.settingTitle}>Powiadomienia</ThemedText>
+                                    <ThemedText variant="bodySmall" color="secondary">
                                         Wyłącz gdy potrzebujesz skupienia lub odpoczynku
                                     </ThemedText>
                                 </View>
@@ -320,17 +343,17 @@ export default function ProfileScreen() {
                                     setNotificationsEnabled(value);
                                     handleSettingChange('notificationsEnabled', value);
                                 }}
-                                trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={notificationsEnabled ? '#f5dd4b' : '#f4f3f4'}
+                                trackColor={{ false: borderColor, true: primaryColor }}
+                                thumbColor={surfaceColor}
                             />
                         </View>
 
-                        <View style={styles.settingItem}>
+                        <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="app.badge" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="app.badge" size={20} color={primaryColor} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Powiadomienia push</ThemedText>
-                                    <ThemedText style={styles.settingDescription}>
+                                    <ThemedText variant="bodyLarge" style={styles.settingTitle}>Powiadomienia push</ThemedText>
+                                    <ThemedText variant="bodySmall" color="secondary">
                                         Alternatywa: otrzymuj tylko powiadomienia email
                                     </ThemedText>
                                 </View>
@@ -341,8 +364,8 @@ export default function ProfileScreen() {
                                     setPushNotifications(value);
                                     handleSettingChange('pushNotifications', value);
                                 }}
-                                trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={pushNotifications ? '#f5dd4b' : '#f4f3f4'}
+                                trackColor={{ false: borderColor, true: primaryColor }}
+                                thumbColor={surfaceColor}
                             />
                         </View>
                     </View>
@@ -351,17 +374,17 @@ export default function ProfileScreen() {
                 {/* Privacy & Analytics Section */}
                 <View style={styles.section}>
                     <ThemedText variant="titleMedium" style={styles.sectionTitle}>
-                        Prywatność i Analityka
+                        Prywatność i analityka
                     </ThemedText>
 
-                    <View style={styles.settingsContainer}>
-                        <View style={styles.settingItem}>
+                    <View style={[styles.settingsContainer, { backgroundColor: surfaceColor, ...getElevation(colorScheme, 1) }]}>
+                        <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="chart.bar.xaxis" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="chart.bar.xaxis" size={20} color={primaryColor} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Zaawansowana analityka</ThemedText>
-                                    <ThemedText style={styles.settingDescription}>
-                                        Wyłącz jeśli nie chcesz analizy wzorceów zachowań
+                                    <ThemedText variant="bodyLarge" style={styles.settingTitle}>Zaawansowana analityka</ThemedText>
+                                    <ThemedText variant="bodySmall" color="secondary">
+                                        Wyłącz jeśli nie chcesz analizy wzorców zachowań
                                     </ThemedText>
                                 </View>
                             </View>
@@ -371,17 +394,17 @@ export default function ProfileScreen() {
                                     setAnalyticsEnabled(value);
                                     handleSettingChange('analyticsEnabled', value);
                                 }}
-                                trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={analyticsEnabled ? '#f5dd4b' : '#f4f3f4'}
+                                trackColor={{ false: borderColor, true: primaryColor }}
+                                thumbColor={surfaceColor}
                             />
                         </View>
 
-                        <View style={styles.settingItem}>
+                        <View style={[styles.settingItem, { borderBottomColor: borderColor }]}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="location" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="location" size={20} color={primaryColor} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Lokalizacja</ThemedText>
-                                    <ThemedText style={styles.settingDescription}>
+                                    <ThemedText variant="bodyLarge" style={styles.settingTitle}>Lokalizacja</ThemedText>
+                                    <ThemedText variant="bodySmall" color="secondary">
                                         Wyłącz dla prywatności i oszczędzania baterii
                                     </ThemedText>
                                 </View>
@@ -392,17 +415,17 @@ export default function ProfileScreen() {
                                     setLocationTrackingEnabled(value);
                                     handleSettingChange('locationTrackingEnabled', value);
                                 }}
-                                trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={locationTrackingEnabled ? '#f5dd4b' : '#f4f3f4'}
+                                trackColor={{ false: borderColor, true: primaryColor }}
+                                thumbColor={surfaceColor}
                             />
                         </View>
 
-                        <View style={styles.settingItem}>
+                        <View style={[styles.settingItem, { borderBottomWidth: 0 }]}>
                             <View style={styles.settingLeft}>
-                                <IconSymbol name="flask" size={20} color={Colors.light.tint} />
+                                <IconSymbol name="flask" size={20} color={primaryColor} />
                                 <View style={styles.settingText}>
-                                    <ThemedText style={styles.settingTitle}>Funkcje beta</ThemedText>
-                                    <ThemedText style={styles.settingDescription}>
+                                    <ThemedText variant="bodyLarge" style={styles.settingTitle}>Funkcje beta</ThemedText>
+                                    <ThemedText variant="bodySmall" color="secondary">
                                         Wyłącz jeśli wolisz stabilność niż nowości
                                     </ThemedText>
                                 </View>
@@ -413,13 +436,12 @@ export default function ProfileScreen() {
                                     setBetaFeaturesEnabled(value);
                                     handleSettingChange('betaFeaturesEnabled', value);
                                 }}
-                                trackColor={{ false: '#767577', true: Colors.light.tint }}
-                                thumbColor={betaFeaturesEnabled ? '#f5dd4b' : '#f4f3f4'}
+                                trackColor={{ false: borderColor, true: primaryColor }}
+                                thumbColor={surfaceColor}
                             />
                         </View>
                     </View>
                 </View>
-
 
                 {/* Profile Menu */}
                 <View style={styles.section}>
@@ -427,26 +449,30 @@ export default function ProfileScreen() {
                         Profil
                     </ThemedText>
 
-                    <View style={styles.menuContainer}>
+                    <View style={[styles.menuContainer, { backgroundColor: surfaceColor, ...getElevation(colorScheme, 1) }]}>
                         {profileMenuItems.map((item, index) => (
-                            <TouchableOpacity key={`profile-${index}`} style={styles.menuItem} onPress={item.onPress}>
+                            <TouchableOpacity
+                                key={`profile-${index}`}
+                                style={[styles.menuItem, { borderBottomColor: borderColor }, index === profileMenuItems.length - 1 && { borderBottomWidth: 0 }]}
+                                onPress={item.onPress}
+                            >
                                 <View style={styles.menuItemLeft}>
-                                    <IconSymbol name={item.icon} size={20} color={Colors.light.tint} />
+                                    <IconSymbol name={item.icon} size={20} color={primaryColor} />
                                     <View style={styles.menuItemText}>
                                         <View style={styles.menuItemTitleRow}>
-                                            <ThemedText style={styles.menuItemTitle}>{item.title}</ThemedText>
+                                            <ThemedText variant="bodyLarge" style={styles.menuItemTitle}>{item.title}</ThemedText>
                                             {item.isPremium && !subscriptionInfo.isPremium && (
-                                                <View style={styles.premiumIndicator}>
-                                                    <ThemedText style={styles.premiumIndicatorText}>PRO</ThemedText>
+                                                <View style={[styles.premiumIndicator, { backgroundColor: primaryColor }]}>
+                                                    <ThemedText variant="labelSmall" style={{ color: onAccentColor, fontWeight: '700' }}>PRO</ThemedText>
                                                 </View>
                                             )}
                                         </View>
-                                        <ThemedText style={styles.menuItemDescription}>
+                                        <ThemedText variant="bodySmall" color="secondary">
                                             {item.description}
                                         </ThemedText>
                                     </View>
                                 </View>
-                                <IconSymbol name="chevron.right" size={16} color="#ccc" />
+                                <IconSymbol name="chevron.right" size={16} color={iconSecondary} />
                             </TouchableOpacity>
                         ))}
                     </View>
@@ -458,29 +484,33 @@ export default function ProfileScreen() {
                         Informacje
                     </ThemedText>
 
-                    <View style={styles.menuContainer}>
+                    <View style={[styles.menuContainer, { backgroundColor: surfaceColor, ...getElevation(colorScheme, 1) }]}>
                         {aboutMenuItems.map((item, index) => (
-                            <TouchableOpacity key={`about-${index}`} style={styles.menuItem} onPress={item.onPress}>
+                            <TouchableOpacity
+                                key={`about-${index}`}
+                                style={[styles.menuItem, { borderBottomColor: borderColor }, index === aboutMenuItems.length - 1 && { borderBottomWidth: 0 }]}
+                                onPress={item.onPress}
+                            >
                                 <View style={styles.menuItemLeft}>
                                     <IconSymbol
                                         name={item.icon}
                                         size={20}
-                                        color={item.isDestructive ? '#ff3b30' : Colors.light.tint}
+                                        color={item.isDestructive ? errorColor : primaryColor}
                                     />
                                     <View style={styles.menuItemText}>
-                                        <ThemedText style={[
-                                            styles.menuItemTitle,
-                                            item.isDestructive && { color: '#ff3b30' }
-                                        ]}>
+                                        <ThemedText
+                                            variant="bodyLarge"
+                                            style={[styles.menuItemTitle, item.isDestructive && { color: errorColor }]}
+                                        >
                                             {item.title}
                                         </ThemedText>
-                                        <ThemedText style={styles.menuItemDescription}>
+                                        <ThemedText variant="bodySmall" color="secondary">
                                             {item.description}
                                         </ThemedText>
                                     </View>
                                 </View>
                                 {!item.isDestructive && (
-                                    <IconSymbol name="chevron.right" size={16} color="#ccc" />
+                                    <IconSymbol name="chevron.right" size={16} color={iconSecondary} />
                                 )}
                             </TouchableOpacity>
                         ))}
@@ -489,8 +519,8 @@ export default function ProfileScreen() {
 
                 {/* App Info */}
                 <View style={styles.appInfoSection}>
-                    <ThemedText style={styles.appVersion}>Wersja 1.0.0</ThemedText>
-                    <ThemedText style={styles.appCopyright}>© 2024 Voice Tasks</ThemedText>
+                    <ThemedText variant="bodySmall" color="secondary">Wersja 1.0.0</ThemedText>
+                    <ThemedText variant="bodySmall" color="tertiary">© 2026 Three Three</ThemedText>
                 </View>
             </ScrollView>
         </View>
@@ -500,7 +530,6 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
     },
     scrollView: {
         flex: 1,
@@ -510,14 +539,7 @@ const styles = StyleSheet.create({
     },
     header: {
         paddingHorizontal: 20,
-        paddingTop: 60, // Will be overridden with dynamic style
         paddingBottom: 24,
-        backgroundColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
     },
     profileSection: {
         flexDirection: 'row',
@@ -528,7 +550,6 @@ const styles = StyleSheet.create({
         width: 60,
         height: 60,
         borderRadius: 30,
-        backgroundColor: '#f5f5f5',
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -536,12 +557,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     userName: {
-        fontSize: 20,
         marginBottom: 4,
-    },
-    userEmail: {
-        opacity: 0.6,
-        fontSize: 14,
     },
     editButton: {
         padding: 8,
@@ -552,69 +568,27 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         marginBottom: 16,
-        color: '#333',
     },
-    premiumCard: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderRadius: 16,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-        borderWidth: 2,
-        borderColor: '#FFD700',
+    themeSwitcher: {
+        flexDirection: 'row',
+        borderRadius: DesignSystem.borderRadius.lg,
+        padding: 4,
+        gap: 4,
     },
-    premiumHeader: {
+    themeOption: {
+        flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 12,
+        justifyContent: 'center',
+        gap: 6,
+        paddingVertical: 10,
+        borderRadius: DesignSystem.borderRadius.md,
     },
-    premiumTitle: {
-        flex: 1,
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#333',
-    },
-    premiumBadge: {
-        backgroundColor: '#FFD700',
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 12,
-    },
-    premiumBadgeText: {
-        color: 'white',
-        fontSize: 12,
-        fontWeight: 'bold',
-    },
-    premiumDescription: {
-        fontSize: 14,
-        opacity: 0.8,
-        lineHeight: 20,
-        marginBottom: 16,
-    },
-    premiumButton: {
-        backgroundColor: Colors.light.tint,
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    premiumButtonText: {
-        color: 'white',
-        fontSize: 16,
+    themeOptionLabel: {
         fontWeight: '600',
     },
     settingsContainer: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        borderRadius: DesignSystem.borderRadius.lg,
     },
     settingItem: {
         flexDirection: 'row',
@@ -622,7 +596,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
     },
     settingLeft: {
         flexDirection: 'row',
@@ -634,23 +607,11 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     settingTitle: {
-        fontSize: 16,
-        fontWeight: '500',
         marginBottom: 2,
-    },
-    settingDescription: {
-        fontSize: 13,
-        opacity: 0.6,
-        lineHeight: 18,
+        fontWeight: '500',
     },
     menuContainer: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
+        borderRadius: DesignSystem.borderRadius.lg,
     },
     menuItem: {
         flexDirection: 'row',
@@ -658,7 +619,6 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         padding: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
     },
     menuItemLeft: {
         flexDirection: 'row',
@@ -670,9 +630,8 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     menuItemTitle: {
-        fontSize: 16,
-        fontWeight: '500',
         marginBottom: 2,
+        fontWeight: '500',
     },
     menuItemTitleRow: {
         flexDirection: 'row',
@@ -681,33 +640,16 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     premiumIndicator: {
-        backgroundColor: '#FFD700',
         paddingHorizontal: 6,
         paddingVertical: 2,
         borderRadius: 8,
         marginLeft: 8,
     },
-    premiumIndicatorText: {
-        fontSize: 10,
-        fontWeight: '700',
-        color: '#000',
-    },
     subscriptionCard: {
-        backgroundColor: 'white',
-        borderRadius: 16,
+        borderRadius: DesignSystem.borderRadius.lg,
         padding: 20,
         marginBottom: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 4,
-        borderWidth: 2,
-        borderColor: '#FFD700',
-    },
-    subscriptionCardFree: {
-        borderColor: '#E5E5E5',
-        backgroundColor: '#FAFAFA',
+        borderWidth: 1.5,
     },
     subscriptionHeader: {
         flexDirection: 'row',
@@ -716,72 +658,28 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     subscriptionTitle: {
-        fontSize: 18,
-        fontWeight: '700',
         flex: 1,
-        color: '#1A1A1A',
     },
     subscriptionBadge: {
         paddingHorizontal: 12,
         paddingVertical: 4,
-        borderRadius: 12,
-    },
-    activeBadge: {
-        backgroundColor: '#10B981',
-    },
-    inactiveBadge: {
-        backgroundColor: '#F87171',
-    },
-    subscriptionBadgeText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    activeBadgeText: {
-        color: 'white',
-    },
-    inactiveBadgeText: {
-        color: 'white',
+        borderRadius: DesignSystem.borderRadius.full,
     },
     subscriptionRenewal: {
-        fontSize: 14,
-        color: '#666',
         marginBottom: 8,
-        fontWeight: '500',
     },
     subscriptionDescription: {
-        fontSize: 14,
-        color: '#888',
-        lineHeight: 20,
         marginBottom: 16,
     },
     subscriptionButton: {
-        backgroundColor: Colors.light.tint,
         paddingVertical: 12,
         paddingHorizontal: 24,
-        borderRadius: 12,
+        borderRadius: DesignSystem.borderRadius.md,
         alignItems: 'center',
-    },
-    subscriptionButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    menuItemDescription: {
-        fontSize: 13,
-        opacity: 0.6,
-        lineHeight: 18,
     },
     appInfoSection: {
         alignItems: 'center',
         paddingVertical: 32,
         gap: 4,
-    },
-    appVersion: {
-        fontSize: 14,
-        opacity: 0.6,
-    },
-    appCopyright: {
-        fontSize: 12,
-        opacity: 0.4,
     },
 });
