@@ -2,7 +2,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
 import { View } from 'react-native';
 
-import { DesignSystem } from '@/constants/theme';
+import { DesignSystem, getElevation } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedText } from './themed-text';
 
@@ -24,15 +25,17 @@ export function ModernCard({
     gradient = false,
     elevation = 2,
     padding = 'lg',
-    borderRadius = 'xl',
+    borderRadius = 'lg',
     style,
 }: ModernCardProps) {
+    const colorScheme = useColorScheme();
     const surfaceColor = useThemeColor({}, 'surface');
+    const surfaceSecondary = useThemeColor({}, 'surfaceSecondary');
 
     const baseStyle = {
         borderRadius: DesignSystem.borderRadius[borderRadius],
         padding: DesignSystem.spacing[padding],
-        ...DesignSystem.elevation[elevation],
+        ...getElevation(colorScheme, elevation),
     };
 
     const content = (
@@ -59,9 +62,6 @@ export function ModernCard({
     );
 
     if (gradient) {
-        const surfaceColor = useThemeColor({}, 'surface');
-        const surfaceSecondary = useThemeColor({}, 'surfaceSecondary');
-
         return (
             <LinearGradient
                 colors={[surfaceColor, surfaceSecondary] as readonly [string, string, ...string[]]}

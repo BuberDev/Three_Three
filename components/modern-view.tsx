@@ -2,7 +2,8 @@ import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
 import { View, ViewProps } from 'react-native';
 
-import { DesignSystem } from '@/constants/theme';
+import { DesignSystem, getElevation } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 
 export type ModernViewProps = ViewProps & {
@@ -27,6 +28,7 @@ export function ModernView({
     children,
     ...otherProps
 }: ModernViewProps) {
+    const colorScheme = useColorScheme();
     const colorKey = variant === 'surface' ? 'surface' :
         variant === 'surfaceSecondary' ? 'surfaceSecondary' : 'background';
     const backgroundColor = useThemeColor({ light: lightColor, dark: darkColor }, colorKey);
@@ -35,7 +37,7 @@ export function ModernView({
         backgroundColor,
         borderRadius: DesignSystem.borderRadius[borderRadius],
         ...(padding && { padding: DesignSystem.spacing[padding] }),
-        ...(elevation > 0 && DesignSystem.elevation[elevation]),
+        ...(elevation > 0 && getElevation(colorScheme, elevation)),
     };
 
     if (gradient) {
