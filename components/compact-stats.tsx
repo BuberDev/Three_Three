@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 
-import { Colors, DesignSystem } from '@/constants/theme';
+import { DesignSystem } from '@/constants/theme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedText } from './themed-text';
 import { IconSymbol } from './ui/icon-symbol';
@@ -29,12 +29,16 @@ export function CompactStats({
     const primaryColor = useThemeColor({}, 'primary');
     const textColor = useThemeColor({}, 'text');
     const textSecondary = useThemeColor({}, 'textSecondary');
+    const borderColor = useThemeColor({}, 'border');
+    const backgroundSecondary = useThemeColor({}, 'backgroundSecondary');
+    const backgroundTertiary = useThemeColor({}, 'backgroundTertiary');
+    const successColor = useThemeColor({}, 'success');
 
     return (
         <TouchableOpacity
             style={[
                 styles.container,
-                { backgroundColor: surfaceColor },
+                { backgroundColor: surfaceColor, borderColor },
                 isActive && { borderColor: primaryColor, borderWidth: 2 }
             ]}
             onPress={onPress}
@@ -42,14 +46,14 @@ export function CompactStats({
         >
             {/* Header with icon and count */}
             <View style={styles.header}>
-                <View style={styles.iconContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: backgroundSecondary }]}>
                     <IconSymbol
                         name={icon}
                         size={16}
                         color={isActive ? primaryColor : textSecondary}
                     />
                 </View>
-                <View style={styles.countBadge}>
+                <View style={[styles.countBadge, { backgroundColor: backgroundTertiary }]}>
                     <ThemedText
                         variant="bodyMedium"
                         style={[styles.count, { color: isActive ? primaryColor : textColor }]}
@@ -74,7 +78,7 @@ export function CompactStats({
                         <View key={item.id} style={styles.previewItem}>
                             <View style={[
                                 styles.previewDot,
-                                { backgroundColor: item.completed ? Colors.light.success : textSecondary }
+                                { backgroundColor: item.completed ? successColor : textSecondary }
                             ]} />
                             <ThemedText
                                 variant="bodySmall"
@@ -108,7 +112,6 @@ const styles = StyleSheet.create({
         padding: DesignSystem.spacing.sm,
         borderRadius: DesignSystem.borderRadius.md,
         borderWidth: 1,
-        borderColor: Colors.light.border,
         ...DesignSystem.elevation[1],
         overflow: 'hidden',
     },
@@ -122,7 +125,6 @@ const styles = StyleSheet.create({
         width: 24,
         height: 24,
         borderRadius: 12,
-        backgroundColor: Colors.light.backgroundSecondary,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -130,7 +132,6 @@ const styles = StyleSheet.create({
         minWidth: 24,
         height: 20,
         borderRadius: 10,
-        backgroundColor: Colors.light.backgroundTertiary,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: DesignSystem.spacing.xs,
