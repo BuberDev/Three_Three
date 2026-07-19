@@ -11,7 +11,8 @@ import {
     ViewStyle,
 } from 'react-native';
 
-import { DesignSystem } from '@/constants/theme';
+import { DesignSystem, getElevation } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useThemeColor } from '@/hooks/use-theme-color';
 import { ThemedText } from './themed-text';
 
@@ -38,12 +39,14 @@ export function ModernButton({
     disabled,
     ...props
 }: ModernButtonProps) {
+    const colorScheme = useColorScheme();
     const primaryColor = useThemeColor({}, 'primary');
     const primaryLight = useThemeColor({}, 'primaryLight');
     const surfaceColor = useThemeColor({}, 'surface');
     const disabledSurfaceColor = useThemeColor({}, 'backgroundTertiary');
     const borderColor = useThemeColor({}, 'border');
     const textSecondaryColor = useThemeColor({}, 'textSecondary');
+    const onAccentColor = useThemeColor({}, 'onAccent');
 
     const sizeStyles = {
         small: {
@@ -84,12 +87,12 @@ export function ModernButton({
         ...sizeStyles[size],
         ...(fullWidth && { width: '100%' as DimensionValue }),
         opacity: loading ? 0.85 : 1,
-        ...DesignSystem.elevation[1],
+        ...getElevation(colorScheme, 1),
     };
 
     if (variant === 'primary') {
         const isDisabled = disabled || loading;
-        const contentColor = isDisabled ? textSecondaryColor : 'white';
+        const contentColor = isDisabled ? textSecondaryColor : onAccentColor;
         const gradientColors = isDisabled
             ? [disabledSurfaceColor, disabledSurfaceColor]
             : [primaryColor, primaryLight];
@@ -186,7 +189,7 @@ export function ModernButton({
                 baseStyle,
                 {
                     backgroundColor: 'transparent',
-                    ...(DesignSystem.elevation[1] || {}),
+                    ...getElevation(colorScheme, 1),
                 },
                 style
             ]}
