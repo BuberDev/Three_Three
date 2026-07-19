@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, DesignSystem } from '@/constants/theme';
+import { Colors, DesignSystem, getElevation } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 import HomeScreen from '@/app/(tabs)/index';
@@ -45,9 +45,9 @@ export function TabNavigator() {
           paddingBottom: bottomPadding,
           paddingTop: 10,
           height: tabBarHeight,
-          ...DesignSystem.elevation[3],
-          borderTopLeftRadius: DesignSystem.borderRadius.xl,
-          borderTopRightRadius: DesignSystem.borderRadius.xl,
+          ...getElevation(colorScheme ?? 'light', 3),
+          borderTopLeftRadius: DesignSystem.borderRadius.lg,
+          borderTopRightRadius: DesignSystem.borderRadius.lg,
         },
         tabBarLabelStyle: {
           fontSize: 11,
