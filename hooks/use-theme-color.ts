@@ -24,17 +24,6 @@ export function useThemeColor(
       ? ensureContrastColor(theme, colorName as 'text' | 'textSecondary' | 'textTertiary')
       : resolvedColor;
 
-    // Debug logging to help identify color resolution issues
-    if (__DEV__ && (colorName === 'text' || colorName === 'textSecondary' || colorName === 'textTertiary')) {
-      console.log('🎨 useThemeColor (text):', {
-        theme,
-        colorName,
-        resolvedColor,
-        finalColor,
-        propsProvided: !!colorFromProps
-      });
-    }
-
     return finalColor;
   }
 }
