@@ -13,7 +13,7 @@ import { ModernCard } from '@/components/modern-card';
 import { ModernView } from '@/components/modern-view';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors, DesignSystem } from '@/constants/theme';
+import { Colors, DesignSystem, Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useAppStore } from '@/stores/app-store';
 import { useNavigation } from '@react-navigation/native';
@@ -177,7 +177,7 @@ export default function HomeScreen() {
           </ThemedText>
 
           <LinearGradient
-            colors={[Colors.light.primary, Colors.light.primaryLight] as readonly [string, string, ...string[]]}
+            colors={[colors.primary, colors.primaryLight] as readonly [string, string, ...string[]]}
             locations={[0, 1] as readonly [number, number, ...number[]]}
             start={DesignSystem.gradients.primary.start}
             end={DesignSystem.gradients.primary.end}
@@ -220,7 +220,7 @@ export default function HomeScreen() {
                   variant="headlineMedium"
                   lightColor="white"
                   darkColor="white"
-                  style={{ fontWeight: '700' }}
+                  style={{ fontWeight: '700', fontFamily: Fonts.mono }}
                 >
                   {getDayProgress()}%
                 </ThemedText>
@@ -254,7 +254,7 @@ export default function HomeScreen() {
                   variant="titleMedium"
                   lightColor="white"
                   darkColor="white"
-                  style={{ fontWeight: '600' }}
+                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
                 >
                   {getProductivityScore()}
                 </ThemedText>
@@ -271,7 +271,7 @@ export default function HomeScreen() {
                   variant="titleMedium"
                   lightColor="white"
                   darkColor="white"
-                  style={{ fontWeight: '600' }}
+                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
                 >
                   {getStreakInfo().current}
                 </ThemedText>
@@ -288,7 +288,7 @@ export default function HomeScreen() {
                   variant="titleMedium"
                   lightColor="white"
                   darkColor="white"
-                  style={{ fontWeight: '600' }}
+                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
                 >
                   {getTodaysActivityCount()}
                 </ThemedText>
