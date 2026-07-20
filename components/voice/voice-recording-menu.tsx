@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { Colors as ColorsTheme } from '../../constants/theme';
 import { useAppStore } from '../../stores/app-store';
+import { AudioRecording } from '../../lib/types';
 import { IconSymbol } from '../ui/icon-symbol';
 import { VoiceRecorder } from './voice-recorder';
 
@@ -42,8 +43,9 @@ export const VoiceRecordingMenu: React.FC<VoiceRecordingMenuProps> = ({
         isProcessingVoiceNote,
     } = useAppStore();
 
-    const handleRecordingComplete = async (audioUri: string) => {
+    const handleRecordingComplete = async (audioRecording: AudioRecording) => {
         if (!selectedCategory) return false;
+        const audioUri = audioRecording.uri;
 
         try {
             let success = false;

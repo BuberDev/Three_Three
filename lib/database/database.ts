@@ -638,7 +638,9 @@ export class DatabaseService {
             completed: row.completed === 1,
             dueDate: row.due_date,
             category: row.category,
-            extractedFromVoiceNoteId: row.extracted_from_voice_note_id
+            extractedFromVoiceNoteId: row.extracted_from_voice_note_id,
+            createdAt: row.created_at,
+            updatedAt: row.updated_at,
         };
     }
 

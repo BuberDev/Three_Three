@@ -201,16 +201,6 @@ export interface DailyEntry {
     updatedAt: string;
 }
 
-export interface Habit {
-    id: string;
-    name: string;
-    description: string;
-    frequency: 'daily' | 'weekly' | 'monthly';
-    streakCount: number;
-    lastCompletedAt?: string;
-    isCompleted: boolean;
-}
-
 export interface AppEvent {
     id: string;
     userId: string;
@@ -456,4 +446,3 @@ export interface CompleteHabitDto {
     rating?: number;
     metadata?: Record<string, any>;
 }
-

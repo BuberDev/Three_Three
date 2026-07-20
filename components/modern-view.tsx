@@ -43,8 +43,8 @@ export function ModernView({
     if (gradient) {
         return (
             <LinearGradient
-                colors={[backgroundColor, backgroundColor] as readonly [string, string, ...string[]]}
-                locations={[0, 1] as readonly [number, number, ...number[]]}
+                colors={[backgroundColor, backgroundColor] as [string, string]}
+                locations={[0, 1] as [number, number]}
                 start={DesignSystem.gradients.surface.start}
                 end={DesignSystem.gradients.surface.end}
                 style={[baseStyle, style]}

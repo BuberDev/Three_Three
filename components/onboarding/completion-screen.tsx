@@ -7,7 +7,7 @@ import { DesignSystem } from '../../constants/theme';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
 
-const { height } = Dimensions.get('window');
+const { height, width } = Dimensions.get('window');
 
 interface CompletionScreenProps {
     onComplete: () => void;
@@ -60,7 +60,12 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
 
                     {/* Welcome Message */}
                     <View style={styles.textContainer}>
-                        <ThemedText style={styles.title}>
+                        <ThemedText
+                            numberOfLines={2}
+                            adjustsFontSizeToFit
+                            minimumFontScale={0.72}
+                            style={styles.title}
+                        >
                             Gotowe, zaczynamy
                         </ThemedText>
 
@@ -141,6 +146,7 @@ const styles = StyleSheet.create({
         color: '#ffffff',
         textAlign: 'center',
         marginBottom: 16,
+        maxWidth: width - 48,
     },
     subtitle: {
         fontSize: 16,

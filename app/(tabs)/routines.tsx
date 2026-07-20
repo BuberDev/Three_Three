@@ -452,21 +452,7 @@ export default function RoutinesScreen() {
 
     const handleHabitAdd = async (habitData: CreateHabitDto) => {
         try {
-            const habitToAdd = {
-                name: habitData.name,
-                description: habitData.description,
-                frequency: habitData.frequency,
-                category: habitData.category,
-                status: 'active' as HabitStatus,
-                currentStreak: 0,
-                longestStreak: 0,
-                totalCompletions: 0,
-                lastCompletedAt: undefined,
-                targetDays: habitData.targetDays,
-                reminderSettings: habitData.reminderSettings,
-                customFields: habitData.customFields,
-            };
-            await addHabit(habitToAdd);
+            await addHabit(habitData);
             setShowAddHabitModal(false);
             Alert.alert('Sukces', 'Nawyk został dodany');
         } catch (error) {
@@ -589,54 +575,37 @@ export default function RoutinesScreen() {
                 {currentView === 'routines' ? (
                     <>
                         {/* Filter Stats */}
-                        <View style={{
-                            flexDirection: 'row',
-                            gap: DesignSystem.spacing.sm,
-                            paddingHorizontal: 20,
-                            marginTop: 16,
-                            marginBottom: 16,
-                            height: 110,
-                            alignItems: 'flex-start',
-                        }}>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={{
+                                gap: DesignSystem.spacing.sm,
+                                paddingHorizontal: 20,
+                                paddingVertical: 2,
+                            }}
+                            style={{
+                                marginTop: 16,
+                                marginBottom: 16,
+                                maxHeight: 116,
+                            }}
+                        >
                             {filters.map((filter) => (
-                                <CompactStats
-                                    key={filter.key}
-                                    title={filter.label}
-                                    count={filter.count}
-                                    icon={
-                                        filter.key === 'all' ? 'list.bullet' :
-                                            filter.key === 'today' ? 'clock' :
-                                                filter.key === 'pending' ? 'circle' :
-                                                    'checkmark.circle'
-                                    }
-                                    isActive={activeFilter === filter.key}
-                                    onPress={() => setActiveFilter(filter.key as FilterType)}
-                                    showPreview={true}
-                                    previewItems={
-                                        filter.key === 'all' ? tasks.slice(0, 2).map(task => ({
-                                            id: task.id,
-                                            title: task.title,
-                                            completed: task.completed
-                                        })) :
-                                            filter.key === 'today' ? todaysTasks.slice(0, 2).map(task => ({
-                                                id: task.id,
-                                                title: task.title,
-                                                completed: task.completed
-                                            })) :
-                                                filter.key === 'pending' ? tasks.filter(t => !t.completed).slice(0, 2).map(task => ({
-                                                    id: task.id,
-                                                    title: task.title,
-                                                    completed: task.completed
-                                                })) :
-                                                    tasks.filter(t => t.completed).slice(0, 2).map(task => ({
-                                                        id: task.id,
-                                                        title: task.title,
-                                                        completed: task.completed
-                                                    }))
-                                    }
-                                />
+                                <View key={filter.key} style={{ width: 124, height: 110 }}>
+                                    <CompactStats
+                                        title={filter.label}
+                                        count={filter.count}
+                                        icon={
+                                            filter.key === 'all' ? 'list.bullet' :
+                                                filter.key === 'today' ? 'clock' :
+                                                    filter.key === 'pending' ? 'circle' :
+                                                        'checkmark.circle'
+                                        }
+                                        isActive={activeFilter === filter.key}
+                                        onPress={() => setActiveFilter(filter.key as FilterType)}
+                                    />
+                                </View>
                             ))}
-                        </View>
+                        </ScrollView>
 
                         {/* Content */}
                         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>

@@ -24,6 +24,7 @@ export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
   const insets = useSafeAreaInsets();
+  const tabBarClearance = insets.bottom + 112;
 
   const {
     todaysTasks,
@@ -158,7 +159,7 @@ export default function HomeScreen() {
         contentContainerStyle={{
           paddingHorizontal: DesignSystem.spacing.lg,
           paddingTop: insets.top + DesignSystem.spacing.lg,
-          paddingBottom: insets.bottom + DesignSystem.spacing['5xl'],
+          paddingBottom: tabBarClearance,
         }}
         refreshControl={
           <RefreshControl
@@ -177,8 +178,8 @@ export default function HomeScreen() {
           </ThemedText>
 
           <LinearGradient
-            colors={[colors.primary, colors.primaryLight] as readonly [string, string, ...string[]]}
-            locations={[0, 1] as readonly [number, number, ...number[]]}
+            colors={[colors.primary, colors.primaryLight] as [string, string]}
+            locations={[0, 1] as [number, number]}
             start={DesignSystem.gradients.primary.start}
             end={DesignSystem.gradients.primary.end}
             style={{
@@ -216,21 +217,21 @@ export default function HomeScreen() {
               </View>
               <View style={{
                 flexShrink: 0,
-                minWidth: 56,
+                width: 72,
+                height: 72,
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 borderRadius: DesignSystem.borderRadius.full,
-                paddingHorizontal: DesignSystem.spacing.md,
-                paddingVertical: DesignSystem.spacing.sm,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
                 <ThemedText
-                  variant="headlineMedium"
+                  variant="titleLarge"
                   lightColor="white"
                   darkColor="white"
                   numberOfLines={1}
                   adjustsFontSizeToFit
-                  style={{ fontWeight: '700', fontFamily: Fonts.mono }}
+                  minimumFontScale={0.55}
+                  style={{ fontWeight: '700', fontFamily: Fonts.mono, includeFontPadding: false }}
                 >
                   {getDayProgress()}%
                 </ThemedText>
@@ -257,9 +258,10 @@ export default function HomeScreen() {
             {/* Stats Row */}
             <View style={{
               flexDirection: 'row',
-              justifyContent: 'space-between'
+              justifyContent: 'space-between',
+              gap: DesignSystem.spacing.sm,
             }}>
-              <View style={{ alignItems: 'center' }}>
+              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <ThemedText
                   variant="titleMedium"
                   lightColor="white"
@@ -274,11 +276,13 @@ export default function HomeScreen() {
                   darkColor="rgba(255,255,255,0.8)"
                   numberOfLines={1}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  style={{ textAlign: 'center' }}
                 >
                   Produktywność
                 </ThemedText>
               </View>
-              <View style={{ alignItems: 'center' }}>
+              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <ThemedText
                   variant="titleMedium"
                   lightColor="white"
@@ -293,11 +297,13 @@ export default function HomeScreen() {
                   darkColor="rgba(255,255,255,0.8)"
                   numberOfLines={1}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  style={{ textAlign: 'center' }}
                 >
                   Dni z rzędu
                 </ThemedText>
               </View>
-              <View style={{ alignItems: 'center' }}>
+              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
                 <ThemedText
                   variant="titleMedium"
                   lightColor="white"
@@ -312,6 +318,8 @@ export default function HomeScreen() {
                   darkColor="rgba(255,255,255,0.8)"
                   numberOfLines={1}
                   adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                  style={{ textAlign: 'center' }}
                 >
                   Aktywności
                 </ThemedText>
@@ -379,39 +387,48 @@ export default function HomeScreen() {
           <View style={{
             flexDirection: 'row',
             flexWrap: 'wrap',
-            gap: DesignSystem.spacing.md,
+            columnGap: DesignSystem.spacing.sm,
+            rowGap: DesignSystem.spacing.md,
           }}>
-            <ModernButton
-              title="Nagraj"
-              size="medium"
-              leftIcon={<IconSymbol name="mic.fill" size={16} color="white" />}
-              onPress={() => handleQuickAction('record')}
-              style={{ flex: 1, minWidth: '45%' }}
-            />
-            <ModernButton
-              title="Dodaj zadanie"
-              variant="secondary"
-              size="medium"
-              leftIcon={<IconSymbol name="plus" size={16} color={colors.primary} />}
-              onPress={() => handleQuickAction('add-task')}
-              style={{ flex: 1, minWidth: '45%' }}
-            />
-            <ModernButton
-              title="Planuj dzień"
-              variant="ghost"
-              size="medium"
-              leftIcon={<IconSymbol name="calendar" size={16} color={colors.primary} />}
-              onPress={() => handleQuickAction('plan-now')}
-              style={{ flex: 1, minWidth: '45%' }}
-            />
-            <ModernButton
-              title="Przegląd dnia"
-              variant="ghost"
-              size="medium"
-              leftIcon={<IconSymbol name="chart.line.uptrend.xyaxis" size={16} color={colors.primary} />}
-              onPress={() => handleQuickAction('daily-review')}
-              style={{ flex: 1, minWidth: '45%' }}
-            />
+            <View style={{ width: '48%', minWidth: 0 }}>
+              <ModernButton
+                title="Nagraj"
+                size="medium"
+                fullWidth
+                leftIcon={<IconSymbol name="mic.fill" size={16} color="white" />}
+                onPress={() => handleQuickAction('record')}
+              />
+            </View>
+            <View style={{ width: '48%', minWidth: 0 }}>
+              <ModernButton
+                title="Dodaj zadanie"
+                variant="secondary"
+                size="medium"
+                fullWidth
+                leftIcon={<IconSymbol name="plus" size={16} color={colors.primary} />}
+                onPress={() => handleQuickAction('add-task')}
+              />
+            </View>
+            <View style={{ width: '48%', minWidth: 0 }}>
+              <ModernButton
+                title="Planuj dzień"
+                variant="ghost"
+                size="medium"
+                fullWidth
+                leftIcon={<IconSymbol name="calendar" size={16} color={colors.primary} />}
+                onPress={() => handleQuickAction('plan-now')}
+              />
+            </View>
+            <View style={{ width: '48%', minWidth: 0 }}>
+              <ModernButton
+                title="Przegląd dnia"
+                variant="ghost"
+                size="medium"
+                fullWidth
+                leftIcon={<IconSymbol name="chart.line.uptrend.xyaxis" size={16} color={colors.primary} />}
+                onPress={() => handleQuickAction('daily-review')}
+              />
+            </View>
           </View>
         </ModernCard>
 

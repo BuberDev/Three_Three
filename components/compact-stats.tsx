@@ -66,6 +66,9 @@ export function CompactStats({
             {/* Title */}
             <ThemedText
                 variant="bodySmall"
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.82}
                 style={[styles.title, { color: isActive ? primaryColor : textSecondary }]}
             >
                 {title}
@@ -114,6 +117,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         ...DesignSystem.elevation[1],
         overflow: 'hidden',
+        minWidth: 0,
     },
     header: {
         flexDirection: 'row',
@@ -144,6 +148,8 @@ const styles = StyleSheet.create({
         fontWeight: '500',
         marginBottom: 2,
         fontSize: 11,
+        lineHeight: 14,
+        minHeight: 28,
     },
     previewContainer: {
         flex: 1,

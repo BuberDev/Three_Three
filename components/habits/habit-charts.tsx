@@ -247,7 +247,7 @@ function WeeklyProgressChart({ data, maxValue }: WeeklyProgressChartProps) {
                                         ]}
                                     >
                                         <LinearGradient
-                                            colors={gradientColors}
+                                            colors={gradientColors as [string, string]}
                                             start={{ x: 0, y: 0 }}
                                             end={{ x: 0, y: 1 }}
                                             style={[
@@ -657,7 +657,7 @@ function CategoryBreakdown({ categoryData, totalHabits }: CategoryBreakdownProps
                     ]}
                 >
                     <LinearGradient
-                        colors={config.gradient}
+                        colors={config.gradient as [string, string]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
                         style={styles.categoryGradientBg}

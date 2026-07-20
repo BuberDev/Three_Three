@@ -330,7 +330,7 @@ export const EnterpriseChatInterface: React.FC<EnterpriseChatInterfaceProps> = (
         return colors.textSecondary;
     };
 
-    const getVoiceButtonIcon = (): keyof typeof Ionicons.glyphMap => {
+    const getVoiceButtonIcon = (): string => {
         if (isRecording) return 'stop-circle';
         return 'mic';
     };

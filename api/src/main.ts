@@ -8,9 +8,6 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { createServer } from 'http';
 import { AppModule } from './app.module';
-import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 const express = require('express');
 
@@ -145,15 +142,10 @@ async function bootstrap() {
         }),
     );
 
-    // Global filters
-    app.useGlobalFilters(new AllExceptionsFilter());
-
-    // Global interceptors
-    app.useGlobalInterceptors(
-        new LoggingInterceptor(),
-        new TransformInterceptor(),
-        new ClassSerializerInterceptor(app.get(Reflector)),
-    );
+    // Global filters and API response/logging interceptors are registered in
+    // AppModule via APP_FILTER / APP_INTERCEPTOR. Register only the serializer
+    // here so responses are not logged or wrapped twice.
+    app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
 
     // Swagger documentation
     if (process.env.NODE_ENV !== 'production') {

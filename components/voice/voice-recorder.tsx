@@ -123,20 +123,20 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         return <Ionicons name="mic" size={iconSize} color="white" />;
     };
 
-    const getGradientColors = (): readonly [string, string, ...string[]] => {
+    const getGradientColors = (): [string, string] => {
         if (disabled || !canRecord) {
-            return [Colors.light.tabIconDefault, Colors.light.tabIconDefault] as const;
+            return [Colors.light.tabIconDefault, Colors.light.tabIconDefault];
         }
 
         if (isRecording) {
-            return ['#FF6B6B', '#FF5252'] as const;
+            return ['#FF6B6B', '#FF5252'];
         }
 
         if (isProcessingVoiceNote) {
-            return ['#FFA726', '#FF9800'] as const;
+            return ['#FFA726', '#FF9800'];
         }
 
-        return ['#4CAF50', '#45A049'] as const;
+        return ['#4CAF50', '#45A049'];
     };
 
     return (
@@ -145,14 +145,14 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
                 <View style={styles.recordingIndicator}>
                     <View style={styles.recordingDot} />
                     <Text style={styles.recordingText}>
-                        Recording {formatDuration(duration)}
+                        Nagrywanie {formatDuration(duration)}
                     </Text>
                 </View>
             )}
 
             {isProcessingVoiceNote && (
                 <Text style={styles.processingText}>
-                    Processing your voice note...
+                    Przetwarzanie notatki głosowej...
                 </Text>
             )}
 
@@ -193,7 +193,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
 
             {!canRecord && (
                 <Text style={styles.permissionText}>
-                    Microphone permission required
+                    Włącz dostęp do mikrofonu, aby nagrywać
                 </Text>
             )}
         </View>

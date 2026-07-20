@@ -84,6 +84,7 @@ export function ModernButton({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        minWidth: 0,
         ...sizeStyles[size],
         ...(fullWidth && { width: '100%' as DimensionValue }),
         opacity: loading ? 0.85 : 1,
@@ -115,6 +116,7 @@ export function ModernButton({
                     end={DesignSystem.gradients.primary.end}
                     style={[
                         baseStyle,
+                        { alignSelf: 'stretch', width: '100%' },
                         isDisabled ? {
                             borderWidth: 1,
                             borderColor,
@@ -136,6 +138,8 @@ export function ModernButton({
                         adjustsFontSizeToFit
                         minimumFontScale={0.82}
                         style={{
+                            flexShrink: 1,
+                            minWidth: 0,
                             color: contentColor,
                             fontSize: size === 'large' ? 16 : size === 'medium' ? 15 : 14,
                             lineHeight: size === 'large' ? 22 : 20,
@@ -171,7 +175,9 @@ export function ModernButton({
                 {leftIcon && <View style={{ marginRight: DesignSystem.spacing.sm }}>{leftIcon}</View>}
                 <ThemedText
                     variant={textVariants[size]}
-                    style={{ fontWeight: '600' }}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={{ flexShrink: 1, minWidth: 0, fontWeight: '600' }}
                 >
                     {title}
                 </ThemedText>
@@ -200,7 +206,9 @@ export function ModernButton({
                 variant={textVariants[size]}
                 lightColor={primaryColor}
                 darkColor={primaryColor}
-                style={{ fontWeight: '600' }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ flexShrink: 1, minWidth: 0, fontWeight: '600' }}
             >
                 {title}
             </ThemedText>

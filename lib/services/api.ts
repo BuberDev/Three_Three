@@ -11,6 +11,26 @@ import {
 import { getApiUrl } from '../utils/config';
 import { AppError, AuthError, ErrorHandler, NetworkError, ServerError, ValidationError } from '../utils/errors';
 
+export function unwrapApiEnvelope<T>(payload: unknown): T {
+    let current = payload;
+    let depth = 0;
+
+    while (
+        current &&
+        typeof current === 'object' &&
+        !Array.isArray(current) &&
+        'success' in current &&
+        'data' in current &&
+        typeof (current as { success?: unknown }).success === 'boolean' &&
+        depth < 5
+    ) {
+        current = (current as { data: unknown }).data;
+        depth += 1;
+    }
+
+    return current as T;
+}
+
 export class ApiService {
     private static instance: ApiService;
     private authToken: string | null = null;
@@ -134,7 +154,14 @@ export class ApiService {
                 };
             }
 
-            const data = await response.json();
+            if (response.status === 204) {
+                return {
+                    success: true,
+                    data: undefined as T,
+                };
+            }
+
+            const data = unwrapApiEnvelope<T>(await response.json());
             return {
                 success: true,
                 data,
@@ -178,7 +205,7 @@ export class ApiService {
     public async uploadVoiceNote(audioUri: string, duration?: number, title?: string, tags?: string[]): Promise<ApiResponse<VoiceNoteResponse>> {
         try {
             if (!await this.checkBackendAvailability()) {
-                throw new NetworkError('Backend server is not available');
+                throw new NetworkError('Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.');
             }
 
             console.log('📄 Audio URI to upload:', audioUri);
@@ -298,7 +325,7 @@ export class ApiService {
                     };
                 }
 
-                const data = await response.json();
+                const data = unwrapApiEnvelope<VoiceNoteResponse>(await response.json());
                 console.log('✅ Voice note API response received successfully');
                 return {
                     success: true,
@@ -471,7 +498,7 @@ export class ApiService {
     public async uploadVoiceNoteWithContext(audioUri: string, context?: string, title?: string): Promise<ApiResponse<VoiceNoteResponse & { extractedActivities?: any[] }>> {
         try {
             if (!await this.checkBackendAvailability()) {
-                throw new NetworkError('Backend server is not available');
+                throw new NetworkError('Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.');
             }
 
             const formData = new FormData();
@@ -514,23 +541,31 @@ export class ApiService {
     }
 
     public async getDailyMetrics(userId: string, date: string): Promise<ApiResponse<any>> {
-        // TODO: Map to existing analytics endpoint when needed
-        throw new Error('Daily metrics endpoint not implemented yet');
+        return this.makeRequest(`/analytics/daily/${date}`);
     }
 
-    public async getWeeklyInsights(userId: string): Promise<ApiResponse<any>> {
-        // TODO: Map to existing analytics endpoint when needed  
-        throw new Error('Weekly insights endpoint not implemented yet');
+    public async getWeeklyInsights(userId: string, startDate?: string, endDate?: string): Promise<ApiResponse<any>> {
+        const params = new URLSearchParams();
+        if (startDate) params.append('startDate', startDate);
+        if (endDate) params.append('endDate', endDate);
+
+        return this.makeRequest(`/analytics/weekly?${params.toString()}`);
     }
 
     public async getProgressMetrics(userId: string): Promise<ApiResponse<any>> {
-        // TODO: Map to existing analytics endpoint when needed
-        throw new Error('Progress metrics endpoint not implemented yet');
+        const endDate = new Date();
+        const startDate = new Date(endDate);
+        startDate.setDate(endDate.getDate() - 6);
+
+        return this.getWeeklyInsights(
+            userId,
+            startDate.toISOString().split('T')[0],
+            endDate.toISOString().split('T')[0],
+        );
     }
 
     public async generatePersonalizedRecommendations(userId: string): Promise<ApiResponse<any[]>> {
-        // TODO: Implement when backend has this endpoint
-        throw new Error('Personalized recommendations endpoint not implemented yet');
+        return this.makeRequest('/analytics/insights/dashboard');
     }
 
     public async generateDailySummary(userId: string, date: string): Promise<ApiResponse<DailyEntry>> {

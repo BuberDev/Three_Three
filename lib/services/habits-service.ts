@@ -9,7 +9,7 @@ import {
     HabitStatus,
     UpdateHabitDto,
 } from '../types';
-import { ApiService } from './api';
+import { ApiService, unwrapApiEnvelope } from './api';
 import { NotificationService } from './notification-service';
 
 export interface GetHabitsFilters {
@@ -63,7 +63,7 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to create habit');
             }
 
-            const habit = this.transformHabitDates((response.data as any).data);
+            const habit = this.transformHabitDates(unwrapApiEnvelope<Habit>(response.data));
 
             // Schedule reminder if enabled
             if (habit.reminderSettings?.enabled && habit.reminderSettings.time) {
@@ -103,11 +103,9 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to fetch habits');
             }
 
-            // Check if we have the nested data structure (response.data.data.data)
-            const outerData = (response.data as any).data;
-            const apiData = outerData?.data;
+            const apiData = unwrapApiEnvelope<GetHabitsResponse>(response.data);
             if (!apiData || !Array.isArray(apiData.habits)) {
-                console.warn('⚠️ Invalid habits response structure:', outerData);
+                console.warn('⚠️ Invalid habits response structure:', response.data);
                 return {
                     habits: [],
                     total: 0,
@@ -140,7 +138,7 @@ export class HabitsService {
                 throw new Error(response.error || 'Habit not found');
             }
 
-            return this.transformHabitDates((response.data as any).data);
+            return this.transformHabitDates(unwrapApiEnvelope<Habit>(response.data));
         } catch (error) {
             console.error('❌ Failed to fetch habit:', error);
             throw error;
@@ -161,7 +159,7 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to update habit');
             }
 
-            const habit = this.transformHabitDates((response.data as any).data);
+            const habit = this.transformHabitDates(unwrapApiEnvelope<Habit>(response.data));
 
             // Cancel existing reminders for this habit
             await this.notificationService.cancelHabitReminders(habit.name);
@@ -228,10 +226,11 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to complete habit');
             }
 
-            // Safe extraction with proper null checking for triple-nested response
-            const responseData = (response.data as any);
-            // Server returns: { success: true, data: { success: true, data: { success: true, data: { habit, completion } } } }
-            const actualData = responseData?.data?.data?.data || responseData?.data?.data || responseData?.data || responseData;
+            const responseData = response.data as any;
+            const actualData = unwrapApiEnvelope<{
+                habit?: Habit;
+                completion?: HabitCompletion;
+            }>(responseData);
             const habitData = actualData?.habit;
             const completionData = actualData?.completion;
 
@@ -241,9 +240,14 @@ export class HabitsService {
                 throw new Error('No habit data received from server');
             }
 
+            if (!completionData) {
+                console.log('Response data structure:', JSON.stringify(responseData, null, 2));
+                throw new Error('No completion data received from server');
+            }
+
             return {
                 habit: this.transformHabitDates(habitData),
-                completion: completionData ? this.transformCompletionDates(completionData) : null,
+                completion: this.transformCompletionDates(completionData),
             };
         } catch (error) {
             console.error('❌ Failed to complete habit:', error);
@@ -265,7 +269,7 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to uncomplete habit');
             }
 
-            return this.transformHabitDates((response.data as any).data);
+            return this.transformHabitDates(unwrapApiEnvelope<Habit>(response.data));
         } catch (error) {
             console.error('❌ Failed to uncomplete habit:', error);
             throw error;
@@ -292,7 +296,8 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to fetch habit completions');
             }
 
-            return (response.data as any).data.map((completion: any) => this.transformCompletionDates(completion));
+            return unwrapApiEnvelope<HabitCompletion[]>(response.data)
+                .map((completion: any) => this.transformCompletionDates(completion));
         } catch (error) {
             console.error('❌ Failed to fetch habit completions:', error);
             throw error;
@@ -315,7 +320,7 @@ export class HabitsService {
                 throw new Error(response.error || 'Failed to fetch habit statistics');
             }
 
-            return (response.data as any).data;
+            return unwrapApiEnvelope<HabitStats>(response.data);
         } catch (error) {
             console.error('❌ Failed to fetch habit statistics:', error);
             throw error;

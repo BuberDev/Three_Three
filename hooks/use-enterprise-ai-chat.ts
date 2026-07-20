@@ -89,7 +89,7 @@ export const useEnterpriseAIChat = () => {
             console.log('🔍 Hook createSession response:', newSession);
 
             // Extract session data from nested response structure
-            const sessionData = newSession.data || newSession;
+            const sessionData = (newSession as any).data || newSession;
 
             const mappedSession: ChatSession = {
                 id: sessionData.id,

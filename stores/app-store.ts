@@ -9,15 +9,22 @@ import { EventService } from '../lib/services/event';
 import { HabitsService } from '../lib/services/habits-service';
 import {
     Activity,
+    ActivityCategory,
+    CreateHabitDto,
     DailyEntry,
     DailyMetrics,
     EventType,
     Habit,
+    HabitFrequency,
     HabitStats,
+    HabitStatus,
+    MoodType,
     ProgressMetrics,
     Recommendation,
     RecordingState,
     Task,
+    TimeOfDay,
+    UpdateHabitDto,
     User,
     UserSettings,
     VoiceNote,
@@ -25,6 +32,29 @@ import {
 } from '../lib/types';
 import { SubscriptionFeature, SubscriptionPlan, SubscriptionStatus } from '../lib/types/subscription';
 import { getApiUrl } from '../lib/utils/config';
+
+const toDateKey = (date: Date) => date.toISOString().split('T')[0];
+
+const toPercentScore = (value?: number | null) => {
+    if (value == null) return 0;
+    return Math.round(Math.max(0, Math.min(100, value <= 10 ? value * 10 : value)));
+};
+
+const toFivePointScore = (value?: number | null) => {
+    if (value == null) return 0;
+    return Math.round(Math.max(0, Math.min(5, value <= 5 ? value : value / 2)));
+};
+
+const normalizeTask = (task: any): Task => ({
+    ...task,
+    priority: task.priority === 'urgent' ? 'high' : task.priority,
+    completed: typeof task.completed === 'boolean'
+        ? task.completed
+        : task.status === 'completed',
+});
+
+const isAuthResponseError = (error?: string) =>
+    !!error && (error.includes('HTTP_401') || error.includes('AUTH_EXPIRED') || error.includes('Unauthorized'));
 
 interface AppStore {
     // User state
@@ -115,8 +145,8 @@ interface AppStore {
     loadTasks: () => Promise<void>;
 
     // Habits actions
-    addHabit: (habit: Omit<Habit, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'completionRate' | 'isCompletedToday'>) => Promise<void>;
-    updateHabit: (habitId: string, updates: Partial<Habit>) => Promise<void>;
+    addHabit: (habit: CreateHabitDto) => Promise<void>;
+    updateHabit: (habitId: string, updates: UpdateHabitDto) => Promise<void>;
     deleteHabit: (habitId: string) => Promise<void>;
     completeHabit: (habitId: string, notes?: string, rating?: number) => Promise<void>;
     uncompleteHabit: (habitId: string, date?: string) => Promise<void>;
@@ -196,9 +226,12 @@ export const useAppStore = create<AppStore>()(
             setUserSettings: (userSettings) => set({ userSettings }),
             updateUserSettings: async (settingsUpdate) => {
                 try {
-                    const habitsService = HabitsService.getInstance();
-                    const updatedSettings = await apiService.updateUserSettings(settingsUpdate);
-                    set({ userSettings: updatedSettings });
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.updateUserSettings(settingsUpdate);
+                    if (!response.success || !response.data) {
+                        throw new Error(response.error || 'Failed to update user settings');
+                    }
+                    set({ userSettings: response.data });
                 } catch (error) {
                     console.error('❌ Error updating user settings:', error);
                     throw error;
@@ -308,7 +341,7 @@ export const useAppStore = create<AppStore>()(
 
                         console.log('✅ Mapped subscription status:', status);
                         set({ subscriptionStatus: status });
-                    } else if (response.error?.code === 'HTTP_401' || response.error?.code === 'AUTH_EXPIRED') {
+                    } else if (isAuthResponseError(response.error)) {
                         // Token expired - try to refresh or logout
                         console.log('🔄 Access token expired, attempting refresh...');
                         const refreshSuccess = await get().refreshAuthToken();
@@ -443,7 +476,7 @@ export const useAppStore = create<AppStore>()(
                             ];
                             set({ availablePlans: defaultPlans });
                         }
-                    } else if (response.error?.code === 'HTTP_401' || response.error?.code === 'AUTH_EXPIRED') {
+                    } else if (isAuthResponseError(response.error)) {
                         // Token expired - try to refresh
                         const refreshSuccess = await get().refreshAuthToken();
                         if (refreshSuccess) {
@@ -1122,8 +1155,7 @@ export const useAppStore = create<AppStore>()(
                     setLoading(true);
                     console.log('Fetching AI sleep insights for:', sleepTrackingId);
 
-                    const apiService = ApiService.getInstance();
-                    const response = await fetch(`${apiService.baseUrl}/sleep-tracking/${sleepTrackingId}/insights`, {
+                    const response = await fetch(`${getApiUrl()}/api/sleep-tracking/${sleepTrackingId}/insights`, {
                         method: 'GET',
                         headers: {
                             'Authorization': `Bearer ${get().accessToken}`,
@@ -1304,7 +1336,7 @@ export const useAppStore = create<AppStore>()(
 
                     // Update local state with server response
                     if (response.data) {
-                        const serverTask = response.data;
+                        const serverTask = normalizeTask(response.data);
                         set((state) => ({
                             tasks: state.tasks.map(t => t.id === task.id ? serverTask : t),
                             todaysTasks: state.todaysTasks.map(t => t.id === task.id ? serverTask : t)
@@ -1313,7 +1345,7 @@ export const useAppStore = create<AppStore>()(
 
                     // Save to local database
                     const dbService = DatabaseService.getInstance();
-                    await dbService.saveTask(response.data || task, user.id);
+                    await dbService.saveTask(response.data ? normalizeTask(response.data) : task, user.id);
 
                     // Log task creation event
                     const eventService = EventService.getInstance();
@@ -1449,7 +1481,9 @@ export const useAppStore = create<AppStore>()(
 
                     if (response.success && response.data) {
                         // Handle API response structure
-                        const tasks = Array.isArray(response.data) ? response.data : [];
+                        const tasks = Array.isArray(response.data)
+                            ? response.data.map(normalizeTask)
+                            : [];
                         console.log('📋 Loaded tasks:', tasks.length);
 
                         const today = new Date().toISOString().split('T')[0];
@@ -1689,7 +1723,8 @@ export const useAppStore = create<AppStore>()(
                     }));
 
                     // Handle error appropriately
-                    if (error.message.includes('already completed on this date')) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    if (errorMessage.includes('already completed on this date')) {
                         // Haptic warning feedback
                         try {
                             const ReactNativeHapticFeedback = (await import('react-native-haptic-feedback')).default;
@@ -1764,7 +1799,7 @@ export const useAppStore = create<AppStore>()(
                     set({ isLoadingHabits: true });
 
                     const habitsService = HabitsService.getInstance();
-                    const response = await habitsService.getHabits({ status: 'active' });
+                    const response = await habitsService.getHabits({ status: HabitStatus.ACTIVE });
 
                     // Process habits to ensure proper completion states
                     const now = new Date();
@@ -1793,9 +1828,7 @@ export const useAppStore = create<AppStore>()(
                 try {
                     const habitsService = HabitsService.getInstance();
                     const response = await habitsService.getHabitStats();
-                    // Extract data from API response structure
-                    const stats = response?.data || response;
-                    set({ habitStats: stats });
+                    set({ habitStats: response });
                 } catch (error) {
                     console.error('Failed to load habit stats:', error);
                     // Provide mock data for development
@@ -1842,11 +1875,11 @@ export const useAppStore = create<AppStore>()(
                 const currentDate = new Date(date);
 
                 switch (habit.frequency) {
-                    case 'DAILY':
+                    case HabitFrequency.DAILY:
                         // Same day completion
                         return completedDate.toDateString() === currentDate.toDateString();
 
-                    case 'WEEKLY':
+                    case HabitFrequency.WEEKLY:
                         // Same week completion (Monday as week start)
                         const getWeekStart = (date: Date) => {
                             const d = new Date(date);
@@ -1859,7 +1892,7 @@ export const useAppStore = create<AppStore>()(
                         const currentWeekStart = getWeekStart(currentDate);
                         return completedWeekStart.getTime() === currentWeekStart.getTime();
 
-                    case 'MONTHLY':
+                    case HabitFrequency.MONTHLY:
                         // Same month and year completion
                         return completedDate.getMonth() === currentDate.getMonth() &&
                             completedDate.getFullYear() === currentDate.getFullYear();
@@ -1917,9 +1950,41 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                // TODO: Enable when backend endpoint is implemented
-                console.log('Daily metrics not available (backend endpoint not implemented yet)');
-                set({ dailyMetrics: null });
+                try {
+                    const today = toDateKey(new Date());
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getDailyMetrics(user.id, today);
+
+                    if (!response.success || !response.data) {
+                        set({ dailyMetrics: null });
+                        return;
+                    }
+
+                    const analytics = response.data as any;
+                    const dailyMetrics: DailyMetrics = {
+                        id: `${user.id}-${today}`,
+                        userId: user.id,
+                        date: analytics.date || today,
+                        totalActivities: analytics.activities || 0,
+                        categoriesBreakdown: {} as Record<ActivityCategory, number>,
+                        averageEnergyLevel: toFivePointScore(analytics.metrics?.energy),
+                        averageMood: toFivePointScore(analytics.metrics?.mood) as MoodType,
+                        timeOfDayBreakdown: {} as Record<TimeOfDay, number>,
+                        topTags: [],
+                        totalFocusTime: 0,
+                        productivityScore: toPercentScore(analytics.metrics?.productivity),
+                        completedTasks: get().todaysTasks.filter(task => task.completed).length,
+                        totalTasks: get().todaysTasks.length,
+                        voiceNotesCount: analytics.voiceNotes || 0,
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                    };
+
+                    set({ dailyMetrics });
+                } catch (error) {
+                    console.log('Daily metrics unavailable, keeping dashboard fallback:', error);
+                    set({ dailyMetrics: null });
+                }
             },
 
             loadWeeklyInsights: async () => {
@@ -1929,9 +1994,60 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                // TODO: Enable when backend endpoint is implemented
-                console.log('Weekly insights not available (backend endpoint not implemented yet)');
-                set({ weeklyInsights: null });
+                try {
+                    const endDate = new Date();
+                    const startDate = new Date(endDate);
+                    startDate.setDate(endDate.getDate() - 6);
+
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getWeeklyInsights(
+                        user.id,
+                        toDateKey(startDate),
+                        toDateKey(endDate),
+                    );
+
+                    if (!response.success || !response.data) {
+                        set({ weeklyInsights: null });
+                        return;
+                    }
+
+                    const weekly = response.data as any;
+                    const trends = Array.isArray(weekly.trends) ? weekly.trends : [];
+                    const mostProductive = trends.reduce((best: any, day: any) => {
+                        const score = toPercentScore(day.metrics?.productivity) + (day.activities || 0);
+                        const bestScore = best ? toPercentScore(best.metrics?.productivity) + (best.activities || 0) : -1;
+                        return score > bestScore ? day : best;
+                    }, null);
+
+                    const weeklyInsights: WeeklyInsights = {
+                        id: `${user.id}-${toDateKey(startDate)}`,
+                        userId: user.id,
+                        weekStart: toDateKey(startDate),
+                        weekEnd: toDateKey(endDate),
+                        totalActivities: weekly.summary?.totalActivities || 0,
+                        mostProductiveDay: mostProductive?.date || toDateKey(endDate),
+                        mostProductiveTimeOfDay: TimeOfDay.MORNING,
+                        dominantMood: toFivePointScore(weekly.summary?.avgMood) as MoodType,
+                        averageEnergyLevel: toFivePointScore(weekly.summary?.avgEnergy),
+                        topCategories: [],
+                        improvementAreas: [],
+                        achievements: weekly.summary?.totalActivities > 0
+                            ? [`${weekly.summary.totalActivities} aktywności w tym tygodniu`]
+                            : [],
+                        habits: {
+                            started: 0,
+                            maintained: get().habitStats?.completedToday || 0,
+                            broken: get().habitStats?.pendingToday || 0,
+                        },
+                        recommendedGoals: [],
+                        createdAt: new Date().toISOString(),
+                    };
+
+                    set({ weeklyInsights });
+                } catch (error) {
+                    console.log('Weekly insights unavailable, keeping dashboard fallback:', error);
+                    set({ weeklyInsights: null });
+                }
             },
 
             loadProgressMetrics: async () => {
@@ -1941,9 +2057,59 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                // TODO: Enable when backend endpoint is implemented
-                console.log('Progress metrics not available (backend endpoint not implemented yet)');
-                set({ progressMetrics: null });
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.getProgressMetrics(user.id);
+
+                    if (!response.success || !response.data) {
+                        set({ progressMetrics: null });
+                        return;
+                    }
+
+                    const weekly = response.data as any;
+                    const trends = Array.isArray(weekly.trends) ? weekly.trends : [];
+                    const activeDays: boolean[] = trends.map((day: any) =>
+                        (day.activities || 0) > 0 ||
+                        day.sleepHours != null ||
+                        Object.values(day.metrics || {}).some(value => value != null)
+                    );
+                    const currentStreak = [...activeDays].reverse().findIndex(active => !active);
+                    let longestStreak = 0;
+                    let runningStreak = 0;
+
+                    activeDays.forEach(active => {
+                        runningStreak = active ? runningStreak + 1 : 0;
+                        longestStreak = Math.max(longestStreak, runningStreak);
+                    });
+
+                    const progressMetrics: ProgressMetrics = {
+                        streak: {
+                            current: currentStreak === -1 ? activeDays.length : currentStreak,
+                            longest: longestStreak,
+                            type: 'daily_logging',
+                        },
+                        goals: {
+                            daily: get().todaysTasks.length,
+                            weekly: get().tasks.length,
+                            monthly: get().tasks.length,
+                        },
+                        completion: {
+                            tasksToday: get().todaysTasks.filter(task => task.completed).length,
+                            tasksThisWeek: get().tasks.filter(task => task.completed).length,
+                            tasksThisMonth: get().tasks.filter(task => task.completed).length,
+                        },
+                        trends: {
+                            energyLevel: trends.map((day: any) => toFivePointScore(day.metrics?.energy)),
+                            mood: trends.map((day: any) => toFivePointScore(day.metrics?.mood)),
+                            productivity: trends.map((day: any) => toPercentScore(day.metrics?.productivity)),
+                        },
+                    };
+
+                    set({ progressMetrics });
+                } catch (error) {
+                    console.log('Progress metrics unavailable, keeping dashboard fallback:', error);
+                    set({ progressMetrics: null });
+                }
             },
 
             generatePersonalizedRecommendations: async () => {
@@ -1953,9 +2119,41 @@ export const useAppStore = create<AppStore>()(
                     return;
                 }
 
-                // TODO: Enable when backend endpoint is implemented
-                console.log('Recommendations not available (backend endpoint not implemented yet)');
-                set({ recommendations: [] });
+                try {
+                    const apiService = ApiService.getInstance();
+                    const response = await apiService.generatePersonalizedRecommendations(user.id);
+
+                    if (!response.success || !response.data) {
+                        set({ recommendations: [] });
+                        return;
+                    }
+
+                    const dashboard = response.data as any;
+                    const topActions = dashboard.recommendations?.topActions || [];
+                    const quickWins = dashboard.recommendations?.quickWins || [];
+                    const actions = topActions.length > 0
+                        ? topActions
+                        : quickWins.map((win: any) => win.action).filter(Boolean);
+
+                    const recommendations = actions.slice(0, 3).map((action: string, index: number): Recommendation => ({
+                        id: `analytics-recommendation-${index}`,
+                        userId: user.id,
+                        type: 'insight',
+                        title: action,
+                        description: action,
+                        reason: quickWins[index]?.impact
+                            ? `Szacowany wpływ: ${Math.round(quickWins[index].impact * 100)}%`
+                            : 'Na podstawie ostatnich insightów AI',
+                        confidence: dashboard.trends?.averageConfidence || 0.5,
+                        createdAt: new Date().toISOString(),
+                        dismissed: false,
+                    }));
+
+                    set({ recommendations });
+                } catch (error) {
+                    console.log('Recommendations unavailable, keeping empty state:', error);
+                    set({ recommendations: [] });
+                }
             },
 
             // Daily entry actions
@@ -2033,7 +2231,6 @@ export const useAppStore = create<AppStore>()(
                             try {
                                 const healthResponse = await fetch(`${getApiUrl()}/api/health`, {
                                     method: 'GET',
-                                    timeout: 5000
                                 });
 
                                 if (healthResponse.ok) {
@@ -2043,7 +2240,7 @@ export const useAppStore = create<AppStore>()(
                                     throw new Error(`Backend unhealthy: ${healthResponse.status}`);
                                 }
                             } catch (healthError) {
-                                console.log('❌ Backend health check failed:', healthError.message);
+                                console.log('❌ Backend health check failed:', healthError instanceof Error ? healthError.message : String(healthError));
                                 console.log('🔄 Skipping token verification, using fallback from token');
                                 backendHealthy = false;
                             }
@@ -2076,7 +2273,6 @@ export const useAppStore = create<AppStore>()(
                                             'Authorization': `Bearer ${accessToken}`,
                                             'Content-Type': 'application/json',
                                         },
-                                        timeout: 10000 // 10 second timeout
                                     });
 
                                     console.log('🔍 Token verification response:', {

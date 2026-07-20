@@ -127,9 +127,9 @@ export default function SleepScreen() {
                                             sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
                                             sleepQualityScore: analysis.sleepQuality,
                                             snoringDetected: analysis.snoringEvents.length > 0,
-                                            snoringIntensity: analysis.snoringEvents.length > 10 ? 'heavy' :
+                                            snoringIntensity: (analysis.snoringEvents.length > 10 ? 'heavy' :
                                                 analysis.snoringEvents.length > 5 ? 'moderate' :
-                                                    analysis.snoringEvents.length > 0 ? 'light' : 'none',
+                                                    analysis.snoringEvents.length > 0 ? 'light' : 'none') as 'heavy' | 'moderate' | 'light' | 'none',
                                             sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
                                             sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
                                             analysisMetadata: {

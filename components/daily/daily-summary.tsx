@@ -165,17 +165,25 @@ export const DailySummary: React.FC<DailySummaryProps> = ({
                             <Text style={styles.sectionTitle}>Habits Tracked</Text>
                             {entry.habits.map((habit, index) => (
                                 <View key={index} style={styles.habitCard}>
-                                    <Ionicons
-                                        name={habit.isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
-                                        size={20}
-                                        color={habit.isCompleted ? '#4CAF50' : Colors.light.tabIconDefault}
-                                    />
-                                    <Text style={styles.habitName}>{habit.name}</Text>
-                                    {habit.streakCount > 0 && (
-                                        <Text style={styles.streakText}>
-                                            {habit.streakCount} day streak
-                                        </Text>
-                                    )}
+                                    {(() => {
+                                        const isCompleted = habit.isCompletedToday;
+                                        const streakCount = habit.currentStreak;
+                                        return (
+                                            <>
+                                                <Ionicons
+                                                    name={isCompleted ? 'checkmark-circle' : 'ellipse-outline'}
+                                                    size={20}
+                                                    color={isCompleted ? '#4CAF50' : Colors.light.tabIconDefault}
+                                                />
+                                                <Text style={styles.habitName}>{habit.name}</Text>
+                                                {streakCount > 0 && (
+                                                    <Text style={styles.streakText}>
+                                                        {streakCount} day streak
+                                                    </Text>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
                                 </View>
                             ))}
                         </View>

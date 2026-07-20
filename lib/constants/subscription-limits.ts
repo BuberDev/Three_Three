@@ -94,11 +94,13 @@ export function hasReachedLimit(
 ): boolean {
     if (isPremium) {
         const premiumLimit = PREMIUM_USER_FEATURES[limitType as keyof typeof PREMIUM_USER_FEATURES];
-        return premiumLimit === -1 ? false : currentUsage >= (premiumLimit as number);
+        return typeof premiumLimit === 'number' && premiumLimit !== -1
+            ? currentUsage >= premiumLimit
+            : false;
     }
 
     const freeLimit = FREE_USER_LIMITS[limitType];
-    return typeof freeLimit === 'number' && freeLimit !== -1 && currentUsage >= freeLimit;
+    return typeof freeLimit === 'number' && currentUsage >= freeLimit;
 }
 
 /**
@@ -111,11 +113,13 @@ export function getRemainingUsage(
 ): number | null {
     if (isPremium) {
         const premiumLimit = PREMIUM_USER_FEATURES[limitType as keyof typeof PREMIUM_USER_FEATURES];
-        return premiumLimit === -1 ? null : Math.max(0, (premiumLimit as number) - currentUsage);
+        return typeof premiumLimit === 'number' && premiumLimit !== -1
+            ? Math.max(0, premiumLimit - currentUsage)
+            : null;
     }
 
     const freeLimit = FREE_USER_LIMITS[limitType];
-    return typeof freeLimit === 'number' && freeLimit !== -1
+    return typeof freeLimit === 'number'
         ? Math.max(0, freeLimit - currentUsage)
         : null;
 }

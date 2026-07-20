@@ -16,6 +16,20 @@ import { AudioService } from '@/lib/services/audio';
 import { AudioRecording } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
 
+const VOICE_TAB_BOTTOM_SPACE = 112;
+
+function getUserFacingVoiceError(error: string) {
+    if (error.includes('Backend server is not available')) {
+        return 'Nie udało się połączyć z serwerem. Sprawdź połączenie i spróbuj ponownie.';
+    }
+
+    if (error.toLowerCase().includes('network')) {
+        return 'Wystąpił problem z połączeniem. Spróbuj ponownie za chwilę.';
+    }
+
+    return error;
+}
+
 export default function VoiceScreen() {
     const colorScheme = useColorScheme();
     const colors = Colors[colorScheme ?? 'light'];
@@ -146,6 +160,8 @@ export default function VoiceScreen() {
         return () => clearInterval(interval);
     }, [isProcessingVoiceNote, loadVoiceNotes]);
 
+    useEffect(() => () => clearError(), [clearError]);
+
     // 🚨 REMOVED: Auto-refresh useEffect that caused infinite loop
     // The useEffect with voiceNotes dependency was triggering infinite refreshes
     // when API calls failed and voiceNotes stayed empty
@@ -170,7 +186,7 @@ export default function VoiceScreen() {
                     contentContainerStyle={{
                         paddingHorizontal: DesignSystem.spacing.lg,
                         paddingTop: insets.top + DesignSystem.spacing.lg,
-                        paddingBottom: DesignSystem.spacing['4xl'],
+                        paddingBottom: insets.bottom + VOICE_TAB_BOTTOM_SPACE,
                     }}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
@@ -225,7 +241,7 @@ export default function VoiceScreen() {
                             }}
                         >
                             {isProcessingVoiceNote
-                                ? 'Processing your voice note...'
+                                ? 'Przetwarzanie notatki głosowej...'
                                 : 'Nagraj swoją myśl lub zadanie'
                             }
                         </ThemedText>
@@ -298,7 +314,7 @@ export default function VoiceScreen() {
                                 <IconSymbol name="exclamationmark.triangle" size={20} color="#F56565" />
                                 <View style={{ flex: 1 }}>
                                     <ThemedText variant="bodyMedium" style={{ color: '#C53030', lineHeight: 20 }}>
-                                        {error}
+                                        {getUserFacingVoiceError(error)}
                                     </ThemedText>
                                     <TouchableOpacity
                                         style={{
@@ -339,9 +355,18 @@ export default function VoiceScreen() {
                             <IconSymbol name="list.bullet" size={20} color={colors.background} />
                             <ThemedText
                                 variant="bodyLarge"
-                                style={{ color: colors.background, fontWeight: '600', marginLeft: DesignSystem.spacing.sm }}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                style={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    color: colors.background,
+                                    fontWeight: '600',
+                                    marginHorizontal: DesignSystem.spacing.sm,
+                                    textAlign: 'center',
+                                }}
                             >
-                                Wybierz kategorie nagrania
+                                Wybierz kategorię nagrania
                             </ThemedText>
                             <IconSymbol name="chevron.right" size={16} color={colors.background} />
                         </TouchableOpacity>
@@ -379,7 +404,7 @@ export default function VoiceScreen() {
                                         color="secondary"
                                         style={{ marginLeft: DesignSystem.spacing.sm }}
                                     >
-                                        Processing your voice note...
+                                        Przetwarzanie notatki głosowej...
                                     </ThemedText>
                                 </View>
                                 <ThemedText variant="bodySmall" color="tertiary" style={{ textAlign: 'center', marginBottom: DesignSystem.spacing.sm }}>

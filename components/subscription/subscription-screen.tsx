@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     loadingText: {
         marginTop: 16,
         fontSize: 16,
-        color: Colors.textSecondary,
+        color: Colors.light.textSecondary,
         textAlign: 'center',
     },
 });
