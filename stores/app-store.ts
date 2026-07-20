@@ -2090,8 +2090,8 @@ export const useAppStore = create<AppStore>()(
                                         const responseData = await response.json();
                                         console.log('🔍 Raw auth response:', responseData);
 
-                                        // Backend returns User object directly, not wrapped in data
-                                        authenticatedUser = responseData;
+                                        // Global TransformInterceptor wraps every response as { success, data, timestamp }
+                                        authenticatedUser = responseData?.data ?? responseData;
 
                                         console.log('🔍 Parsed user object:', {
                                             id: authenticatedUser?.id,
@@ -2130,13 +2130,23 @@ export const useAppStore = create<AppStore>()(
                                             });
 
                                             if (refreshResponse.ok) {
-                                                const refreshData = await refreshResponse.json();
-                                                const newAccessToken = refreshData.accessToken;
+                                                const rawRefreshData = await refreshResponse.json();
+                                                const refreshData = rawRefreshData?.data ?? rawRefreshData;
+                                                const newAccessToken = refreshData?.accessToken;
+                                                const newRefreshToken = refreshData?.refreshToken;
 
                                                 if (newAccessToken) {
                                                     console.log('✅ Token refreshed during initialization');
                                                     loadedTokens.accessToken = newAccessToken;
                                                     await AsyncStorage.setItem('@access_token', newAccessToken);
+
+                                                    // The backend rotates the refresh token on every use and
+                                                    // invalidates the old one — must persist the new one or the
+                                                    // next refresh attempt will fail even though this one worked.
+                                                    if (newRefreshToken) {
+                                                        loadedTokens.refreshToken = newRefreshToken;
+                                                        await AsyncStorage.setItem('@refresh_token', newRefreshToken);
+                                                    }
 
                                                     // Retry auth check with new token
                                                     const retryResponse = await fetch(`${getApiUrl()}/api/auth/profile`, {
@@ -2357,8 +2367,9 @@ export const useAppStore = create<AppStore>()(
                     });
 
                     if (response.ok) {
-                        const data = await response.json();
-                        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = data;
+                        const rawData = await response.json();
+                        const data = rawData?.data ?? rawData;
+                        const { accessToken: newAccessToken, refreshToken: newRefreshToken } = data ?? {};
 
                         if (newAccessToken) {
                             console.log('✅ Token refresh successful');
@@ -2387,18 +2398,16 @@ export const useAppStore = create<AppStore>()(
                 if (!accessToken) return;
 
                 try {
-                    const response = await fetch(`${getApiUrl()}/api/auth/me`, {
+                    const response = await fetch(`${getApiUrl()}/api/users/me`, {
                         headers: {
                             'Authorization': `Bearer ${accessToken}`,
                         },
                     });
 
                     if (response.ok) {
-                        const userData = await response.json();
-                        set({
-                            user: userData.user,
-                            subscription: userData.subscription
-                        });
+                        const responseData = await response.json();
+                        const refreshedUser = responseData?.data ?? responseData;
+                        set({ user: refreshedUser });
                     }
                 } catch (error) {
                     console.error('Failed to refresh user:', error);
