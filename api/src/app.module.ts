@@ -102,6 +102,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
                     HabitCompletion,
                 ],
                 migrations: ['dist/migrations/*.js'],
+                migrationsRun: true,
                 synchronize: configService.get('app.nodeEnv') === 'development',
                 logging: configService.get('app.nodeEnv') === 'development' ? ['query', 'error'] : ['error'],
                 ssl: configService.get('database.ssl') ? {
