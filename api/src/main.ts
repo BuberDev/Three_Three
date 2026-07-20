@@ -17,6 +17,11 @@ const express = require('express');
 async function bootstrap() {
     const startedAt = new Date().toISOString();
     const expressApp = express();
+    // Caddy sits directly in front as the only reverse proxy hop, so trust
+    // exactly one layer of X-Forwarded-For — otherwise Express falls back to
+    // the proxy's own socket address for every client, and express-rate-limit
+    // buckets the entire user base under a single shared IP.
+    expressApp.set('trust proxy', 1);
     const port = Number(process.env.PORT || 3000);
     let nestReady = false;
 
