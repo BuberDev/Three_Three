@@ -280,7 +280,8 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                         disabled={!canContinue}
                         style={[
                             styles.primaryAction,
-                            !canContinue && styles.primaryActionDisabled,
+                            { backgroundColor: colors.primary },
+                            !canContinue && [styles.primaryActionDisabled, { backgroundColor: colors.backgroundTertiary, borderColor: colors.border }],
                         ]}
                     >
                         <Text
@@ -289,7 +290,8 @@ export const ConsentScreen: React.FC<ConsentScreenProps> = ({ onContinue, onBack
                             minimumFontScale={0.82}
                             style={[
                                 styles.primaryActionText,
-                                !canContinue && styles.primaryActionTextDisabled,
+                                { color: colors.onAccent },
+                                !canContinue && { color: colors.textSecondary },
                             ]}
                         >
                             {canContinue ? 'Kontynuuj' : 'Włącz zgodę, aby kontynuować'}
@@ -317,7 +319,6 @@ const styles = StyleSheet.create({
     primaryAction: {
         minHeight: 64,
         borderRadius: 16,
-        backgroundColor: '#4CAF50',
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 24,
@@ -331,20 +332,14 @@ const styles = StyleSheet.create({
         elevation: 4,
     },
     primaryActionDisabled: {
-        backgroundColor: '#E5E7EB',
         borderWidth: 1,
-        borderColor: '#CBD5E1',
         shadowOpacity: 0,
         elevation: 0,
     },
     primaryActionText: {
-        color: '#FFFFFF',
         fontSize: 18,
         lineHeight: 24,
         fontWeight: '700',
         textAlign: 'center',
-    },
-    primaryActionTextDisabled: {
-        color: '#475569',
     },
 });

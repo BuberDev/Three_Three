@@ -3,6 +3,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
 import { Dimensions, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DesignSystem } from '../../constants/theme';
 import { ThemedText } from '../themed-text';
 import { ThemedView } from '../themed-view';
 
@@ -28,7 +29,7 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
     return (
         <ThemedView style={styles.container}>
             <LinearGradient
-                colors={['#667eea', '#764ba2']}
+                colors={DesignSystem.gradients.primaryVertical.colors as [string, string]}
                 style={styles.gradient}
             >
                 <ScrollView

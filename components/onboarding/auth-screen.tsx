@@ -12,7 +12,7 @@ import {
     View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/theme';
+import { useThemeColor } from '../../hooks/use-theme-color';
 import GoogleAuthService from '../../lib/services/google-auth';
 import { getApiUrl } from '../../lib/utils/config';
 
@@ -38,6 +38,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
     const [isLoginMode, setIsLoginMode] = useState(false); // true = login, false = register
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+
+    const backgroundColor = useThemeColor({}, 'background');
+    const surfaceColor = useThemeColor({}, 'surface');
+    const textColor = useThemeColor({}, 'text');
+    const textSecondaryColor = useThemeColor({}, 'textSecondary');
+    const borderColor = useThemeColor({}, 'border');
+    const primaryColor = useThemeColor({}, 'primary');
+    const onAccentColor = useThemeColor({}, 'onAccent');
 
     const handleAppleAuth = async () => {
         setIsLoading(true);
@@ -167,10 +175,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
     };
 
     return (
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={[styles.container, { backgroundColor }]}>
             <View style={styles.header}>
-                <TouchableOpacity style={styles.backButton} onPress={onBack}>
-                    <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
+                <TouchableOpacity style={[styles.backButton, { backgroundColor: surfaceColor, borderColor, borderWidth: 1 }]} onPress={onBack}>
+                    <Ionicons name="arrow-back" size={24} color={textColor} />
                 </TouchableOpacity>
             </View>
 
@@ -179,8 +187,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                <Text style={styles.title}>{isLoginMode ? 'Zaloguj się' : 'Utwórz konto'}</Text>
-                <Text style={styles.subtitle}>
+                <Text style={[styles.title, { color: textColor }]}>{isLoginMode ? 'Zaloguj się' : 'Utwórz konto'}</Text>
+                <Text style={[styles.subtitle, { color: textSecondaryColor }]}>
                     {isLoginMode
                         ? 'Zaloguj się do swojego konta, aby kontynuować.'
                         : 'Twoje dane są bezpieczne. Synchronizujemy je tylko po to, by usprawnić Twoją codzienność.'
@@ -198,37 +206,37 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                        style={[styles.authButton, styles.googleButton]}
+                        style={[styles.authButton, styles.googleButton, { backgroundColor: surfaceColor, borderColor }]}
                         onPress={handleGoogleAuth}
                         disabled={isLoading}
                     >
                         <Ionicons name="logo-google" size={24} color="#4285F4" />
-                        <Text style={styles.googleButtonText}>Kontynuuj z Google</Text>
+                        <Text style={[styles.googleButtonText, { color: textColor }]}>Kontynuuj z Google</Text>
                     </TouchableOpacity>
 
                     <View style={styles.divider}>
-                        <View style={styles.dividerLine} />
-                        <Text style={styles.dividerText}>lub</Text>
-                        <View style={styles.dividerLine} />
+                        <View style={[styles.dividerLine, { backgroundColor: borderColor }]} />
+                        <Text style={[styles.dividerText, { color: textSecondaryColor }]}>lub</Text>
+                        <View style={[styles.dividerLine, { backgroundColor: borderColor }]} />
                     </View>
 
                     <TouchableOpacity
-                        style={[styles.authButton, styles.emailButton]}
+                        style={[styles.authButton, styles.emailButton, { backgroundColor: surfaceColor, borderColor }]}
                         onPress={handleEmailAuth}
                         disabled={isLoading}
                     >
-                        <Ionicons name="mail" size={24} color={Colors.light.text} />
-                        <Text style={styles.emailButtonText}>Kontynuuj z Email</Text>
+                        <Ionicons name="mail" size={24} color={textColor} />
+                        <Text style={[styles.emailButtonText, { color: textColor }]}>Kontynuuj z Email</Text>
                     </TouchableOpacity>
 
                     {/* Login/Register Toggle - moved outside form for better visibility */}
                     {showEmailForm && (
                         <TouchableOpacity
-                            style={styles.toggleButton}
+                            style={[styles.toggleButton, { backgroundColor: primaryColor + '15', borderColor: primaryColor + '33' }]}
                             onPress={() => setIsLoginMode(!isLoginMode)}
                             disabled={isLoading}
                         >
-                            <Text style={styles.toggleText}>
+                            <Text style={[styles.toggleText, { color: primaryColor }]}>
                                 {isLoginMode
                                     ? 'Nie masz konta? Utwórz nowe'
                                     : 'Masz już konto? Zaloguj się'
@@ -242,11 +250,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                             style={styles.keyboardAvoidingView}
                         >
-                            <View style={styles.emailForm}>
+                            <View style={[styles.emailForm, { backgroundColor: surfaceColor, borderColor }]}>
                                 <TextInput
-                                    style={styles.emailInput}
+                                    style={[styles.emailInput, { backgroundColor, borderColor, color: textColor }]}
                                     placeholder="Wprowadź swój email"
-                                    placeholderTextColor={Colors.light.icon}
+                                    placeholderTextColor={textSecondaryColor}
                                     value={email}
                                     onChangeText={setEmail}
                                     keyboardType="email-address"
@@ -255,9 +263,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                                     autoFocus
                                 />
                                 <TextInput
-                                    style={styles.emailInput}
+                                    style={[styles.emailInput, { backgroundColor, borderColor, color: textColor }]}
                                     placeholder="Wprowadź hasło"
-                                    placeholderTextColor={Colors.light.icon}
+                                    placeholderTextColor={textSecondaryColor}
                                     value={password}
                                     onChangeText={setPassword}
                                     secureTextEntry
@@ -266,21 +274,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                                 />
                                 <View style={styles.emailFormButtons}>
                                     <TouchableOpacity
-                                        style={[styles.formButton, styles.cancelButton]}
+                                        style={[styles.formButton, styles.cancelButton, { backgroundColor: borderColor }]}
                                         onPress={() => {
                                             setShowEmailForm(false);
                                             setEmail('');
                                             setPassword('');
                                         }}
                                     >
-                                        <Text style={styles.cancelButtonText}>Anuluj</Text>
+                                        <Text style={[styles.cancelButtonText, { color: textColor }]}>Anuluj</Text>
                                     </TouchableOpacity>
                                     <TouchableOpacity
-                                        style={[styles.formButton, styles.submitButton]}
+                                        style={[styles.formButton, styles.submitButton, { backgroundColor: primaryColor }]}
                                         onPress={handleEmailSubmit}
                                         disabled={!email.trim() || !password.trim() || isLoading}
                                     >
-                                        <Text style={[styles.submitButtonText, (!email.trim() || !password.trim()) && styles.disabledText]}>
+                                        <Text style={[styles.submitButtonText, { color: onAccentColor }, (!email.trim() || !password.trim()) && styles.disabledText]}>
                                             {isLoading ? 'Przetwarzanie...' : isLoginMode ? 'Zaloguj się' : 'Kontynuuj'}
                                         </Text>
                                     </TouchableOpacity>
@@ -291,12 +299,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
                 </View>
             </ScrollView>
 
-            <View style={styles.footerContainer}>
-                <Text style={styles.termsText}>
+            <View style={[styles.footerContainer, { backgroundColor, borderTopColor: borderColor }]}>
+                <Text style={[styles.termsText, { color: textSecondaryColor }]}>
                     Kontynuując, akceptujesz nasze{' '}
-                    <Text style={styles.termsLink}>Warunki korzystania</Text>
+                    <Text style={[styles.termsLink, { color: primaryColor }]}>Warunki korzystania</Text>
                     {' '}i{' '}
-                    <Text style={styles.termsLink}>Politykę prywatności</Text>
+                    <Text style={[styles.termsLink, { color: primaryColor }]}>Politykę prywatności</Text>
                 </Text>
             </View>
         </SafeAreaView>
@@ -306,7 +314,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onContinue, onBack }) =>
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
     },
     header: {
         paddingHorizontal: 20,
@@ -318,20 +325,17 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.05)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     title: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: Colors.light.text,
         textAlign: 'center',
         marginBottom: 12,
     },
     subtitle: {
         fontSize: 16,
-        color: Colors.light.tabIconDefault,
         textAlign: 'center',
         lineHeight: 22,
         marginBottom: 40,
@@ -361,14 +365,10 @@ const styles = StyleSheet.create({
         backgroundColor: '#000',
     },
     googleButton: {
-        backgroundColor: 'white',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     emailButton: {
-        backgroundColor: 'white',
         borderWidth: 1,
-        borderColor: '#E0E0E0',
     },
     appleButtonText: {
         color: 'white',
@@ -377,13 +377,11 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     googleButtonText: {
-        color: Colors.light.text,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 12,
     },
     emailButtonText: {
-        color: Colors.light.text,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 12,
@@ -396,21 +394,17 @@ const styles = StyleSheet.create({
     dividerLine: {
         flex: 1,
         height: 1,
-        backgroundColor: '#E0E0E0',
     },
     dividerText: {
-        color: Colors.light.tabIconDefault,
         paddingHorizontal: 16,
         fontSize: 14,
     },
     termsText: {
         fontSize: 12,
-        color: Colors.light.tabIconDefault,
         textAlign: 'center',
         lineHeight: 18,
     },
     termsLink: {
-        color: '#4CAF50',
         fontWeight: '600',
     },
     scrollView: {
@@ -422,12 +416,10 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     footerContainer: {
-        backgroundColor: Colors.light.background,
         paddingHorizontal: 24,
         paddingTop: 16,
         paddingBottom: 16,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
     },
     keyboardAvoidingView: {
         flex: 0,
@@ -435,20 +427,15 @@ const styles = StyleSheet.create({
     emailForm: {
         marginTop: 16,
         padding: 16,
-        backgroundColor: Colors.light.surface,
         borderRadius: 12,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.1)',
     },
     emailInput: {
-        backgroundColor: Colors.light.background,
         borderRadius: 8,
         paddingHorizontal: 16,
         paddingVertical: 12,
         fontSize: 16,
-        color: Colors.light.text,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.1)',
         marginBottom: 12,
     },
     emailFormButtons: {
@@ -462,17 +449,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     cancelButton: {
-        backgroundColor: 'rgba(0,0,0,0.05)',
     },
     cancelButtonText: {
-        color: Colors.light.text,
         fontWeight: '600',
     },
     submitButton: {
-        backgroundColor: Colors.light.primary,
     },
     submitButtonText: {
-        color: 'white',
         fontWeight: '600',
     },
     disabledText: {
@@ -484,13 +467,10 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 20,
         alignItems: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
         borderRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(76, 175, 80, 0.2)',
     },
     toggleText: {
-        color: Colors.light.primary,
         fontSize: 16,
         fontWeight: '600',
     },

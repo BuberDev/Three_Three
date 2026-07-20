@@ -8,7 +8,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Colors } from '../../constants/theme';
+import { useThemeColor } from '../../hooks/use-theme-color';
 
 interface PersonalizationScreenProps {
     onContinue: (goals: string[]) => void | Promise<void>;
@@ -20,6 +20,15 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
+
+    const backgroundColor = useThemeColor({}, 'background');
+    const surfaceColor = useThemeColor({}, 'surface');
+    const textColor = useThemeColor({}, 'text');
+    const textSecondaryColor = useThemeColor({}, 'textSecondary');
+    const borderColor = useThemeColor({}, 'border');
+    const primaryColor = useThemeColor({}, 'primary');
+    const errorColor = useThemeColor({}, 'error');
+    const onAccentColor = useThemeColor({}, 'onAccent');
 
     const goals = [
         {
@@ -96,14 +105,14 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
     };
 
     return (
-        <View style={styles.container}>
+        <View style={[styles.container, { backgroundColor }]}>
             <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
                 <TouchableOpacity
-                    style={styles.backButton}
+                    style={[styles.backButton, { backgroundColor: surfaceColor, borderColor, borderWidth: 1 }]}
                     onPress={onBack}
                     disabled={isSubmitting}
                 >
-                    <Ionicons name="arrow-back" size={24} color={Colors.light.text} />
+                    <Ionicons name="arrow-back" size={24} color={textColor} />
                 </TouchableOpacity>
                 <TouchableOpacity
                     onPress={handleSkip}
@@ -111,7 +120,7 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
                     style={styles.skipTouchTarget}
                     hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
                 >
-                    <Text style={[styles.skipButton, isSubmitting && styles.disabledText]}>Pomiń</Text>
+                    <Text style={[styles.skipButton, { color: textSecondaryColor }, isSubmitting && styles.disabledText]}>Pomiń</Text>
                 </TouchableOpacity>
             </View>
 
@@ -125,9 +134,9 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
                 keyboardShouldPersistTaps="handled"
             >
                 <View style={styles.titleContainer}>
-                    <Ionicons name="flag" size={48} color="#4CAF50" />
-                    <Text style={styles.title}>Jakie obszary chcesz usprawnić?</Text>
-                    <Text style={styles.subtitle}>
+                    <Ionicons name="flag" size={48} color={primaryColor} />
+                    <Text style={[styles.title, { color: textColor }]}>Jakie obszary chcesz usprawnić?</Text>
+                    <Text style={[styles.subtitle, { color: textSecondaryColor }]}>
                         Wybierz cele, które są dla Ciebie najważniejsze. Pomoże nam to lepiej dostosować aplikację.
                     </Text>
                 </View>
@@ -141,32 +150,35 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
                                 key={goal.id}
                                 style={[
                                     styles.goalItem,
-                                    isSelected && styles.goalItemSelected
+                                    {
+                                        backgroundColor: isSelected ? primaryColor + '15' : surfaceColor,
+                                        borderColor: isSelected ? primaryColor : 'transparent',
+                                    },
                                 ]}
                                 onPress={() => toggleGoal(goal.id)}
                             >
                                 <View style={styles.goalContent}>
                                     <View style={[
                                         styles.goalIcon,
-                                        isSelected && styles.goalIconSelected
+                                        { backgroundColor: isSelected ? primaryColor : primaryColor + '20' },
                                     ]}>
                                         <Ionicons
                                             name={goal.icon as any}
                                             size={24}
-                                            color={isSelected ? 'white' : '#4CAF50'}
+                                            color={isSelected ? onAccentColor : primaryColor}
                                         />
                                     </View>
 
                                     <View style={styles.goalText}>
                                         <Text style={[
                                             styles.goalTitle,
-                                            isSelected && styles.goalTitleSelected
+                                            { color: isSelected ? primaryColor : textColor },
                                         ]}>
                                             {goal.title}
                                         </Text>
                                         <Text style={[
                                             styles.goalDescription,
-                                            isSelected && styles.goalDescriptionSelected
+                                            { color: isSelected ? primaryColor : textSecondaryColor },
                                         ]}>
                                             {goal.description}
                                         </Text>
@@ -174,10 +186,11 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 
                                     <View style={[
                                         styles.checkbox,
-                                        isSelected && styles.checkboxSelected
+                                        { borderColor: isSelected ? primaryColor : borderColor },
+                                        isSelected && { backgroundColor: primaryColor },
                                     ]}>
                                         {isSelected && (
-                                            <Ionicons name="checkmark" size={16} color="white" />
+                                            <Ionicons name="checkmark" size={16} color={onAccentColor} />
                                         )}
                                     </View>
                                 </View>
@@ -188,20 +201,21 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 
             </ScrollView>
 
-            <View style={[styles.footerContainer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
+            <View style={[styles.footerContainer, { backgroundColor, borderTopColor: borderColor, paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
                 {submitError && (
-                    <Text style={styles.errorText}>{submitError}</Text>
+                    <Text style={[styles.errorText, { color: errorColor }]}>{submitError}</Text>
                 )}
                 <TouchableOpacity
                     style={[
                         styles.continueButton,
+                        { backgroundColor: primaryColor },
                         isSubmitting && styles.continueButtonDisabled,
                     ]}
                     onPress={handleContinue}
                     disabled={isSubmitting}
                     activeOpacity={0.85}
                 >
-                    <Text style={styles.continueButtonText}>{getContinueLabel()}</Text>
+                    <Text style={[styles.continueButtonText, { color: onAccentColor }]}>{getContinueLabel()}</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -211,7 +225,6 @@ export const PersonalizationScreen: React.FC<PersonalizationScreenProps> = ({ on
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
     },
     header: {
         flexDirection: 'row',
@@ -225,12 +238,10 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: 'rgba(0,0,0,0.05)',
         alignItems: 'center',
         justifyContent: 'center',
     },
     skipButton: {
-        color: Colors.light.tabIconDefault,
         fontSize: 16,
         fontWeight: '600',
     },
@@ -259,14 +270,12 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 24,
         fontWeight: 'bold',
-        color: Colors.light.text,
         textAlign: 'center',
         marginTop: 16,
         marginBottom: 8,
     },
     subtitle: {
         fontSize: 16,
-        color: Colors.light.tabIconDefault,
         textAlign: 'center',
         lineHeight: 22,
     },
@@ -274,24 +283,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     goalItem: {
-        backgroundColor: 'white',
         borderRadius: 12,
         padding: 20,
         marginBottom: 12,
         borderWidth: 2,
-        borderColor: 'transparent',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    goalItemSelected: {
-        borderColor: '#4CAF50',
-        backgroundColor: '#F8FDF8',
     },
     goalContent: {
         flexDirection: 'row',
@@ -301,13 +296,9 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 16,
-    },
-    goalIconSelected: {
-        backgroundColor: '#4CAF50',
     },
     goalText: {
         flex: 1,
@@ -316,43 +307,28 @@ const styles = StyleSheet.create({
     goalTitle: {
         fontSize: 16,
         fontWeight: '600',
-        color: Colors.light.text,
         marginBottom: 4,
-    },
-    goalTitleSelected: {
-        color: '#4CAF50',
     },
     goalDescription: {
         fontSize: 14,
-        color: Colors.light.tabIconDefault,
         lineHeight: 18,
-    },
-    goalDescriptionSelected: {
-        color: '#4CAF50',
     },
     checkbox: {
         width: 24,
         height: 24,
         borderRadius: 12,
         borderWidth: 2,
-        borderColor: '#E0E0E0',
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    checkboxSelected: {
-        backgroundColor: '#4CAF50',
-        borderColor: '#4CAF50',
     },
     footerContainer: {
         position: 'absolute',
         left: 0,
         right: 0,
         bottom: 0,
-        backgroundColor: Colors.light.background,
         paddingHorizontal: 24,
         paddingTop: 16,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(0,0,0,0.05)',
         zIndex: 30,
         elevation: 12,
         shadowColor: '#000',
@@ -364,14 +340,12 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
     },
     errorText: {
-        color: '#D32F2F',
         fontSize: 13,
         lineHeight: 18,
         textAlign: 'center',
         marginBottom: 10,
     },
     continueButton: {
-        backgroundColor: '#4CAF50',
         minHeight: 56,
         paddingHorizontal: 32,
         borderRadius: 12,
@@ -390,7 +364,6 @@ const styles = StyleSheet.create({
         opacity: 0.65,
     },
     continueButtonText: {
-        color: 'white',
         fontSize: 16,
         fontWeight: '600',
     },
