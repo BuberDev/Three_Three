@@ -16,11 +16,10 @@ export default registerAs('app', () => ({
         s3BucketName: process.env.AWS_S3_BUCKET_NAME || 'three-three-voice-notes',
     },
 
-    // OpenRouter Configuration
-    openRouter: {
-        apiKey: process.env.OPENROUTER_API_KEY,
-        model: process.env.OPENROUTER_MODEL || 'microsoft/phi-3-medium-128k-instruct:free',
-        baseUrl: 'https://openrouter.ai/api/v1',
+    // Local LLM (Ollama) Configuration
+    ollama: {
+        baseUrl: process.env.OLLAMA_BASE_URL || 'http://ollama:11434/v1',
+        model: process.env.OLLAMA_MODEL || 'llama3.2:3b',
     },
 
     // Kafka Configuration

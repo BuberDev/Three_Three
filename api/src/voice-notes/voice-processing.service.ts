@@ -21,19 +21,14 @@ export interface VoiceProcessingResult {
 @Injectable()
 export class VoiceProcessingService {
     private readonly logger = new Logger(VoiceProcessingService.name);
-    private openRouter: OpenAI | null = null;
+    private readonly ollamaModel: string;
+    private readonly ollama: OpenAI;
 
     constructor(private readonly configService: ConfigService) {
-        const apiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-
-        if (!apiKey) {
-            this.logger.warn('OPENROUTER_API_KEY not configured. Voice note AI analysis will use fallback processing.');
-            return;
-        }
-
-        this.openRouter = new OpenAI({
-            apiKey,
-            baseURL: 'https://openrouter.ai/api/v1',
+        this.ollamaModel = this.configService.get<string>('app.ollama.model');
+        this.ollama = new OpenAI({
+            apiKey: 'ollama',
+            baseURL: this.configService.get<string>('app.ollama.baseUrl'),
         });
     }
 
@@ -126,13 +121,9 @@ Provide the analysis in this exact JSON structure:
 - Focus on productivity, goals, and personal development context
 `;
 
-        if (!this.openRouter) {
-            return this.createFallbackAnalysis(transcription);
-        }
-
         try {
-            const response = await this.openRouter.chat.completions.create({
-                model: 'microsoft/phi-3-medium-128k-instruct:free',
+            const response = await this.ollama.chat.completions.create({
+                model: this.ollamaModel,
                 messages: [
                     {
                         role: 'system',
@@ -248,13 +239,9 @@ Provide the analysis in this exact JSON structure:
     }
 
     async generateTitleFromTranscription(transcription: string): Promise<string> {
-        if (!this.openRouter) {
-            return 'Voice Note';
-        }
-
         try {
-            const response = await this.openRouter.chat.completions.create({
-                model: 'microsoft/phi-3-medium-128k-instruct:free',
+            const response = await this.ollama.chat.completions.create({
+                model: this.ollamaModel,
                 messages: [
                     {
                         role: 'system',

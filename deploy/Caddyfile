@@ -1,0 +1,7 @@
+threethree.pl, www.threethree.pl {
+	reverse_proxy landing:3000
+}
+
+api.threethree.pl {
+	reverse_proxy api:3000
+}

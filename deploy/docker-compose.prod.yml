@@ -1,0 +1,68 @@
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: three-three-ollama
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    expose:
+      - "11434"
+    networks:
+      - web
+
+  api:
+    build:
+      context: ../api
+    container_name: three-three-api
+    restart: unless-stopped
+    env_file:
+      - ../api/.env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_SSL: "true"
+      CORS_ORIGINS: https://threethree.pl,https://www.threethree.pl
+      OLLAMA_BASE_URL: http://ollama:11434/v1
+      OLLAMA_MODEL: llama3.2:3b
+    depends_on:
+      - ollama
+    expose:
+      - "3000"
+    networks:
+      - web
+
+  landing:
+    build:
+      context: ../landing-page
+    container_name: three-three-landing
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - web
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: three-three-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    depends_on:
+      - api
+      - landing
+
+networks:
+  web:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  ollama_data:

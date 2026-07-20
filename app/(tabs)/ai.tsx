@@ -204,9 +204,6 @@ export default function AIScreen() {
                 <AISettingsModal
                     visible={showSettings}
                     onClose={() => setShowSettings(false)}
-                    selectedModel={aiChat.selectedModel}
-                    onModelSelect={aiChat.setSelectedModel}
-                    availableModels={aiChat.availableModels}
                     systemInstruction={aiChat.systemInstruction}
                     onSystemInstructionChange={aiChat.setSystemInstruction}
                 />

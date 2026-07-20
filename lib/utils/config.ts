@@ -15,7 +15,7 @@ export function getApiUrl(): string {
         return configuredUrl.replace(/\/+$/, '');
     }
 
-    return __DEV__ ? 'http://localhost:3000' : 'https://three-three-api.onrender.com';
+    return __DEV__ ? 'http://localhost:3000' : 'https://api.threethree.pl';
 }
 
 /**

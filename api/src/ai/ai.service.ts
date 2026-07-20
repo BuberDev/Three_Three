@@ -23,36 +23,26 @@ interface OpenRouterResponse {
 @Injectable()
 export class AiService {
     private readonly logger = new Logger(AiService.name);
-    private readonly openRouterApiKey: string;
-    private readonly openRouterBaseUrl = 'https://openrouter.ai/api/v1';
+    private readonly ollamaBaseUrl: string;
+    private readonly ollamaModel: string;
 
     constructor(
         private configService: ConfigService,
         private chatService: ChatService,
     ) {
-        this.openRouterApiKey = this.configService.get<string>('OPENROUTER_API_KEY');
-
-        if (!this.openRouterApiKey) {
-            this.logger.warn('OPENROUTER_API_KEY not configured. AI chat will not work.');
-        }
+        this.ollamaBaseUrl = this.configService.get<string>('app.ollama.baseUrl');
+        this.ollamaModel = this.configService.get<string>('app.ollama.model');
     }
 
     async createChatCompletion(request: ChatCompletionDto): Promise<OpenRouterResponse> {
-        if (!this.openRouterApiKey) {
-            throw new Error('OpenRouter API key not configured');
-        }
-
         try {
-            const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+            const response = await fetch(`${this.ollamaBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.openRouterApiKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://three-three-app.local',
-                    'X-Title': 'Three Three AI Assistant'
                 },
                 body: JSON.stringify({
-                    model: request.model,
+                    model: this.ollamaModel,
                     messages: request.messages,
                     temperature: request.temperature || 0.7,
                     max_tokens: request.max_tokens || 4000,
@@ -61,7 +51,7 @@ export class AiService {
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                this.logger.error(`OpenRouter API error: ${response.status}`, errorData);
+                this.logger.error(`Ollama API error: ${response.status}`, errorData);
                 throw new Error(`AI service error: ${response.status}`);
             }
 
@@ -73,41 +63,34 @@ export class AiService {
     }
 
     async streamChatCompletion(request: ChatCompletionDto) {
-        if (!this.openRouterApiKey) {
-            throw new Error('OpenRouter API key not configured');
-        }
-
         try {
             const requestBody = {
-                model: request.model,
+                model: this.ollamaModel,
                 messages: request.messages,
                 temperature: request.temperature || 0.7,
                 max_tokens: request.max_tokens || 4000,
                 stream: true,
             };
 
-            this.logger.debug('OpenRouter request body:', JSON.stringify(requestBody, null, 2));
+            this.logger.debug('Ollama request body:', JSON.stringify(requestBody, null, 2));
 
-            const response = await fetch(`${this.openRouterBaseUrl}/chat/completions`, {
+            const response = await fetch(`${this.ollamaBaseUrl}/chat/completions`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${this.openRouterApiKey}`,
                     'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://three-three-app.local',
-                    'X-Title': 'Three Three AI Assistant'
                 },
                 body: JSON.stringify(requestBody)
             });
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}));
-                this.logger.error(`OpenRouter API error: ${response.status}`, errorData);
+                this.logger.error(`Ollama API error: ${response.status}`, errorData);
                 throw new Error(`AI service error: ${response.status}`);
             }
 
-            this.logger.debug('OpenRouter response headers:', Object.fromEntries(response.headers.entries()));
-            this.logger.debug('OpenRouter response body type:', typeof response.body);
-            this.logger.debug('OpenRouter response body readable:', response.body ? 'yes' : 'no');
+            this.logger.debug('Ollama response headers:', Object.fromEntries(response.headers.entries()));
+            this.logger.debug('Ollama response body type:', typeof response.body);
+            this.logger.debug('Ollama response body readable:', response.body ? 'yes' : 'no');
 
             return response;
         } catch (error) {
@@ -117,16 +100,8 @@ export class AiService {
     }
 
     async getAvailableModels() {
-        if (!this.openRouterApiKey) {
-            return { models: [] };
-        }
-
         try {
-            const response = await fetch(`${this.openRouterBaseUrl}/models`, {
-                headers: {
-                    'Authorization': `Bearer ${this.openRouterApiKey}`
-                }
-            });
+            const response = await fetch(`${this.ollamaBaseUrl}/models`);
 
             if (!response.ok) {
                 this.logger.error(`Failed to fetch models: ${response.status}`);

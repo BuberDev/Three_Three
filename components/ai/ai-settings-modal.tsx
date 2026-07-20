@@ -11,14 +11,10 @@ import {
 } from 'react-native';
 import { Colors, DesignSystem } from '../../constants/theme';
 import { useColorScheme } from '../../hooks/use-color-scheme';
-import { LLMModel } from '../../lib/types/llm';
 
 interface AISettingsModalProps {
     visible: boolean;
     onClose: () => void;
-    selectedModel: LLMModel;
-    onModelSelect: (model: LLMModel) => void;
-    availableModels: LLMModel[];
     systemInstruction: string;
     onSystemInstructionChange: (instruction: string) => void;
 }
@@ -26,9 +22,6 @@ interface AISettingsModalProps {
 export const AISettingsModal: React.FC<AISettingsModalProps> = ({
     visible,
     onClose,
-    selectedModel,
-    onModelSelect,
-    availableModels,
     systemInstruction,
     onSystemInstructionChange,
 }) => {
@@ -55,20 +48,6 @@ Twoja rola to pomoc użytkownikowi w rozwiązywaniu problemów i udzielaniu info
         setTempInstruction(defaultInstruction);
     };
 
-    const getProviderIcon = (provider: string) => {
-        switch (provider.toLowerCase()) {
-            case 'anthropic': return 'sparkles';
-            case 'openai': return 'flash';
-            case 'google': return 'search';
-            case 'meta': return 'library';
-            default: return 'hardware-chip';
-        }
-    };
-
-    const formatPrice = (price: number) => {
-        return price < 1 ? `$${price}` : `$${price}`;
-    };
-
     return (
         <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
             <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -88,66 +67,6 @@ Twoja rola to pomoc użytkownikowi w rozwiązywaniu problemów i udzielaniu info
                 </View>
 
                 <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    {/* Model Selection */}
-                    <View style={styles.section}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }]}>
-                            Wybór modelu AI
-                        </Text>
-                        <Text style={[styles.sectionDescription, { color: colors.textSecondary }]}>
-                            Wybierz model językowy do konwersacji
-                        </Text>
-
-                        {availableModels.map((model) => (
-                            <TouchableOpacity
-                                key={model.id}
-                                style={[
-                                    styles.modelCard,
-                                    {
-                                        backgroundColor: selectedModel.id === model.id
-                                            ? colors.primary + '15'
-                                            : colors.surface,
-                                        borderColor: selectedModel.id === model.id
-                                            ? colors.primary
-                                            : colors.border,
-                                    }
-                                ]}
-                                onPress={() => onModelSelect(model)}
-                            >
-                                <View style={styles.modelHeader}>
-                                    <View style={styles.modelInfo}>
-                                        <View style={[styles.providerIcon, { backgroundColor: colors.primary + '20' }]}>
-                                            <Ionicons
-                                                name={getProviderIcon(model.provider) as any}
-                                                size={16}
-                                                color={colors.primary}
-                                            />
-                                        </View>
-                                        <View style={styles.modelDetails}>
-                                            <Text style={[styles.modelName, { color: colors.text }]}>
-                                                {model.name}
-                                            </Text>
-                                            <Text style={[styles.modelProvider, { color: colors.textSecondary }]}>
-                                                {model.provider} • {(model.contextLength / 1000).toFixed(0)}k context
-                                            </Text>
-                                        </View>
-                                    </View>
-                                    {selectedModel.id === model.id && (
-                                        <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
-                                    )}
-                                </View>
-                                <Text style={[styles.modelDescription, { color: colors.textSecondary }]}>
-                                    {model.description}
-                                </Text>
-                                <View style={styles.modelPricing}>
-                                    <Text style={[styles.pricingText, { color: colors.textTertiary }]}>
-                                        Wejście: {formatPrice(model.pricing.input)}/1M •
-                                        Wyjście: {formatPrice(model.pricing.output)}/1M
-                                    </Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
-                    </View>
-
                     {/* System Instruction */}
                     <View style={styles.section}>
                         <View style={styles.instructionHeader}>
