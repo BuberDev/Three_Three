@@ -24,7 +24,7 @@ export class UserSettings extends BaseEntity {
     @Column({ type: 'jsonb', default: {} })
     preferences: Record<string, any>;
 
-    @Column({ nullable: true, length: 10 })
+    @Column({ nullable: true, length: 50 })
     timezone?: string;
 
     @Column({ nullable: true, length: 5 })
