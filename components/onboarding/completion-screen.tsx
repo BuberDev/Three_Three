@@ -37,7 +37,7 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
                     contentContainerStyle={[
                         styles.content,
                         {
-                            paddingTop: insets.top + 24,
+                            paddingTop: Math.max(insets.top, 47) + 24,
                             paddingBottom: insets.bottom + 84,
                         },
                     ]}

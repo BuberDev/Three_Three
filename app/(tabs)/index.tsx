@@ -158,7 +158,7 @@ export default function HomeScreen() {
         contentContainerStyle={{
           paddingHorizontal: DesignSystem.spacing.lg,
           paddingTop: insets.top + DesignSystem.spacing.lg,
-          paddingBottom: DesignSystem.spacing['4xl'],
+          paddingBottom: insets.bottom + DesignSystem.spacing['5xl'],
         }}
         refreshControl={
           <RefreshControl
@@ -185,6 +185,7 @@ export default function HomeScreen() {
               marginTop: DesignSystem.spacing.lg,
               borderRadius: DesignSystem.borderRadius['2xl'],
               padding: DesignSystem.spacing.xl,
+              overflow: 'hidden',
               ...DesignSystem.elevation[3],
             }}
           >
@@ -194,11 +195,12 @@ export default function HomeScreen() {
               alignItems: 'center',
               marginBottom: DesignSystem.spacing.lg
             }}>
-              <View>
+              <View style={{ flex: 1, marginRight: DesignSystem.spacing.md }}>
                 <ThemedText
                   variant="titleLarge"
                   lightColor="rgba(255,255,255,0.9)"
                   darkColor="rgba(255,255,255,0.9)"
+                  numberOfLines={1}
                   style={{ marginBottom: DesignSystem.spacing.xs }}
                 >
                   Dzisiejszy postęp
@@ -207,19 +209,27 @@ export default function HomeScreen() {
                   variant="bodyMedium"
                   lightColor="rgba(255,255,255,0.7)"
                   darkColor="rgba(255,255,255,0.7)"
+                  numberOfLines={1}
                 >
                   {(todaysTasks?.filter(t => t.completed).length || 0)} z {todaysTasks?.length || 0} zadań
                 </ThemedText>
               </View>
               <View style={{
+                flexShrink: 0,
+                minWidth: 56,
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 borderRadius: DesignSystem.borderRadius.full,
-                padding: DesignSystem.spacing.md,
+                paddingHorizontal: DesignSystem.spacing.md,
+                paddingVertical: DesignSystem.spacing.sm,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}>
                 <ThemedText
                   variant="headlineMedium"
                   lightColor="white"
                   darkColor="white"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={{ fontWeight: '700', fontFamily: Fonts.mono }}
                 >
                   {getDayProgress()}%
@@ -262,6 +272,8 @@ export default function HomeScreen() {
                   variant="bodySmall"
                   lightColor="rgba(255,255,255,0.8)"
                   darkColor="rgba(255,255,255,0.8)"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   Produktywność
                 </ThemedText>
@@ -279,6 +291,8 @@ export default function HomeScreen() {
                   variant="bodySmall"
                   lightColor="rgba(255,255,255,0.8)"
                   darkColor="rgba(255,255,255,0.8)"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   Dni z rzędu
                 </ThemedText>
@@ -296,6 +310,8 @@ export default function HomeScreen() {
                   variant="bodySmall"
                   lightColor="rgba(255,255,255,0.8)"
                   darkColor="rgba(255,255,255,0.8)"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   Aktywności
                 </ThemedText>

@@ -593,6 +593,7 @@ export default function RoutinesScreen() {
                             flexDirection: 'row',
                             gap: DesignSystem.spacing.sm,
                             paddingHorizontal: 20,
+                            marginTop: 16,
                             marginBottom: 16,
                             height: 110,
                             alignItems: 'flex-start',
