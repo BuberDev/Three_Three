@@ -9,13 +9,12 @@ import { Platform } from 'react-native';
  * Get the appropriate API URL based on the environment and device type
  */
 export function getApiUrl(): string {
-    const configuredUrl = process.env.API_URL;
-
-    if (configuredUrl) {
-        return configuredUrl.replace(/\/+$/, '');
+    if (!__DEV__) {
+        return 'https://api.threethree.pl';
     }
 
-    return __DEV__ ? 'http://localhost:3000' : 'https://api.threethree.pl';
+    const configuredUrl = process.env.API_URL;
+    return (configuredUrl || 'http://localhost:3000').replace(/\/+$/, '');
 }
 
 /**
