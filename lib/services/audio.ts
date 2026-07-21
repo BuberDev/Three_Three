@@ -136,6 +136,15 @@ export class AudioService {
             };
             this.notifyListeners();
 
+            // Live-tick the displayed duration as recording progresses
+            AudioRecorderPlayer.addRecordBackListener((recordBackMeta) => {
+                this.recordingState = {
+                    ...this.recordingState,
+                    duration: recordBackMeta.currentPosition,
+                };
+                this.notifyListeners();
+            });
+
             console.log('Voice recording started');
         } catch (error) {
             console.error('Failed to start voice recording:', error);
@@ -160,6 +169,7 @@ export class AudioService {
 
         try {
             const uri = await AudioRecorderPlayer.stopRecorder();
+            AudioRecorderPlayer.removeRecordBackListener();
 
             // Calculate duration manually, consistent with the previous implementation
             const duration = this.recordingStartTime
@@ -330,6 +340,7 @@ export class AudioService {
         }
         if (this.isCurrentlyRecording) {
             AudioRecorderPlayer.stopRecorder();
+            AudioRecorderPlayer.removeRecordBackListener();
             this.isCurrentlyRecording = false;
         }
         console.log('Audio service cleaned up');
