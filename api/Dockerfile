@@ -20,11 +20,24 @@ RUN npm run build
 # Remove dev dependencies for smaller image
 RUN npm prune --production
 
-# Stage 2: Production stage
+# Stage 2: whisper.cpp build stage (real, local, offline speech-to-text —
+# no external API calls; see docs/superpowers/specs/2026-07-21-real-audio-transcription-design.md)
+FROM node:18-alpine AS whisper-builder
+
+RUN apk add --no-cache build-base git cmake
+
+WORKDIR /opt
+RUN git clone --depth 1 --branch v1.9.1 https://github.com/ggml-org/whisper.cpp.git
+WORKDIR /opt/whisper.cpp
+RUN sh ./models/download-ggml-model.sh base
+RUN cmake -B build && cmake --build build -j --config Release
+
+# Stage 3: Production stage
 FROM node:18-alpine AS production
 
-# Install dumb-init for proper signal handling
-RUN apk add --no-cache dumb-init
+# Install dumb-init for proper signal handling, and ffmpeg + whisper.cpp's
+# runtime shared-lib requirements (libgomp for OpenMP, libstdc++)
+RUN apk add --no-cache dumb-init ffmpeg libgomp libstdc++
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -34,6 +47,12 @@ WORKDIR /app
 
 # Set ownership of the app directory
 RUN chown -R nestjs:nodejs /app
+
+# whisper.cpp binary + multilingual base model, baked into the image (no
+# runtime download)
+COPY --from=whisper-builder /opt/whisper.cpp/build/bin/whisper-cli /opt/whisper.cpp/build/bin/whisper-cli
+COPY --from=whisper-builder /opt/whisper.cpp/models/ggml-base.bin /opt/whisper.cpp/models/ggml-base.bin
+
 USER nestjs
 
 # Copy production dependencies from builder stage
@@ -45,8 +64,8 @@ COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 # Copy package.json for metadata
 COPY --from=builder --chown=nestjs:nodejs /app/package.json ./
 
-# Create uploads directory
-RUN mkdir -p uploads/voice-notes
+# Create uploads directories
+RUN mkdir -p uploads/voice-notes uploads/sleep-recordings
 
 # Expose default local port. Render injects PORT at runtime.
 EXPOSE 3000
