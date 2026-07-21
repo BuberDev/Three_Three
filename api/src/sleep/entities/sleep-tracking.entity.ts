@@ -16,6 +16,13 @@ export enum SnoringIntensity {
     HEAVY = 'heavy',
 }
 
+export enum SleepProcessingStatus {
+    PENDING = 'pending',
+    PROCESSING = 'processing',
+    COMPLETED = 'completed',
+    FAILED = 'failed',
+}
+
 @Entity('sleep_tracking')
 @Index(['userId', 'sleepDate'], { unique: true })
 @Index(['sleepQualityScore'])
@@ -86,6 +93,17 @@ export class SleepTracking extends BaseEntity {
         averageHeartRate?: number;
         oxygenSaturation?: number;
     };
+
+    @Column({
+        name: 'processing_status',
+        type: 'varchar',
+        length: 20,
+        default: SleepProcessingStatus.PENDING,
+    })
+    processingStatus: SleepProcessingStatus;
+
+    @Column({ name: 'processing_error', type: 'text', nullable: true })
+    processingError?: string;
 
     // Relations
     @ManyToOne(() => User, (user) => user.sleepSessions, {
