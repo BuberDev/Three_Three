@@ -17,6 +17,7 @@ import {
     ApiResponse,
     ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response } from 'express';
 import { CreateUserDto } from '../users/dto/create-user.dto';
 import { User } from '../users/entities/user.entity';
@@ -36,6 +37,7 @@ export class AuthController {
     constructor(private readonly authService: AuthService) { }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @Post('register')
     @ApiOperation({ summary: 'Register a new user' })
     @ApiResponse({
@@ -56,6 +58,7 @@ export class AuthController {
     }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @UseGuards(LocalAuthGuard)
     @Post('login')
     @HttpCode(HttpStatus.OK)
@@ -78,6 +81,7 @@ export class AuthController {
     }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @Post('google/mobile')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Authenticate native mobile Google sign-in' })
@@ -94,6 +98,7 @@ export class AuthController {
     }
 
     @Public()
+    @Throttle({ default: { limit: 10, ttl: 60000 } })
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
     @ApiOperation({ summary: 'Refresh access token' })

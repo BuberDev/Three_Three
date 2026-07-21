@@ -98,10 +98,13 @@ async function bootstrap() {
         rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
             max: 3000, // limit each IP to 3000 requests per windowMs — this is
-            // coarse DDoS-level protection; per-route throttling happens in
-            // ThrottlerModule (app.module.ts). 100 was exhausted by a single
-            // user's normal navigation within minutes (multiple tabs mounted
-            // at once, each firing several parallel dashboard calls).
+            // coarse DDoS-level protection. Per-route throttling is enforced
+            // by ThrottlerGuard (registered as a global APP_GUARD in
+            // app.module.ts), with tighter @Throttle() overrides on the
+            // auth endpoints (auth.controller.ts) for brute-force
+            // resistance. 100 here was exhausted by a single user's normal
+            // navigation within minutes (multiple tabs mounted at once,
+            // each firing several parallel dashboard calls).
         }),
     );
 
