@@ -24,7 +24,10 @@ RUN npm prune --production
 # no external API calls; see docs/superpowers/specs/2026-07-21-real-audio-transcription-design.md)
 FROM node:18-alpine AS whisper-builder
 
-RUN apk add --no-cache build-base git cmake
+# wget explicitly, not just relying on busybox's built-in applet — the
+# model-download script below uses `wget --no-config`, a flag busybox's
+# minimal wget doesn't support ("wget: unrecognized option: no-config").
+RUN apk add --no-cache build-base git cmake wget
 
 WORKDIR /opt
 RUN git clone --depth 1 --branch v1.9.1 https://github.com/ggml-org/whisper.cpp.git
