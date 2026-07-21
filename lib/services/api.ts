@@ -277,7 +277,9 @@ export class ApiService {
                 fileSize: fileInfo.exists && (fileInfo as any).size ? (fileInfo as any).size : 0
             });
 
-            if (duration !== undefined) formData.append('duration', duration.toString());
+            // `duration` arrives in milliseconds (AudioService.getRecordingDuration()),
+            // but the backend stores/expects seconds (CreateVoiceNoteDto.duration).
+            if (duration !== undefined) formData.append('duration', (duration / 1000).toString());
             if (title) formData.append('title', title);
             if (tags && tags.length > 0) {
                 formData.append('tags', JSON.stringify(tags));

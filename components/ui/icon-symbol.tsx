@@ -99,6 +99,14 @@ const MAPPING: IconMapping = {
   'minus': 'minus',
   'checklist': 'checkbox-marked-circle-outline',
   'circle.lefthalf.filled': 'theme-light-dark',
+  // Added after being found unmapped (silently rendering "?") in the voice
+  // notes playback list, AI Lab beta tab, habit category config, and
+  // onboarding consent screen:
+  'play.fill': 'play',
+  'stop.fill': 'stop',
+  'clock.fill': 'clock',
+  'flask.fill': 'flask',
+  'shield.fill': 'shield',
 };
 
 /**
