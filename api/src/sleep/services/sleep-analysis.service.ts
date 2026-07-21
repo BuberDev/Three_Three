@@ -3,13 +3,13 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { OpenAI } from 'openai';
 import { Repository } from 'typeorm';
+import { AudioTranscriptionService } from '../../audio-transcription/audio-transcription.service';
 import { SleepEvent, SleepEventIntensity, SleepEventType } from '../entities/sleep-event.entity';
 
 interface AudioSegment {
     startTime: number; // seconds
     endTime: number; // seconds
-    audioData: ArrayBuffer;
-    volume: number;
+    avgVolumeDb: number; // real mean volume from ffmpeg's volumedetect filter
 }
 
 interface AudioAnalysisResult {
@@ -34,6 +34,7 @@ export class SleepAnalysisService {
         @InjectRepository(SleepEvent)
         private sleepEventsRepository: Repository<SleepEvent>,
         private configService: ConfigService,
+        private readonly audioTranscriptionService: AudioTranscriptionService,
     ) {
         this.ollamaModel = this.configService.get<string>('app.ollama.model');
         this.ollama = new OpenAI({
@@ -85,9 +86,9 @@ export class SleepAnalysisService {
             // 4. Calculate overall metrics
             const analysis = this.calculateOverallMetrics(allEvents, recordingDurationMs);
 
-            // 5. Save events to database
-            await this.saveEventsToDatabase(sleepTrackingId, allEvents);
-
+            // Persisting events/metrics is the caller's responsibility
+            // (SleepTrackingService.applyAnalysisResults) — this service only
+            // computes the analysis.
             this.logger.log(`Sleep analysis completed. Found ${allEvents.length} events`);
 
             return analysis;
@@ -101,25 +102,13 @@ export class SleepAnalysisService {
     /**
      * Segment audio into 30-second chunks for analysis
      */
-    private async segmentAudio(audioFilePath: string, durationMs: number): Promise<AudioSegment[]> {
-        const segments: AudioSegment[] = [];
-        const segmentDurationMs = 30 * 1000; // 30 seconds
-
-        // This is a simplified version - in production you'd use FFmpeg or similar
-        // For now, create logical segments
-        for (let i = 0; i < durationMs; i += segmentDurationMs) {
-            const startTime = i / 1000;
-            const endTime = Math.min((i + segmentDurationMs) / 1000, durationMs / 1000);
-
-            segments.push({
-                startTime,
-                endTime,
-                audioData: new ArrayBuffer(0), // Placeholder
-                volume: Math.random() * 100, // Placeholder - would be calculated from actual audio
-            });
-        }
-
-        return segments;
+    private async segmentAudio(audioFilePath: string, _durationMs: number): Promise<AudioSegment[]> {
+        const volumeSegments = await this.audioTranscriptionService.analyzeVolumeSegments(audioFilePath, 30);
+        return volumeSegments.map((s) => ({
+            startTime: s.startTime,
+            endTime: s.endTime,
+            avgVolumeDb: s.avgVolumeDb,
+        }));
     }
 
     /**
@@ -131,15 +120,17 @@ export class SleepAnalysisService {
         segmentIndex: number,
     ): Promise<Omit<SleepEvent, 'id' | 'createdAt' | 'updatedAt' | 'sleepTracking'>[]> {
         const events: Omit<SleepEvent, 'id' | 'createdAt' | 'updatedAt' | 'sleepTracking'>[] = [];
-
-        // Analyze volume patterns to detect different events
-        const avgVolume = segment.volume;
+        const avgVolumeDb = segment.avgVolumeDb;
         const segmentDuration = segment.endTime - segment.startTime;
 
-        // Snoring detection (based on volume patterns and frequency)
-        if (avgVolume > 40 && segmentIndex % 3 === 0) { // Simulate snoring detection
-            const intensity = avgVolume > 70 ? SleepEventIntensity.HIGH :
-                avgVolume > 50 ? SleepEventIntensity.MODERATE :
+        // Real audio, simple heuristic thresholds (not ML, not clinically
+        // validated — see docs/superpowers/specs/2026-07-21-real-audio-transcription-design.md).
+        // Snoring: moderately loud, sustained low-frequency-ish rumble —
+        // approximated here by a mid volume band without the sharper energy
+        // of speech.
+        if (avgVolumeDb > -35 && avgVolumeDb <= -15) {
+            const intensity = avgVolumeDb > -22 ? SleepEventIntensity.HIGH :
+                avgVolumeDb > -28 ? SleepEventIntensity.MODERATE :
                     SleepEventIntensity.LOW;
 
             events.push({
@@ -148,49 +139,49 @@ export class SleepAnalysisService {
                 eventType: SleepEventType.SNORING,
                 intensity,
                 durationSeconds: segmentDuration,
-                confidenceScore: 0.8 + (Math.random() * 0.2),
+                confidenceScore: 0.6,
                 audioSegmentStart: segment.startTime,
                 audioSegmentEnd: segment.endTime,
                 details: {
-                    volume: avgVolume,
+                    volume: avgVolumeDb,
                     pattern: intensity === SleepEventIntensity.HIGH ? 'irregular' : 'regular',
-                    frequency: 20 + (Math.random() * 30), // Hz
                 },
             });
         }
 
-        // Sleep talking detection (higher volume spikes with speech patterns)
-        if (avgVolume > 60 && segmentIndex % 7 === 0) { // Simulate sleep talking
+        // Sleep talking: the loudest, sharpest volume spikes — most likely
+        // to be actual speech rather than snoring/breathing.
+        if (avgVolumeDb > -15) {
             events.push({
                 sleepTrackingId,
                 eventTime: new Date(Date.now() - (segmentIndex * 30000)),
                 eventType: SleepEventType.SLEEP_TALKING,
                 intensity: SleepEventIntensity.MODERATE,
-                durationSeconds: Math.min(segmentDuration, 5 + Math.random() * 10),
-                confidenceScore: 0.7 + (Math.random() * 0.2),
+                durationSeconds: segmentDuration,
+                confidenceScore: 0.6,
                 audioSegmentStart: segment.startTime,
                 audioSegmentEnd: segment.endTime,
                 details: {
-                    volume: avgVolume,
-                    words_detected: ['hmm', 'nie', 'tak'], // Placeholder
+                    volume: avgVolumeDb,
                 },
             });
         }
 
-        // Movement detection (sudden volume changes)
-        if (segmentIndex > 0 && Math.random() < 0.1) { // 10% chance of movement
+        // Movement: brief, moderate volume that isn't sustained enough to be
+        // snoring or speech — approximated by a quieter band than both.
+        if (avgVolumeDb > -50 && avgVolumeDb <= -35) {
             events.push({
                 sleepTrackingId,
                 eventTime: new Date(Date.now() - (segmentIndex * 30000)),
                 eventType: SleepEventType.MOVEMENT,
                 intensity: SleepEventIntensity.LOW,
-                durationSeconds: 2 + Math.random() * 5,
-                confidenceScore: 0.6 + (Math.random() * 0.3),
+                durationSeconds: Math.min(segmentDuration, 5),
+                confidenceScore: 0.5,
                 audioSegmentStart: segment.startTime,
                 audioSegmentEnd: segment.endTime,
                 details: {
                     movement_type: 'position_change',
-                    volume: avgVolume,
+                    volume: avgVolumeDb,
                 },
             });
         }
@@ -206,31 +197,18 @@ export class SleepAnalysisService {
         startTime: number,
         endTime: number,
     ): Promise<string> {
+        let segmentPath: string | null = null;
         try {
-            // In production, you'd extract the audio segment and send to Whisper
-            // For now, return placeholder transcriptions
-            const placeholderTranscriptions = [
-                'mmm... nie...',
-                'gdzie jest...',
-                'tak, tak...',
-                'nie chcę...',
-                'już późno...',
-                'hmm... dobrze...',
-            ];
-
-            return placeholderTranscriptions[Math.floor(Math.random() * placeholderTranscriptions.length)];
-
-            // Real implementation would be:
-            // const transcription = await this.openai.audio.transcriptions.create({
-            //     file: fs.createReadStream(segmentPath),
-            //     model: 'whisper-1',
-            //     language: 'pl',
-            // });
-            // return transcription.text;
-
+            segmentPath = await this.audioTranscriptionService.extractSegment(audioFilePath, startTime, endTime);
+            return await this.audioTranscriptionService.transcribe(segmentPath, 'pl');
         } catch (error) {
             this.logger.warn(`Transcription failed: ${error.message}`);
             return '';
+        } finally {
+            if (segmentPath) {
+                const fs = await import('fs/promises');
+                await fs.unlink(segmentPath).catch(() => undefined);
+            }
         }
     }
 
@@ -311,26 +289,6 @@ export class SleepAnalysisService {
                 durationAnalyzed: durationMs,
             },
         };
-    }
-
-    /**
-     * Save events to database
-     */
-    private async saveEventsToDatabase(
-        sleepTrackingId: string,
-        events: Omit<SleepEvent, 'id' | 'createdAt' | 'updatedAt' | 'sleepTracking'>[],
-    ): Promise<void> {
-        if (events.length === 0) return;
-
-        const sleepEvents = events.map(eventData =>
-            this.sleepEventsRepository.create({
-                ...eventData,
-                sleepTrackingId,
-            })
-        );
-
-        await this.sleepEventsRepository.save(sleepEvents);
-        this.logger.log(`Saved ${sleepEvents.length} sleep events to database`);
     }
 
     /**
