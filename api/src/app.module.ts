@@ -144,7 +144,7 @@ import { VoiceNote } from './voice-notes/entities/voice-note.entity';
             imports: [ConfigModule],
             useFactory: (configService: ConfigService) => [{
                 ttl: configService.get('app.rateLimitTtl') || 60000,
-                limit: configService.get('app.rateLimitMax') || 10,
+                limit: configService.get('app.rateLimitMax') || 300,
             }],
             inject: [ConfigService],
         }),

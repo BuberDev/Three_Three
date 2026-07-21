@@ -8,6 +8,13 @@ export default registerAs('app', () => ({
     jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
     jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
 
+    // A single screen mount fires several parallel calls (tasks, activities,
+    // daily metrics, progress metrics, recommendations), and the mobile app
+    // keeps multiple tabs mounted at once — a per-request-style limit here
+    // gets exhausted by completely normal navigation, not just abuse.
+    rateLimitTtl: parseInt(process.env.RATE_LIMIT_TTL_MS, 10) || 60000,
+    rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX, 10) || 300,
+
     // AWS S3 Configuration
     aws: {
         region: process.env.AWS_REGION || 'us-east-1',

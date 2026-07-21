@@ -97,7 +97,11 @@ async function bootstrap() {
     app.use(
         rateLimit({
             windowMs: 15 * 60 * 1000, // 15 minutes
-            max: 100, // limit each IP to 100 requests per windowMs
+            max: 3000, // limit each IP to 3000 requests per windowMs — this is
+            // coarse DDoS-level protection; per-route throttling happens in
+            // ThrottlerModule (app.module.ts). 100 was exhausted by a single
+            // user's normal navigation within minutes (multiple tabs mounted
+            // at once, each firing several parallel dashboard calls).
         }),
     );
 
