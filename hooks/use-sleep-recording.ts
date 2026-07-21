@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { AudioService } from '../lib/services/audio';
-import { ApiService, unwrapApiEnvelope } from '../lib/services/api';
+import { ApiService } from '../lib/services/api';
 import { getApiUrl } from '../lib/utils/config';
 import { useAppStore } from '../stores/app-store';
 
@@ -194,44 +194,43 @@ async function processSleepRecording(recording: any): Promise<SleepAnalysis> {
     try {
         const authToken = ApiService.getInstance().getAuthToken();
 
-        // Call the backend API for real AI analysis
+        const formData = new FormData();
+        formData.append('audio', {
+            uri: recording.uri,
+            type: 'audio/m4a',
+            name: 'sleep_recording.m4a',
+        } as any);
+        formData.append('bedtime', new Date(recording.startTime || Date.now() - recording.duration).toISOString());
+        formData.append('wakeTime', new Date().toISOString());
+
+        // Call the backend API for real AI analysis — audio is now actually
+        // uploaded (previously this sent recording.uri, a local device path,
+        // as a JSON string field; the server never received any audio).
         const response = await fetch(`${getApiUrl()}/api/sleep-tracking/process-audio`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+                // Don't set Content-Type - let fetch set it with the multipart boundary
             },
-            body: JSON.stringify({
-                audioFilePath: recording.uri,
-                bedtime: new Date(recording.startTime || Date.now() - recording.duration).toISOString(),
-                wakeTime: new Date().toISOString(),
-            }),
+            body: formData,
         });
 
         if (!response.ok) {
             throw new Error(`API call failed: ${response.statusText}`);
         }
 
-        const sleepRecord = unwrapApiEnvelope<any>(await response.json());
+        await response.json();
 
-        // Transform API response to match our SleepAnalysis interface
+        // Analysis runs async on the server now (it can take a while for a
+        // full night's recording) — this just confirms the upload succeeded.
+        // The real results populate sleepRecord.snoringDetected etc. later;
+        // callers should re-fetch via getSleepInsights / findLatest once
+        // processingStatus is 'completed'.
         return {
-            snoringEvents: sleepRecord.snoringDetected ? [
-                {
-                    timestamp: new Date(sleepRecord.recordingStartTime),
-                    duration: 30,
-                    intensity: sleepRecord.snoringIntensity.toLowerCase(),
-                }
-            ] : [],
-            sleepTalkingEvents: sleepRecord.sleepTalkingDetected ? [
-                {
-                    timestamp: new Date(sleepRecord.recordingStartTime),
-                    transcript: 'Sleep talking detected',
-                    confidence: 0.8,
-                }
-            ] : [],
+            snoringEvents: [],
+            sleepTalkingEvents: [],
             totalSleepDuration: recording.duration,
-            sleepQuality: sleepRecord.sleepQualityScore || 5,
+            sleepQuality: 0,
         };
 
     } catch (error) {
