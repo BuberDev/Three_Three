@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AppState } from 'react-native';
 import { AudioService } from '../lib/services/audio';
+import { ApiService, unwrapApiEnvelope } from '../lib/services/api';
+import { getApiUrl } from '../lib/utils/config';
 import { useAppStore } from '../stores/app-store';
 
 interface SleepRecordingConfig {
@@ -28,7 +30,7 @@ interface SleepAnalysis {
 
 export const useSleepRecording = () => {
     const audioService = AudioService.getInstance();
-    const { uploadSleepRecording, setError } = useAppStore();
+    const { setError } = useAppStore();
 
     const [isRecordingEnabled, setIsRecordingEnabled] = useState(false);
     const [currentRecording, setCurrentRecording] = useState<any>(null);
@@ -110,11 +112,9 @@ export const useSleepRecording = () => {
                 return null;
             }
 
-            // Process the recording for sleep analysis
+            // Process the recording for sleep analysis — the backend persists
+            // the resulting SleepTracking record itself, no separate upload step needed.
             const sleepAnalysis = await processSleepRecording(recording);
-
-            // Upload to server for further analysis
-            await uploadSleepRecording(sleepAnalysis);
 
             return sleepAnalysis;
         } catch (error) {
@@ -122,7 +122,7 @@ export const useSleepRecording = () => {
             setError(error instanceof Error ? error.message : 'Failed to stop sleep recording');
             return null;
         }
-    }, [audioService, uploadSleepRecording, setError]);
+    }, [audioService, setError]);
 
     const getCurrentSleepSession = useCallback(async (): Promise<{
         duration: number;
@@ -192,12 +192,14 @@ function isCurrentlyNightTime(): boolean {
 
 async function processSleepRecording(recording: any): Promise<SleepAnalysis> {
     try {
+        const authToken = ApiService.getInstance().getAuthToken();
+
         // Call the backend API for real AI analysis
-        const response = await fetch('/api/sleep-tracking/process-audio', {
+        const response = await fetch(`${getApiUrl()}/api/sleep-tracking/process-audio`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                // Add authorization header if needed
+                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
             },
             body: JSON.stringify({
                 audioFilePath: recording.uri,
@@ -210,7 +212,7 @@ async function processSleepRecording(recording: any): Promise<SleepAnalysis> {
             throw new Error(`API call failed: ${response.statusText}`);
         }
 
-        const sleepRecord = await response.json();
+        const sleepRecord = unwrapApiEnvelope<any>(await response.json());
 
         // Transform API response to match our SleepAnalysis interface
         return {

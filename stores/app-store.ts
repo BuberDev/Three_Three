@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { DatabaseService } from '../lib/database/database';
-import { ApiService } from '../lib/services/api';
+import { ApiService, unwrapApiEnvelope } from '../lib/services/api';
 import { AudioService } from '../lib/services/audio';
 import { EventService } from '../lib/services/event';
 import { HabitsService } from '../lib/services/habits-service';
@@ -129,7 +129,6 @@ interface AppStore {
     setProcessingVoiceNote: (processing: boolean) => void;
     uploadVoiceNote: (audioUri: string, duration?: number) => Promise<boolean>;
     uploadVoiceNoteWithContext: (audioUri: string, context?: string) => Promise<boolean>;
-    uploadSleepRecording: (sleepData: any) => Promise<boolean>;
     getSleepInsights: (sleepTrackingId: string) => Promise<any>;
 
     // 🏢 ENTERPRISE Voice Recording Functions
@@ -1116,36 +1115,6 @@ export const useAppStore = create<AppStore>()(
                 }
             },
 
-            uploadSleepRecording: async (sleepData: any) => {
-                const { user, setError, setLoading } = get();
-                if (!user) {
-                    setError('User not authenticated');
-                    return false;
-                }
-
-                try {
-                    setLoading(true);
-                    console.log('Uploading sleep recording data:', sleepData);
-
-                    // Here you would typically upload to your API
-                    // For now, just save locally and return success
-                    console.log('Sleep data would be saved locally:', sleepData);
-
-                    // TODO: Implement proper database save when sleep_sessions table is created
-                    // const dbService = DatabaseService.getInstance();
-                    // await dbService.saveSleepSession(sleepData);
-
-                    console.log('Sleep recording data saved successfully');
-                    return true;
-                } catch (error) {
-                    console.error('Upload sleep recording error:', error);
-                    setError(error instanceof Error ? error.message : 'Upload failed');
-                    return false;
-                } finally {
-                    setLoading(false);
-                }
-            },
-
             getSleepInsights: async (sleepTrackingId: string) => {
                 const { user, setError, setLoading } = get();
                 if (!user) {
@@ -1169,7 +1138,7 @@ export const useAppStore = create<AppStore>()(
                         throw new Error(`Failed to fetch sleep insights: ${response.statusText}`);
                     }
 
-                    const insights = await response.json();
+                    const insights = unwrapApiEnvelope<any>(await response.json());
                     console.log('✨ Sleep insights received:', insights);
 
                     return insights;
