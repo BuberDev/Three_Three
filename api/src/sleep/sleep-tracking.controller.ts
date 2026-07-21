@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Delete,
@@ -8,10 +9,15 @@ import {
     Patch,
     Post,
     Query,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
     ApiBearerAuth,
+    ApiBody,
+    ApiConsumes,
     ApiOperation,
     ApiParam,
     ApiQuery,
@@ -22,6 +28,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { User } from '../users/entities/user.entity';
 import { CreateSleepTrackingDto } from './dto/create-sleep-tracking.dto';
+import { ProcessSleepAudioDto } from './dto/process-sleep-audio.dto';
 import { UpdateSleepTrackingDto } from './dto/update-sleep-tracking.dto';
 import { SleepTracking } from './entities/sleep-tracking.entity';
 import { SleepTrackingService } from './sleep-tracking.service';
@@ -240,23 +247,54 @@ export class SleepTrackingController {
     }
 
     @Post('process-audio')
-    @ApiOperation({ summary: 'Process nocturnal audio recording with AI analysis' })
+    @UseInterceptors(
+        FileInterceptor('audio', {
+            limits: {
+                fileSize: 1024 * 1024 * 1024, // 1GB — a full night can run large at even modest bitrates
+            },
+            fileFilter: (req, file, cb) => {
+                const allowedMimeTypes = [
+                    'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/aac',
+                    'audio/m4a', 'audio/x-m4a', 'audio/mp4', 'audio/flac',
+                    'audio/ogg', 'audio/webm', 'application/octet-stream',
+                ];
+                if (allowedMimeTypes.includes(file.mimetype)) {
+                    cb(null, true);
+                } else {
+                    cb(new BadRequestException('Invalid audio file format'), false);
+                }
+            },
+        }),
+    )
+    @ApiOperation({ summary: 'Upload a nocturnal audio recording for AI analysis' })
+    @ApiConsumes('multipart/form-data')
+    @ApiBody({
+        schema: {
+            type: 'object',
+            properties: {
+                audio: { type: 'string', format: 'binary' },
+                bedtime: { type: 'string' },
+                wakeTime: { type: 'string' },
+            },
+            required: ['audio', 'bedtime', 'wakeTime'],
+        },
+    })
     @ApiResponse({
         status: 201,
-        description: 'Audio processed and sleep record created successfully',
+        description: 'Recording accepted and queued for analysis (processingStatus: pending)',
         type: SleepTracking,
     })
     async processAudio(
         @CurrentUser() user: User,
-        @Body() processAudioDto: {
-            audioFilePath: string;
-            bedtime: string;
-            wakeTime: string;
-        },
+        @Body() processAudioDto: ProcessSleepAudioDto,
+        @UploadedFile() audioFile: Express.Multer.File,
     ): Promise<SleepTracking> {
-        return this.sleepTrackingService.processNocurnalAudio(
+        if (!audioFile) {
+            throw new BadRequestException('Audio file is required');
+        }
+        return this.sleepTrackingService.createPendingRecordAndQueue(
             user.id,
-            processAudioDto.audioFilePath,
+            audioFile,
             processAudioDto.bedtime,
             processAudioDto.wakeTime,
         );

@@ -1,3 +1,4 @@
+import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DailyActivity } from '../activities/entities/daily-activity.entity';
@@ -16,7 +17,10 @@ import { SleepTrackingService } from './sleep-tracking.service';
             SleepEvent,
             VoiceNote,
             DailyActivity
-        ])
+        ]),
+        BullModule.registerQueue({
+            name: 'sleep-processing',
+        }),
     ],
     controllers: [SleepTrackingController],
     providers: [

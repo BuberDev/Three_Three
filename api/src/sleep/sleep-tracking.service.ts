@@ -1,10 +1,15 @@
+import { InjectQueue } from '@nestjs/bull';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Queue } from 'bull';
+import { randomUUID as uuidv4 } from 'crypto';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { Between, FindManyOptions, Repository } from 'typeorm';
 import { CreateSleepTrackingDto } from './dto/create-sleep-tracking.dto';
 import { UpdateSleepTrackingDto } from './dto/update-sleep-tracking.dto';
 import { SleepEvent } from './entities/sleep-event.entity';
-import { SleepTracking, SnoringIntensity } from './entities/sleep-tracking.entity';
+import { SleepProcessingStatus, SleepTracking, SnoringIntensity } from './entities/sleep-tracking.entity';
 import { SleepAnalysisService } from './services/sleep-analysis.service';
 import { SleepCorrelationService } from './services/sleep-correlation.service';
 
@@ -19,6 +24,8 @@ export class SleepTrackingService {
         private readonly sleepEventRepository: Repository<SleepEvent>,
         private readonly sleepAnalysisService: SleepAnalysisService,
         private readonly sleepCorrelationService: SleepCorrelationService,
+        @InjectQueue('sleep-processing')
+        private readonly sleepProcessingQueue: Queue,
     ) { }
 
     async create(
@@ -61,9 +68,9 @@ export class SleepTrackingService {
         });
     }
 
-    async findById(id: string, userId: string): Promise<SleepTracking> {
+    async findById(id: string, userId?: string): Promise<SleepTracking> {
         const sleepRecord = await this.sleepTrackingRepository.findOne({
-            where: { id, userId },
+            where: userId ? { id, userId } : { id },
         });
 
         if (!sleepRecord) {
@@ -153,70 +160,101 @@ export class SleepTrackingService {
     }
 
     /**
-     * Process nocturnal audio with real AI analysis (replaces old mock method)
+     * Saves the uploaded recording, creates a pending SleepTracking record,
+     * and queues it for async analysis (see SleepProcessingProcessor).
+     * Mirrors VoiceNotesService.create()'s upload-then-queue pattern.
      */
-    async processNocurnalAudio(
+    async createPendingRecordAndQueue(
         userId: string,
-        audioFilePath: string,
+        audioFile: Express.Multer.File,
         bedtime: string,
         wakeTime: string,
     ): Promise<SleepTracking> {
-        this.logger.log(`Starting AI analysis for nocturnal audio: ${audioFilePath}`);
+        const uploadsDir = path.join(process.cwd(), 'uploads', 'sleep-recordings');
+        await fs.mkdir(uploadsDir, { recursive: true });
 
-        try {
-            // 1. Calculate basic sleep metrics
-            const sleepDurationHours = Math.round(
-                (new Date(wakeTime).getTime() - new Date(bedtime).getTime()) / (1000 * 60 * 60) * 10
-            ) / 10;
+        const fileExtension = path.extname(audioFile.originalname) || '.m4a';
+        const fileName = `${uuidv4()}${fileExtension}`;
+        const filePath = path.join(uploadsDir, fileName);
 
-            // 2. Perform real audio analysis
-            const analysisResult = await this.sleepAnalysisService.analyzeSleepAudio(
-                'temp-id', // Will be replaced when sleep record is created
-                audioFilePath,
-                sleepDurationHours * 60 * 60 * 1000, // Convert hours to milliseconds
+        await fs.writeFile(filePath, audioFile.buffer);
+
+        const sleepDurationHours = Math.round(
+            (new Date(wakeTime).getTime() - new Date(bedtime).getTime()) / (1000 * 60 * 60) * 10
+        ) / 10;
+
+        const sleepRecord = await this.create(userId, {
+            sleepDate: new Date().toISOString().split('T')[0],
+            recordingStartTime: bedtime,
+            recordingEndTime: wakeTime,
+            sleepDurationHours,
+            audioFiles: [{
+                url: filePath,
+                duration: sleepDurationHours * 60,
+                segment: 1,
+                size: audioFile.size,
+            }],
+        });
+
+        await this.sleepTrackingRepository.update(sleepRecord.id, {
+            processingStatus: SleepProcessingStatus.PENDING,
+        });
+        sleepRecord.processingStatus = SleepProcessingStatus.PENDING;
+
+        this.sleepProcessingQueue.add('process-sleep-audio', {
+            sleepTrackingId: sleepRecord.id,
+            audioFilePath: filePath,
+        }).catch((error) => {
+            this.logger.error(`Failed to queue sleep recording ${sleepRecord.id} for processing:`, error);
+        });
+
+        return sleepRecord;
+    }
+
+    /**
+     * Writes real analysis results onto an existing (pending) SleepTracking
+     * record and saves its SleepEvents. Called by SleepProcessingProcessor
+     * after AI analysis completes.
+     */
+    async applyAnalysisResults(
+        sleepTrackingId: string,
+        analysisResult: {
+            snoringDetected: boolean;
+            snoringIntensity: SnoringIntensity;
+            sleepTalkingDetected: boolean;
+            sleepTalkingFrequency: number;
+            sleepQualityScore: number;
+            awakeningsCount: number;
+            sleepEfficiency: number;
+            analysisMetadata: any;
+            events: Omit<SleepEvent, 'id' | 'createdAt' | 'updatedAt' | 'sleepTracking'>[];
+        },
+    ): Promise<void> {
+        await this.sleepTrackingRepository.update(sleepTrackingId, {
+            snoringDetected: analysisResult.snoringDetected,
+            snoringIntensity: analysisResult.snoringIntensity,
+            sleepTalkingDetected: analysisResult.sleepTalkingDetected,
+            sleepTalkingFrequency: analysisResult.sleepTalkingFrequency,
+            sleepQualityScore: analysisResult.sleepQualityScore,
+            awakeningsCount: analysisResult.awakeningsCount,
+            sleepEfficiency: analysisResult.sleepEfficiency,
+            analysisMetadata: analysisResult.analysisMetadata,
+            processingStatus: SleepProcessingStatus.COMPLETED,
+        });
+
+        if (analysisResult.events.length > 0) {
+            const sleepEvents = analysisResult.events.map((event) =>
+                this.sleepEventRepository.create({ ...event, sleepTrackingId }),
             );
-
-            // 3. Create sleep record with analysis results
-            const sleepRecord = await this.create(userId, {
-                sleepDate: new Date().toISOString().split('T')[0],
-                recordingStartTime: bedtime,
-                recordingEndTime: wakeTime,
-                sleepDurationHours,
-                audioFiles: [{
-                    url: audioFilePath,
-                    duration: sleepDurationHours * 60,
-                    segment: 1,
-                    size: 0
-                }],
-                snoringDetected: analysisResult.snoringDetected,
-                snoringIntensity: analysisResult.snoringIntensity,
-                sleepTalkingDetected: analysisResult.sleepTalkingDetected,
-                sleepTalkingFrequency: analysisResult.sleepTalkingFrequency,
-                sleepQualityScore: analysisResult.sleepQualityScore,
-                awakeningsCount: analysisResult.awakeningsCount,
-                sleepEfficiency: analysisResult.sleepEfficiency,
-                analysisMetadata: analysisResult.analysisMetadata,
-            });
-
-            // 4. Save sleep events detected in analysis
-            if (analysisResult.events && analysisResult.events.length > 0) {
-                const sleepEvents = analysisResult.events.map(event =>
-                    this.sleepEventRepository.create({
-                        ...event,
-                        sleepTrackingId: sleepRecord.id,
-                    })
-                );
-                await this.sleepEventRepository.save(sleepEvents);
-            }
-
-            this.logger.log(`Sleep analysis completed. Quality: ${analysisResult.sleepQualityScore}/10`);
-            return sleepRecord;
-
-        } catch (error) {
-            this.logger.error(`Sleep audio analysis failed: ${error.message}`, error.stack);
-            // Fallback to basic record without AI analysis
-            return this.createBasicSleepRecord(userId, audioFilePath, bedtime, wakeTime);
+            await this.sleepEventRepository.save(sleepEvents);
         }
+    }
+
+    async markProcessingFailed(sleepTrackingId: string, errorMessage: string): Promise<void> {
+        await this.sleepTrackingRepository.update(sleepTrackingId, {
+            processingStatus: SleepProcessingStatus.FAILED,
+            processingError: errorMessage,
+        });
     }
 
     /**
@@ -239,9 +277,10 @@ export class SleepTrackingService {
     }
 
     /**
-     * Fallback method for basic sleep record creation
+     * Fallback method for basic sleep record creation — used when real
+     * analysis fails (called by SleepProcessingProcessor).
      */
-    private async createBasicSleepRecord(
+    async createBasicSleepRecord(
         userId: string,
         audioFilePath: string,
         bedtime: string,
