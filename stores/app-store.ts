@@ -969,8 +969,10 @@ export const useAppStore = create<AppStore>()(
                     if (response.success && response.data) {
                         console.log('✅ Voice note uploaded successfully!');
 
-                        // Backend response structure: response.data.data.data contains the voice note
-                        const voiceNoteData = (response.data as any)?.data?.data;
+                        // ApiService.uploadVoiceNote() already runs the response through
+                        // unwrapApiEnvelope(), so response.data is the VoiceNote itself —
+                        // no further .data drilling needed.
+                        const voiceNoteData = response.data as any;
                         console.log('🔍 Voice note object structure:', {
                             id: voiceNoteData?.id,
                             userId: voiceNoteData?.userId,
