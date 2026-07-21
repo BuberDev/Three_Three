@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, Repository } from 'typeorm';
 import { DailyActivity } from '../../activities/entities/daily-activity.entity';
 import { JournalEntry } from '../../journal/entities/journal-entry.entity';
 import { SleepTracking } from '../../sleep/entities/sleep-tracking.entity';
@@ -413,10 +413,7 @@ export class AnalyticsService {
         return this.journalEntryRepository.find({
             where: {
                 userId,
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay,
-                } as any,
+                createdAt: Between(startOfDay, endOfDay),
             },
         });
     }
@@ -428,10 +425,7 @@ export class AnalyticsService {
         return this.voiceNoteRepository.find({
             where: {
                 userId,
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay,
-                } as any,
+                createdAt: Between(startOfDay, endOfDay),
             },
         });
     }
