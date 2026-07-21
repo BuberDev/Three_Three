@@ -1,6 +1,6 @@
 import LinearGradient from 'react-native-linear-gradient';
 import React from 'react';
-import { Alert, RefreshControl, ScrollView, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CompactStats } from '@/components/compact-stats';
@@ -40,6 +40,8 @@ export default function HomeScreen() {
     generatePersonalizedRecommendations
   } = useAppStore();
 
+  const [quickActionsRowWidth, setQuickActionsRowWidth] = React.useState(0);
+  const quickActionsColumnWidth = quickActionsRowWidth > 0 ? (quickActionsRowWidth - 8) / 2 : 150;
   const [refreshing, setRefreshing] = React.useState(false);
   const [showQuickActivityModal, setShowQuickActivityModal] = React.useState(false);
   const [showAddTaskModal, setShowAddTaskModal] = React.useState(false);
@@ -183,6 +185,8 @@ export default function HomeScreen() {
             start={DesignSystem.gradients.primary.start}
             end={DesignSystem.gradients.primary.end}
             style={{
+              width: '100%',
+              alignSelf: 'stretch',
               marginTop: DesignSystem.spacing.lg,
               borderRadius: DesignSystem.borderRadius['2xl'],
               padding: DesignSystem.spacing.xl,
@@ -258,71 +262,30 @@ export default function HomeScreen() {
             {/* Stats Row */}
             <View style={{
               flexDirection: 'row',
-              justifyContent: 'space-between',
-              gap: DesignSystem.spacing.sm,
             }}>
-              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
-                <ThemedText
-                  variant="titleMedium"
-                  lightColor="white"
-                  darkColor="white"
-                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
-                >
+              <View style={{ width: 100, alignItems: 'center', marginRight: 8 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
                   {getProductivityScore()}
-                </ThemedText>
-                <ThemedText
-                  variant="bodySmall"
-                  lightColor="rgba(255,255,255,0.8)"
-                  darkColor="rgba(255,255,255,0.8)"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  style={{ textAlign: 'center' }}
-                >
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, marginTop: 4 }}>
                   Produktywność
-                </ThemedText>
+                </Text>
               </View>
-              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
-                <ThemedText
-                  variant="titleMedium"
-                  lightColor="white"
-                  darkColor="white"
-                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
-                >
+              <View style={{ width: 100, alignItems: 'center', marginRight: 8 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
                   {getStreakInfo().current}
-                </ThemedText>
-                <ThemedText
-                  variant="bodySmall"
-                  lightColor="rgba(255,255,255,0.8)"
-                  darkColor="rgba(255,255,255,0.8)"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  style={{ textAlign: 'center' }}
-                >
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, marginTop: 4 }}>
                   Dni z rzędu
-                </ThemedText>
+                </Text>
               </View>
-              <View style={{ flex: 1, minWidth: 0, alignItems: 'center' }}>
-                <ThemedText
-                  variant="titleMedium"
-                  lightColor="white"
-                  darkColor="white"
-                  style={{ fontWeight: '600', fontFamily: Fonts.mono }}
-                >
+              <View style={{ width: 100, alignItems: 'center' }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 18, fontWeight: '700' }}>
                   {getTodaysActivityCount()}
-                </ThemedText>
-                <ThemedText
-                  variant="bodySmall"
-                  lightColor="rgba(255,255,255,0.8)"
-                  darkColor="rgba(255,255,255,0.8)"
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.7}
-                  style={{ textAlign: 'center' }}
-                >
+                </Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, marginTop: 4 }}>
                   Aktywności
-                </ThemedText>
+                </Text>
               </View>
             </View>
           </LinearGradient>
@@ -373,7 +336,7 @@ export default function HomeScreen() {
         <ModernCard
           gradient
           elevation={2}
-          padding="md"
+          padding="lg"
           style={{
             marginBottom: DesignSystem.spacing.md
           }}
@@ -384,22 +347,20 @@ export default function HomeScreen() {
           >
             Szybkie akcje
           </ThemedText>
-          <View style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            columnGap: DesignSystem.spacing.sm,
-            rowGap: DesignSystem.spacing.md,
-          }}>
-            <View style={{ width: '48%', minWidth: 0 }}>
+          <View
+            style={{ flexDirection: 'row', marginBottom: DesignSystem.spacing.md }}
+            onLayout={(e) => setQuickActionsRowWidth(e.nativeEvent.layout.width)}
+          >
+            <View style={{ width: quickActionsColumnWidth, marginRight: 8 }}>
               <ModernButton
                 title="Nagraj"
                 size="medium"
                 fullWidth
-                leftIcon={<IconSymbol name="mic.fill" size={16} color="white" />}
+                leftIcon={<IconSymbol name="mic.fill" size={16} color={colors.onAccent} />}
                 onPress={() => handleQuickAction('record')}
               />
             </View>
-            <View style={{ width: '48%', minWidth: 0 }}>
+            <View style={{ width: quickActionsColumnWidth }}>
               <ModernButton
                 title="Dodaj zadanie"
                 variant="secondary"
@@ -409,7 +370,9 @@ export default function HomeScreen() {
                 onPress={() => handleQuickAction('add-task')}
               />
             </View>
-            <View style={{ width: '48%', minWidth: 0 }}>
+          </View>
+          <View style={{ flexDirection: 'row', marginBottom: DesignSystem.spacing.sm }}>
+            <View style={{ width: quickActionsColumnWidth, marginRight: 8 }}>
               <ModernButton
                 title="Planuj dzień"
                 variant="ghost"
@@ -419,7 +382,7 @@ export default function HomeScreen() {
                 onPress={() => handleQuickAction('plan-now')}
               />
             </View>
-            <View style={{ width: '48%', minWidth: 0 }}>
+            <View style={{ width: quickActionsColumnWidth }}>
               <ModernButton
                 title="Przegląd dnia"
                 variant="ghost"

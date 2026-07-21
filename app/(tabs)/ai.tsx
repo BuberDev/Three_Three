@@ -10,11 +10,14 @@ import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useEnterpriseAIChat } from '@/hooks/use-enterprise-ai-chat';
 import { useAppStore } from '@/stores/app-store';
 
 export default function AIScreen() {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme];
     const [currentView, setCurrentView] = useState<'chat' | 'analytics'>('chat');
     const [showSettings, setShowSettings] = useState(false);
     const {
@@ -70,38 +73,46 @@ export default function AIScreen() {
             feature="ai_chat"
             screenTitle="AI Asystent"
         >
-            <View style={styles.container}>
-                <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <StatusBar
+                    barStyle={colorScheme === 'dark' ? 'light-content' : 'dark-content'}
+                    backgroundColor={colors.surface}
+                />
 
                 {/* Navigation Header */}
                 <View style={[
                     currentView === 'chat' && aiChat.currentSession ? styles.compactHeader : styles.navigationHeader,
-                    { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 5 : 10) }
+                    { paddingTop: insets.top + (currentView === 'chat' && aiChat.currentSession ? 5 : 10) },
+                    { backgroundColor: colors.surface, borderBottomColor: colors.border }
                 ]}>
                     {!(currentView === 'chat' && aiChat.currentSession) && (
                         <View style={styles.navContent}>
-                            <IconSymbol name="brain" size={32} color={Colors.light.tint} />
-                            <ThemedText variant="headlineMedium" style={styles.navTitle}>
+                            <IconSymbol name="brain" size={32} color={colors.tint} />
+                            <ThemedText variant="headlineMedium" style={[styles.navTitle, { color: colors.tint }]}>
                                 AI Assistant
                             </ThemedText>
                         </View>
                     )}
 
                     <View style={styles.headerMain}>
-                        <View style={currentView === 'chat' && aiChat.currentSession ? styles.compactTabs : styles.navTabs}>
+                        <View style={[
+                            currentView === 'chat' && aiChat.currentSession ? styles.compactTabs : styles.navTabs,
+                            { backgroundColor: colors.backgroundSecondary }
+                        ]}>
                             <TouchableOpacity
-                                style={[styles.navTab, currentView === 'chat' && styles.activeNavTab]}
+                                style={[styles.navTab, currentView === 'chat' && { backgroundColor: colors.tint }]}
                                 onPress={() => setCurrentView('chat')}
                             >
                                 <IconSymbol
                                     name="message.circle.fill"
                                     size={currentView === 'chat' && aiChat.currentSession ? 14 : 20}
-                                    color={currentView === 'chat' ? '#fff' : Colors.light.tint}
+                                    color={currentView === 'chat' ? colors.onAccent : colors.tint}
                                 />
                                 {!(currentView === 'chat' && aiChat.currentSession) && (
                                     <ThemedText style={[
                                         styles.navTabText,
-                                        currentView === 'chat' && styles.activeNavTabText
+                                        { color: colors.tint },
+                                        currentView === 'chat' && { color: colors.onAccent }
                                     ]}>
                                         Chat
                                     </ThemedText>
@@ -109,18 +120,19 @@ export default function AIScreen() {
                             </TouchableOpacity>
 
                             <TouchableOpacity
-                                style={[styles.navTab, currentView === 'analytics' && styles.activeNavTab]}
+                                style={[styles.navTab, currentView === 'analytics' && { backgroundColor: colors.tint }]}
                                 onPress={() => setCurrentView('analytics')}
                             >
                                 <IconSymbol
                                     name="chart.bar.fill"
                                     size={currentView === 'analytics' && aiChat.currentSession ? 14 : 20}
-                                    color={currentView === 'analytics' ? '#fff' : Colors.light.tint}
+                                    color={currentView === 'analytics' ? colors.onAccent : colors.tint}
                                 />
                                 {!(currentView === 'chat' && aiChat.currentSession) && (
                                     <ThemedText style={[
                                         styles.navTabText,
-                                        currentView === 'analytics' && styles.activeNavTabText
+                                        { color: colors.tint },
+                                        currentView === 'analytics' && { color: colors.onAccent }
                                     ]}>
                                         Analiza
                                     </ThemedText>
@@ -142,7 +154,7 @@ export default function AIScreen() {
                                         <ThemedText style={styles.betaBadgeText}>BETA</ThemedText>
                                     </View>
                                     {!(currentView === 'chat' && aiChat.currentSession) && (
-                                        <ThemedText style={[styles.navTabText, styles.betaTabText]}>
+                                        <ThemedText style={[styles.navTabText, { color: colors.tint }, styles.betaTabText]}>
                                             AI Lab
                                         </ThemedText>
                                     )}
@@ -153,7 +165,7 @@ export default function AIScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.settingsButton,
-                                { borderColor: Colors.light.tint + '30' },
+                                { borderColor: colors.tint + '30' },
                                 currentView === 'chat' && aiChat.currentSession && styles.compactSettingsButton
                             ]}
                             onPress={() => setShowSettings(true)}
@@ -161,7 +173,7 @@ export default function AIScreen() {
                             <IconSymbol
                                 name="gear"
                                 size={currentView === 'chat' && aiChat.currentSession ? 14 : 18}
-                                color={Colors.light.tint}
+                                color={colors.tint}
                             />
                         </TouchableOpacity>
                     </View>
@@ -215,14 +227,11 @@ export default function AIScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#FFFFFF',
     },
     navigationHeader: {
-        backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,
         paddingBottom: 16,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -257,7 +266,6 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     navTitle: {
-        color: Colors.light.tint,
         fontWeight: '700',
     },
     headerMain: {
@@ -277,7 +285,6 @@ const styles = StyleSheet.create({
     },
     navTabs: {
         flexDirection: 'row',
-        backgroundColor: '#f8f9fa',
         borderRadius: 12,
         padding: 4,
     },
@@ -285,14 +292,12 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     compactHeader: {
-        backgroundColor: 'white',
         paddingHorizontal: 20,
         paddingBottom: 8,
 
     },
     compactTabs: {
         flexDirection: 'row',
-        backgroundColor: '#f8f9fa',
         borderRadius: 8,
         padding: 2,
         height: 32,
@@ -309,16 +314,9 @@ const styles = StyleSheet.create({
         gap: 4,
         minWidth: 36,
     },
-    activeNavTab: {
-        backgroundColor: Colors.light.tint,
-    },
     navTabText: {
         fontSize: 14,
         fontWeight: '600',
-        color: Colors.light.tint,
-    },
-    activeNavTabText: {
-        color: '#fff',
     },
     compactSettingsButton: {
         width: 32,

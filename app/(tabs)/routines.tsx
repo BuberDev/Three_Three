@@ -12,6 +12,7 @@ import { SubscriptionGate } from '@/components/subscription/subscription-gate';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors, DesignSystem } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
 import { CreateHabitDto, HabitStatus, Task } from '@/lib/types';
 import { useAppStore } from '@/stores/app-store';
 
@@ -376,6 +377,8 @@ function AddTaskModal({ visible, onClose, onAdd }: AddTaskModalProps) {
 
 export default function RoutinesScreen() {
     const insets = useSafeAreaInsets();
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme];
     const { tasks, todaysTasks, loadTasks, addTask, addHabit } = useAppStore();
     const [currentView, setCurrentView] = React.useState<ViewType>('routines');
     const [activeFilter, setActiveFilter] = React.useState<FilterType>('all');
@@ -499,34 +502,34 @@ export default function RoutinesScreen() {
             feature="routines_screen"
             screenTitle="Ekran główny"
         >
-            <View style={styles.container}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
 
                 {/* Header */}
-                <View style={[styles.header, { paddingTop: insets.top + 20 }]}>
+                <View style={[styles.header, { paddingTop: insets.top + 20, backgroundColor: colors.surface }]}>
                     <View style={styles.headerContent}>
                         <View style={styles.headerLeft}>
                             <Pressable
                                 onPress={() => setShowSidebar(true)}
                                 style={({ pressed }) => [
                                     { padding: 4, borderRadius: 8 },
-                                    pressed && { backgroundColor: Colors.light.tint + '20' }
+                                    pressed && { backgroundColor: colors.tint + '20' }
                                 ]}
                                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                             >
-                                <IconSymbol name="list.bullet" size={28} color={Colors.light.tint} />
+                                <IconSymbol name="list.bullet" size={28} color={colors.tint} />
                             </Pressable>
                             <ThemedText variant="headlineMedium" style={styles.title}>
                                 Lista & Rutyny
                             </ThemedText>
                         </View>
                         <TouchableOpacity
-                            style={styles.addButton}
+                            style={[styles.addButton, { backgroundColor: colors.tint }]}
                             onPress={currentView === 'habits' ? handleAddHabit : handleAddTask}
                         >
                             <IconSymbol
                                 name={currentView === 'habits' ? "plus.circle.fill" : "paperplane.fill"}
                                 size={20}
-                                color="white"
+                                color={colors.onAccent}
                             />
                         </TouchableOpacity>
                     </View>
@@ -535,18 +538,19 @@ export default function RoutinesScreen() {
                     </ThemedText>
 
                     {/* View Tabs */}
-                    <View style={styles.viewTabs}>
+                    <View style={[styles.viewTabs, { backgroundColor: colors.backgroundSecondary }]}>
                         <TouchableOpacity
                             style={[
                                 styles.viewTab,
-                                currentView === 'routines' && styles.viewTabActive
+                                currentView === 'routines' && { backgroundColor: colors.surface, ...DesignSystem.elevation[1] }
                             ]}
                             onPress={() => setCurrentView('routines')}
                         >
                             <ThemedText
                                 style={[
                                     styles.viewTabText,
-                                    currentView === 'routines' && styles.viewTabTextActive
+                                    { color: colors.textSecondary },
+                                    currentView === 'routines' && { color: colors.tint, fontWeight: '600' }
                                 ]}
                             >
                                 Rutyny
@@ -555,14 +559,15 @@ export default function RoutinesScreen() {
                         <TouchableOpacity
                             style={[
                                 styles.viewTab,
-                                currentView === 'habits' && styles.viewTabActive
+                                currentView === 'habits' && { backgroundColor: colors.surface, ...DesignSystem.elevation[1] }
                             ]}
                             onPress={() => setCurrentView('habits')}
                         >
                             <ThemedText
                                 style={[
                                     styles.viewTabText,
-                                    currentView === 'habits' && styles.viewTabTextActive
+                                    { color: colors.textSecondary },
+                                    currentView === 'habits' && { color: colors.tint, fontWeight: '600' }
                                 ]}
                             >
                                 Nawyki
@@ -612,13 +617,13 @@ export default function RoutinesScreen() {
                             {/* Quick Actions */}
                             <View style={[styles.quickActionsSection, { paddingVertical: 12 }]}>
                                 <View style={styles.quickActionsRow}>
-                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddTask}>
-                                        <IconSymbol name="paperplane.fill" size={18} color={Colors.light.tint} />
-                                        <ThemedText style={styles.quickActionText}>Dodaj zadanie</ThemedText>
+                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10, backgroundColor: colors.surface }]} onPress={handleAddTask}>
+                                        <IconSymbol name="paperplane.fill" size={18} color={colors.tint} />
+                                        <ThemedText style={[styles.quickActionText, { color: colors.tint }]}>Dodaj zadanie</ThemedText>
                                     </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10 }]} onPress={handleAddRoutine}>
-                                        <IconSymbol name="brain" size={18} color={Colors.light.tint} />
-                                        <ThemedText style={styles.quickActionText}>Dodaj rutynę</ThemedText>
+                                    <TouchableOpacity style={[styles.quickActionButton, { paddingVertical: 10, backgroundColor: colors.surface }]} onPress={handleAddRoutine}>
+                                        <IconSymbol name="brain" size={18} color={colors.tint} />
+                                        <ThemedText style={[styles.quickActionText, { color: colors.tint }]}>Dodaj rutynę</ThemedText>
                                     </TouchableOpacity>
                                 </View>
                             </View>
@@ -644,11 +649,11 @@ export default function RoutinesScreen() {
                                         emptyMessage={`Brak zadań w kategorii "${filters.find(f => f.key === activeFilter)?.label}"`}
                                     />
                                 ) : (
-                                    <View style={styles.emptyState}>
+                                    <View style={[styles.emptyState, { backgroundColor: colors.surface }]}>
                                         <IconSymbol
                                             name={activeFilter === 'completed' ? 'list.bullet' : 'paperplane.fill'}
                                             size={48}
-                                            color="#ccc"
+                                            color={colors.iconSecondary}
                                         />
                                         <ThemedText style={styles.emptyTitle}>
                                             {activeFilter === 'completed' ? 'Brak wykonanych zadań' : 'Brak zadań'}
@@ -660,8 +665,8 @@ export default function RoutinesScreen() {
                                             }
                                         </ThemedText>
                                         {activeFilter !== 'completed' && (
-                                            <TouchableOpacity style={styles.emptyActionButton} onPress={handleAddTask}>
-                                                <ThemedText style={styles.emptyActionText}>Dodaj pierwsze zadanie</ThemedText>
+                                            <TouchableOpacity style={[styles.emptyActionButton, { backgroundColor: colors.tint }]} onPress={handleAddTask}>
+                                                <ThemedText style={[styles.emptyActionText, { color: colors.onAccent }]}>Dodaj pierwsze zadanie</ThemedText>
                                             </TouchableOpacity>
                                         )}
                                     </View>
@@ -673,8 +678,8 @@ export default function RoutinesScreen() {
                                 <ThemedText variant="titleMedium" style={styles.sectionTitle}>
                                     Rutyny
                                 </ThemedText>
-                                <View style={[styles.routinesPlaceholder, { paddingVertical: 16 }]}>
-                                    <IconSymbol name="brain" size={24} color="#ccc" />
+                                <View style={[styles.routinesPlaceholder, { paddingVertical: 16, backgroundColor: colors.surface }]}>
+                                    <IconSymbol name="brain" size={24} color={colors.iconSecondary} />
                                     <ThemedText style={[styles.placeholderText, { marginTop: 8 }]}>
                                         Funkcja rutyn zostanie wkrótce dodana
                                     </ThemedText>
@@ -824,7 +829,6 @@ const styles = StyleSheet.create({
     sectionTitle: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#333',
         marginBottom: 8,
     },
     prioritySelector: {
@@ -862,13 +866,11 @@ const styles = StyleSheet.create({
     // Original styles continue below
     container: {
         flex: 1,
-        backgroundColor: Colors.light.background,
     },
     header: {
         paddingHorizontal: 20,
         paddingTop: 60, // Will be overridden with dynamic style
         paddingBottom: 20,
-        backgroundColor: 'white',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -887,7 +889,6 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     title: {
-        color: '#333',
     },
     subtitle: {
         opacity: 0.7,
@@ -897,7 +898,6 @@ const styles = StyleSheet.create({
         width: 40,
         height: 40,
         borderRadius: 20,
-        backgroundColor: Colors.light.tint,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -966,7 +966,6 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingVertical: 12,
         paddingHorizontal: 16,
-        backgroundColor: 'white',
         borderRadius: 12,
         gap: 8,
         shadowColor: '#000',
@@ -976,7 +975,6 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     quickActionText: {
-        color: Colors.light.tint,
         fontSize: 14,
         fontWeight: '500',
     },
@@ -991,7 +989,6 @@ const styles = StyleSheet.create({
     routinesPlaceholder: {
         alignItems: 'center',
         padding: 32,
-        backgroundColor: 'white',
         borderRadius: 12,
         gap: 8,
     },
@@ -1070,7 +1067,6 @@ const styles = StyleSheet.create({
     emptyState: {
         alignItems: 'center',
         padding: 40,
-        backgroundColor: 'white',
         borderRadius: 12,
         gap: 12,
     },
@@ -1089,11 +1085,9 @@ const styles = StyleSheet.create({
         marginTop: 8,
         paddingHorizontal: 20,
         paddingVertical: 12,
-        backgroundColor: Colors.light.tint,
         borderRadius: 20,
     },
     emptyActionText: {
-        color: 'white',
         fontSize: 14,
         fontWeight: '500',
     },
@@ -1101,7 +1095,6 @@ const styles = StyleSheet.create({
     viewTabs: {
         flexDirection: 'row',
         marginTop: 16,
-        backgroundColor: '#f5f5f5',
         borderRadius: 12,
         padding: 4,
     },
@@ -1112,24 +1105,8 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         alignItems: 'center',
     },
-    viewTabActive: {
-        backgroundColor: 'white',
-        shadowColor: '#000',
-        shadowOffset: {
-            width: 0,
-            height: 1,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 2,
-        elevation: 2,
-    },
     viewTabText: {
         fontSize: 14,
         fontWeight: '500',
-        color: '#666',
-    },
-    viewTabTextActive: {
-        color: Colors.light.tint,
-        fontWeight: '600',
     },
 });

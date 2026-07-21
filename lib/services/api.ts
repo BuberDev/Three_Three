@@ -36,7 +36,7 @@ export class ApiService {
     private authToken: string | null = null;
     private backendAvailable: boolean | null = null;
     private lastBackendCheck: number = 0;
-    private readonly BACKEND_CHECK_INTERVAL = 30000; // 30 seconds
+    private readonly BACKEND_CHECK_INTERVAL = 10000; // 10 seconds — short enough that one bad check doesn't lock out retries for long
     private hasLoggedBackendUnavailable = false;
 
     private constructor() { }
@@ -68,7 +68,7 @@ export class ApiService {
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
 
             // Use simple GET to base API path since /health doesn't exist
             const response = await fetch(`${this.baseURL.replace('/api', '')}`, {
@@ -204,10 +204,6 @@ export class ApiService {
 
     public async uploadVoiceNote(audioUri: string, duration?: number, title?: string, tags?: string[]): Promise<ApiResponse<VoiceNoteResponse>> {
         try {
-            if (!await this.checkBackendAvailability()) {
-                throw new NetworkError('Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.');
-            }
-
             console.log('📄 Audio URI to upload:', audioUri);
 
             // Check if file exists and get its info
@@ -497,10 +493,6 @@ export class ApiService {
     // Activity tracking methods
     public async uploadVoiceNoteWithContext(audioUri: string, context?: string, title?: string): Promise<ApiResponse<VoiceNoteResponse & { extractedActivities?: any[] }>> {
         try {
-            if (!await this.checkBackendAvailability()) {
-                throw new NetworkError('Nie udało się połączyć z serwerem. Spróbuj ponownie za chwilę.');
-            }
-
             const formData = new FormData();
             formData.append('audio', {
                 uri: audioUri,

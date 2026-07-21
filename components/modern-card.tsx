@@ -33,6 +33,8 @@ export function ModernCard({
     const surfaceSecondary = useThemeColor({}, 'surfaceSecondary');
 
     const baseStyle = {
+        width: '100%' as const,
+        alignSelf: 'stretch' as const,
         borderRadius: DesignSystem.borderRadius[borderRadius],
         padding: DesignSystem.spacing[padding],
         ...getElevation(colorScheme, elevation),

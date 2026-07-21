@@ -104,6 +104,7 @@ export function ModernButton({
                 disabled={disabled || loading}
                 activeOpacity={0.85}
                 style={[
+                    { minHeight: sizeStyles[size].minHeight },
                     fullWidth && { width: '100%' },
                     style,
                 ]}
@@ -125,32 +126,27 @@ export function ModernButton({
                         } : null,
                     ]}
                 >
-                    {leftIcon && <View style={{ marginRight: DesignSystem.spacing.sm }}>{leftIcon}</View>}
-                    {loading && (
-                        <ActivityIndicator
-                            size="small"
-                            color={contentColor}
-                            style={{ marginRight: DesignSystem.spacing.sm }}
-                        />
-                    )}
-                    <Text
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                        minimumFontScale={0.82}
-                        style={{
-                            flexShrink: 1,
-                            minWidth: 0,
-                            color: contentColor,
-                            fontSize: size === 'large' ? 16 : size === 'medium' ? 15 : 14,
-                            lineHeight: size === 'large' ? 22 : 20,
-                            fontWeight: '700',
-                            textAlign: 'center',
-                            includeFontPadding: false,
-                        }}
-                    >
-                        {title}
-                    </Text>
-                    {rightIcon && <View style={{ marginLeft: DesignSystem.spacing.sm }}>{rightIcon}</View>}
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {leftIcon && <View style={{ marginRight: DesignSystem.spacing.md }}>{leftIcon}</View>}
+                        {loading && (
+                            <ActivityIndicator
+                                size="small"
+                                color={contentColor}
+                                style={{ marginRight: DesignSystem.spacing.sm }}
+                            />
+                        )}
+                        <Text
+                            style={{
+                                color: contentColor,
+                                fontSize: size === 'large' ? 16 : size === 'medium' ? 15 : 14,
+                                fontWeight: '700',
+                                textAlign: 'center',
+                            }}
+                        >
+                            {title}
+                        </Text>
+                        {rightIcon && <View style={{ marginLeft: DesignSystem.spacing.sm }}>{rightIcon}</View>}
+                    </View>
                 </LinearGradient>
             </TouchableOpacity>
         );

@@ -61,6 +61,7 @@ export default function CompletionScreen({ onComplete, userName }: Readonly<Comp
                     {/* Welcome Message */}
                     <View style={styles.textContainer}>
                         <ThemedText
+                            variant="headlineMedium"
                             numberOfLines={2}
                             adjustsFontSizeToFit
                             minimumFontScale={0.72}

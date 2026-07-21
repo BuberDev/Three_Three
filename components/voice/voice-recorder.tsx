@@ -9,6 +9,7 @@ import {
     View,
 } from 'react-native';
 import { Colors } from '../../constants/theme';
+import { useColorScheme } from '../../hooks/use-color-scheme';
 import { useVoiceRecording } from '../../hooks/use-voice-recording';
 import { AudioRecording } from '../../lib/types';
 
@@ -33,6 +34,9 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
         recordOnly,
         isProcessingVoiceNote,
     } = useVoiceRecording();
+
+    const colorScheme = useColorScheme();
+    const colors = Colors[colorScheme];
 
     const pulseAnimation = React.useRef(new Animated.Value(1)).current;
 
@@ -112,46 +116,48 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
     }[size];
 
     const getButtonContent = () => {
+        const iconColor = (disabled || !canRecord) ? colors.textSecondary : colors.onAccent;
+
         if (isProcessingVoiceNote) {
-            return <Ionicons name="hourglass" size={iconSize} color="white" />;
+            return <Ionicons name="hourglass" size={iconSize} color={iconColor} />;
         }
 
         if (isRecording) {
-            return <Ionicons name="stop" size={iconSize} color="white" />;
+            return <Ionicons name="stop" size={iconSize} color={iconColor} />;
         }
 
-        return <Ionicons name="mic" size={iconSize} color="white" />;
+        return <Ionicons name="mic" size={iconSize} color={iconColor} />;
     };
 
     const getGradientColors = (): [string, string] => {
         if (disabled || !canRecord) {
-            return [Colors.light.tabIconDefault, Colors.light.tabIconDefault];
+            return [colors.backgroundTertiary, colors.backgroundTertiary];
         }
 
         if (isRecording) {
-            return ['#FF6B6B', '#FF5252'];
+            return [colors.error, colors.error];
         }
 
         if (isProcessingVoiceNote) {
-            return ['#FFA726', '#FF9800'];
+            return [colors.secondary, colors.secondaryLight];
         }
 
-        return ['#4CAF50', '#45A049'];
+        return [colors.primary, colors.primaryLight];
     };
 
     return (
         <View style={styles.container}>
             {isRecording && (
-                <View style={styles.recordingIndicator}>
-                    <View style={styles.recordingDot} />
-                    <Text style={styles.recordingText}>
+                <View style={[styles.recordingIndicator, { backgroundColor: colors.error + '1A' }]}>
+                    <View style={[styles.recordingDot, { backgroundColor: colors.error }]} />
+                    <Text style={[styles.recordingText, { color: colors.error }]}>
                         Nagrywanie {formatDuration(duration)}
                     </Text>
                 </View>
             )}
 
             {isProcessingVoiceNote && (
-                <Text style={styles.processingText}>
+                <Text style={[styles.processingText, { color: colors.textSecondary }]}>
                     Przetwarzanie notatki głosowej...
                 </Text>
             )}
@@ -192,7 +198,7 @@ export const VoiceRecorder: React.FC<VoiceRecorderProps> = ({
             </Animated.View>
 
             {!canRecord && (
-                <Text style={styles.permissionText}>
+                <Text style={[styles.permissionText, { color: colors.textSecondary }]}>
                     Włącz dostęp do mikrofonu, aby nagrywać
                 </Text>
             )}
@@ -230,30 +236,25 @@ const styles = StyleSheet.create({
         marginBottom: 20,
         paddingHorizontal: 16,
         paddingVertical: 8,
-        backgroundColor: 'rgba(255, 107, 107, 0.1)',
         borderRadius: 20,
     },
     recordingDot: {
         width: 8,
         height: 8,
         borderRadius: 4,
-        backgroundColor: '#FF6B6B',
         marginRight: 8,
     },
     recordingText: {
         fontSize: 14,
-        color: '#FF6B6B',
         fontWeight: '600',
     },
     processingText: {
         fontSize: 14,
-        color: Colors.light.tabIconDefault,
         marginBottom: 16,
         textAlign: 'center',
     },
     permissionText: {
         fontSize: 12,
-        color: Colors.light.tabIconDefault,
         marginTop: 16,
         textAlign: 'center',
         paddingHorizontal: 20,
