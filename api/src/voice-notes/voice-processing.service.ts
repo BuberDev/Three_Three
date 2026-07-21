@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import OpenAI from 'openai';
 import * as path from 'path';
+import { AudioTranscriptionService } from '../audio-transcription/audio-transcription.service';
 
 export interface VoiceProcessingResult {
     transcription: string;
@@ -24,7 +25,10 @@ export class VoiceProcessingService {
     private readonly ollamaModel: string;
     private readonly ollama: OpenAI;
 
-    constructor(private readonly configService: ConfigService) {
+    constructor(
+        private readonly configService: ConfigService,
+        private readonly audioTranscriptionService: AudioTranscriptionService,
+    ) {
         this.ollamaModel = this.configService.get<string>('app.ollama.model');
         this.ollama = new OpenAI({
             apiKey: 'ollama',
@@ -61,18 +65,9 @@ export class VoiceProcessingService {
 
     private async transcribeAudio(audioFilePath: string): Promise<string> {
         try {
-            // Note: OpenRouter free models don't include Whisper for audio transcription
-            // Using placeholder transcription for now
-
-            const filename = path.basename(audioFilePath);
-            const placeholderText = `Placeholder transcription for ${filename}. ` +
-                `W przyszłości można użyć lokalnego modelu transkrypcji lub płatnej usługi.`;
-
-            this.logger.warn('Using placeholder transcription - Whisper not available in OpenRouter free tier');
-            return placeholderText;
-
+            return await this.audioTranscriptionService.transcribe(audioFilePath, 'pl');
         } catch (error) {
-            this.logger.error('Transcription placeholder failed:', error);
+            this.logger.error('Transcription failed:', error);
             throw new Error(`Transcription failed: ${error.message}`);
         }
     }

@@ -1,6 +1,7 @@
 import { BullModule } from '@nestjs/bull';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AudioTranscriptionModule } from '../audio-transcription/audio-transcription.module';
 import { EventsModule } from '../events/events.module';
 import { UsersModule } from '../users/users.module';
 import { VoiceNote } from './entities/voice-note.entity';
@@ -17,6 +18,7 @@ import { VoiceProcessingService } from './voice-processing.service';
         }),
         UsersModule,
         EventsModule,
+        AudioTranscriptionModule,
     ],
     controllers: [VoiceNotesController],
     providers: [
