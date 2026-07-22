@@ -8,11 +8,11 @@ export interface SleepRecord {
     recordingStartTime: string;
     recordingEndTime: string;
     sleepDurationHours: number;
-    sleepQuality: number; // This will be mapped from sleepQualityScore
+    sleepQualityScore: number;
     sleepEfficiency: number;
     restfulnessScore: number;
     snoringDetected: boolean;
-    snoringIntensity: 'NONE' | 'LIGHT' | 'MODERATE' | 'HEAVY'; // UI uses uppercase for display
+    snoringIntensity: 'none' | 'light' | 'moderate' | 'heavy';
     sleepTalkingDetected: boolean;
     sleepTalkingFrequency: number;
     awakeningsCount: number;
@@ -252,7 +252,7 @@ class SleepApiService {
         // Process trends
         const qualityTrend = records.map(record => ({
             date: record.sleepDate,
-            quality: record.sleepQuality || 0
+            quality: record.sleepQualityScore || 0
         })).reverse();
 
         const durationTrend = records.map(record => ({
@@ -267,14 +267,14 @@ class SleepApiService {
 
         const snoringTrend = records.map(record => ({
             date: record.sleepDate,
-            intensity: record.snoringIntensity || 'NONE'
+            intensity: record.snoringIntensity || 'none'
         })).reverse();
 
         // Calculate weekly averages
         const recentWeek = records.slice(0, 7);
         const weeklyAverages = {
             avgDuration: recentWeek.reduce((sum, r) => sum + (r.sleepDurationHours || 0), 0) / recentWeek.length,
-            avgQuality: recentWeek.reduce((sum, r) => sum + (r.sleepQuality || 0), 0) / recentWeek.length,
+            avgQuality: recentWeek.reduce((sum, r) => sum + (r.sleepQualityScore || 0), 0) / recentWeek.length,
             avgEfficiency: recentWeek.reduce((sum, r) => sum + (r.sleepEfficiency || 0), 0) / recentWeek.length,
             snoringNights: recentWeek.filter(r => r.snoringDetected).length,
         };

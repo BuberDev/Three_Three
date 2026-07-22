@@ -119,33 +119,18 @@ export default function SleepScreen() {
 
                                     const analysis = await stopSleepRecording();
                                     if (analysis) {
-                                        // Save sleep session to backend
-                                        const sleepRecordData = {
-                                            sleepDate: new Date().toISOString().split('T')[0],
-                                            recordingStartTime: sleepConfig.startTime.toISOString(),
-                                            recordingEndTime: new Date().toISOString(),
-                                            sleepDurationHours: analysis.totalSleepDuration / (1000 * 60 * 60),
-                                            sleepQualityScore: analysis.sleepQuality,
-                                            snoringDetected: analysis.snoringEvents.length > 0,
-                                            snoringIntensity: (analysis.snoringEvents.length > 10 ? 'heavy' :
-                                                analysis.snoringEvents.length > 5 ? 'moderate' :
-                                                    analysis.snoringEvents.length > 0 ? 'light' : 'none') as 'heavy' | 'moderate' | 'light' | 'none',
-                                            sleepTalkingDetected: analysis.sleepTalkingEvents.length > 0,
-                                            sleepTalkingFrequency: analysis.sleepTalkingEvents.length,
-                                            analysisMetadata: {
-                                                sleepEfficiency: Math.min(100, (analysis.totalSleepDuration / (8 * 60 * 60 * 1000)) * 100)
-                                            }
-                                        };
-
-                                        const sleepRecord = await sleepApiService.createSleepRecord(sleepRecordData);
-
-                                        // Refresh data to show the new record
+                                        // The upload (inside stopSleepRecording) already created the
+                                        // SleepTracking record on the backend and queued it for real
+                                        // AI analysis — no separate record to create here. Posting one
+                                        // ourselves with these placeholder zero values used to collide
+                                        // with that record (same user+date) and get rejected by the
+                                        // backend's validation, which made it look like nothing saved.
                                         await fetchSleepData();
 
                                         Alert.alert(
-                                            '🌅 Analiza snu zakończona!',
-                                            `Jakość snu: ${analysis.sleepQuality}/10\nCzas snu: ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin\nChrapanie: ${analysis.snoringEvents.length} epizodów`,
-                                            [{ text: 'Zobacz więcej', onPress: () => fetchSleepData() }, { text: 'OK' }]
+                                            '🌙 Nagrywanie zakończone',
+                                            `Nagrano ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin. Analiza snu jest przetwarzana i pojawi się tutaj za chwilę.`,
+                                            [{ text: 'Odśwież', onPress: () => fetchSleepData() }, { text: 'OK' }]
                                         );
                                     }
                                 } catch (error) {
@@ -257,20 +242,20 @@ export default function SleepScreen() {
 
     const getSnoringIntensityText = (intensity: string) => {
         switch (intensity) {
-            case 'NONE': return 'Brak';
-            case 'LIGHT': return 'Słabe';
-            case 'MODERATE': return 'Umiarkowane';
-            case 'HEAVY': return 'Silne';
+            case 'none': return 'Brak';
+            case 'light': return 'Słabe';
+            case 'moderate': return 'Umiarkowane';
+            case 'heavy': return 'Silne';
             default: return 'Nieznane';
         }
     };
 
     const getSnoringIntensityColor = (intensity: string) => {
         switch (intensity) {
-            case 'NONE': return colors.success;
-            case 'LIGHT': return colors.warning;
-            case 'MODERATE': return colors.error;
-            case 'HEAVY': return colors.error;
+            case 'none': return colors.success;
+            case 'light': return colors.warning;
+            case 'moderate': return colors.error;
+            case 'heavy': return colors.error;
             default: return colors.text;
         }
     };
@@ -545,14 +530,14 @@ export default function SleepScreen() {
 
                             <View style={styles.analysisItem}>
                                 <View style={[styles.analysisIconContainer, { backgroundColor: colors.primary + '15' }]}>
-                                    <IconSymbol name="star" size={20} color={getQualityColor(latestSleepRecord.sleepQuality)} />
+                                    <IconSymbol name="star" size={20} color={getQualityColor(latestSleepRecord.sleepQualityScore)} />
                                 </View>
                                 <View>
                                     <Text style={[styles.analysisLabel, { color: colors.textSecondary }]}>
                                         Jakość snu
                                     </Text>
-                                    <Text style={[styles.analysisValue, { color: getQualityColor(latestSleepRecord.sleepQuality) }]}>
-                                        {latestSleepRecord.sleepQuality}/10
+                                    <Text style={[styles.analysisValue, { color: getQualityColor(latestSleepRecord.sleepQualityScore) }]}>
+                                        {latestSleepRecord.sleepQualityScore}/10
                                     </Text>
                                 </View>
                             </View>
@@ -686,8 +671,8 @@ export default function SleepScreen() {
                                     <Text style={[styles.historyDuration, { color: colors.primary }]}>
                                         {formatSleepDuration(record.sleepDurationHours)}
                                     </Text>
-                                    <Text style={[styles.historyQuality, { color: getQualityColor(record.sleepQuality) }]}>
-                                        {record.sleepQuality}/10
+                                    <Text style={[styles.historyQuality, { color: getQualityColor(record.sleepQualityScore) }]}>
+                                        {record.sleepQualityScore}/10
                                     </Text>
                                     <View style={styles.historyIndicators}>
                                         {record.snoringDetected && (
