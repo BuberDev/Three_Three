@@ -132,6 +132,16 @@ export default function SleepScreen() {
                                             `Nagrano ${(analysis.totalSleepDuration / (1000 * 60 * 60)).toFixed(1)} godzin. Analiza snu jest przetwarzana i pojawi się tutaj za chwilę.`,
                                             [{ text: 'Odśwież', onPress: () => fetchSleepData() }, { text: 'OK' }]
                                         );
+                                    } else {
+                                        // stopSleepRecording() failed internally (e.g. the upload
+                                        // errored out) and already reported it via setError — but
+                                        // that error can be easy to miss, so also make it explicit
+                                        // that nothing was saved rather than silently doing nothing.
+                                        Alert.alert(
+                                            '⚠️ Nie udało się zapisać nagrania',
+                                            'Przesłanie nagrania snu na serwer nie powiodło się. Analiza nie została zapisana — spróbuj ponownie przy lepszym połączeniu.',
+                                            [{ text: 'OK' }]
+                                        );
                                     }
                                 } catch (error) {
                                     console.error('Error stopping sleep recording:', error);

@@ -191,67 +191,53 @@ function isCurrentlyNightTime(): boolean {
 }
 
 async function processSleepRecording(recording: any): Promise<SleepAnalysis> {
-    try {
-        const authToken = ApiService.getInstance().getAuthToken();
+    const authToken = ApiService.getInstance().getAuthToken();
 
-        const formData = new FormData();
-        formData.append('audio', {
-            uri: recording.uri,
-            type: 'audio/m4a',
-            name: 'sleep_recording.m4a',
-        } as any);
-        formData.append('bedtime', new Date(recording.startTime || Date.now() - recording.duration).toISOString());
-        formData.append('wakeTime', new Date().toISOString());
+    const formData = new FormData();
+    formData.append('audio', {
+        uri: recording.uri,
+        type: 'audio/m4a',
+        name: 'sleep_recording.m4a',
+    } as any);
+    formData.append('bedtime', new Date(recording.startTime || Date.now() - recording.duration).toISOString());
+    formData.append('wakeTime', new Date().toISOString());
 
-        // Call the backend API for real AI analysis — audio is now actually
-        // uploaded (previously this sent recording.uri, a local device path,
-        // as a JSON string field; the server never received any audio).
-        const response = await fetch(`${getApiUrl()}/api/sleep-tracking/process-audio`, {
-            method: 'POST',
-            headers: {
-                ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-                // Don't set Content-Type - let fetch set it with the multipart boundary
-            },
-            body: formData,
-        });
+    // Call the backend API for real AI analysis — audio is now actually
+    // uploaded (previously this sent recording.uri, a local device path,
+    // as a JSON string field; the server never received any audio).
+    //
+    // Deliberately no catch-and-fake-success fallback here: a full night's
+    // recording can be a large multipart upload (100+ MB), and it used to
+    // silently fail (bad network, dropped connection, server error) while
+    // returning a fabricated local quality score that was never persisted.
+    // The caller (stopSleepRecording) showed a "success" alert either way,
+    // so failed uploads looked identical to real ones and nothing was ever
+    // saved server-side. Throwing here lets stopSleepRecording's existing
+    // catch surface the real error instead.
+    const response = await fetch(`${getApiUrl()}/api/sleep-tracking/process-audio`, {
+        method: 'POST',
+        headers: {
+            ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+            // Don't set Content-Type - let fetch set it with the multipart boundary
+        },
+        body: formData,
+    });
 
-        if (!response.ok) {
-            throw new Error(`API call failed: ${response.statusText}`);
-        }
-
-        await response.json();
-
-        // Analysis runs async on the server now (it can take a while for a
-        // full night's recording) — this just confirms the upload succeeded.
-        // The real results populate sleepRecord.snoringDetected etc. later;
-        // callers should re-fetch via getSleepInsights / findLatest once
-        // processingStatus is 'completed'.
-        return {
-            snoringEvents: [],
-            sleepTalkingEvents: [],
-            totalSleepDuration: recording.duration,
-            sleepQuality: 0,
-        };
-
-    } catch (error) {
-        console.warn('AI sleep analysis failed, using fallback:', error);
-
-        // Fallback to local processing if API fails
-        const actualDuration = recording?.duration || 0;
-        const durationMinutes = actualDuration / (1000 * 60);
-        const baseQuality = Math.min(10, Math.max(1, 5 + (durationMinutes / 60)));
-
-        return {
-            snoringEvents: durationMinutes > 10 ? [
-                {
-                    timestamp: new Date(Date.now() - (actualDuration / 2)),
-                    duration: 30,
-                    intensity: 'light',
-                }
-            ] : [],
-            sleepTalkingEvents: [],
-            totalSleepDuration: actualDuration,
-            sleepQuality: Number(baseQuality.toFixed(1)),
-        };
+    if (!response.ok) {
+        throw new Error(`API call failed: ${response.statusText}`);
     }
+
+    await response.json();
+
+    // Analysis runs async on the server now (it can take a while for a
+    // full night's recording) — this just confirms the upload succeeded.
+    // The real results populate sleepRecord.snoringDetected etc. later;
+    // callers should re-fetch via getSleepInsights / findLatest once
+    // processingStatus is 'completed'.
+    return {
+        snoringEvents: [],
+        sleepTalkingEvents: [],
+        totalSleepDuration: recording.duration,
+        sleepQuality: 0,
+    };
 }

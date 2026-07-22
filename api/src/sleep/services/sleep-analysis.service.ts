@@ -5,6 +5,7 @@ import { OpenAI } from 'openai';
 import { Repository } from 'typeorm';
 import { AudioTranscriptionService } from '../../audio-transcription/audio-transcription.service';
 import { SleepEvent, SleepEventIntensity, SleepEventType } from '../entities/sleep-event.entity';
+import { SnoringIntensity } from '../entities/sleep-tracking.entity';
 
 interface AudioSegment {
     startTime: number; // seconds
@@ -257,14 +258,14 @@ export class SleepAnalysisService {
             e.intensity === SleepEventIntensity.HIGH || e.intensity === SleepEventIntensity.VERY_HIGH
         ).length;
 
-        let snoringIntensity = 'NONE';
+        let snoringIntensity: SnoringIntensity = SnoringIntensity.NONE;
         if (snoringEvents.length > 0) {
             if (highIntensitySnoringCount > snoringEvents.length / 2) {
-                snoringIntensity = 'HEAVY';
+                snoringIntensity = SnoringIntensity.HEAVY;
             } else if (snoringEvents.length > 10) {
-                snoringIntensity = 'MODERATE';
+                snoringIntensity = SnoringIntensity.MODERATE;
             } else {
-                snoringIntensity = 'LIGHT';
+                snoringIntensity = SnoringIntensity.LIGHT;
             }
         }
 
