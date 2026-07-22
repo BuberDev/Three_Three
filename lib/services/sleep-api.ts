@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '@/lib/utils';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { unwrapApiEnvelope } from './api';
 
 export interface SleepRecord {
     id: string;
@@ -92,12 +93,18 @@ class SleepApiService {
         };
     }
 
-    private async handleResponse(response: Response) {
+    private async handleResponse<T>(response: Response): Promise<T> {
         if (!response.ok) {
             const error = await response.text();
             throw new Error(`HTTP ${response.status}: ${error}`);
         }
-        return response.json();
+        // The backend's global TransformInterceptor wraps every response as
+        // { success, data, timestamp } — unwrap it here so callers get the
+        // actual SleepRecord/SleepStats instead of the envelope. Every field
+        // on the record used to read as undefined (NaN durations, "Invalid
+        // Date", blank numbers) because this was returning the raw envelope.
+        const json = await response.json();
+        return unwrapApiEnvelope<T>(json);
     }
 
     /**
